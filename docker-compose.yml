@@ -1,0 +1,32 @@
+services:
+  mcraftr:
+    build: .
+    image: mcraftr:latest
+    container_name: mcraftr
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3054:3050"
+    env_file: .env
+    environment:
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@mcraftr-redis:6379
+    volumes:
+      - ./data:/app/data
+    networks:
+      - default
+      - minecraft
+    depends_on:
+      - mcraftr-redis
+
+  mcraftr-redis:
+    image: redis:7-alpine
+    container_name: mcraftr-redis
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no --requirepass ${REDIS_PASSWORD}
+    networks:
+      - default
+
+networks:
+  default:
+  minecraft:
+    external: true
+    name: code_default

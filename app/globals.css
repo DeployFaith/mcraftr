@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Dark theme (default) ─────────────────────────────────────────────────── */
+:root {
+  --bg:          #0d0d14;
+  --bg2:         #111119;
+  --panel:       #16161f;
+  --border:      #22223a;
+  --text:        #d8d8e8;
+  --text-dim:    #6a6a85;
+  --red:         #ff3355;
+  --accent:      #00ffc8;
+  --accent-dim:  color-mix(in srgb, var(--accent) 18%, transparent);
+  --accent-mid:  color-mix(in srgb, var(--accent) 40%, transparent);
+  --accent-glow: var(--accent);
+}
+
+/* ── Light theme ──────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg:       #f0f0f5;
+  --bg2:      #e8e8f0;
+  --panel:    #ffffff;
+  --border:   #d0d0e0;
+  --text:     #1a1a2e;
+  --text-dim: #707090;
+  --red:      #cc1133;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Glassmorphism card */
+.glass-card {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+[data-theme="light"] .glass-card {
+  background: rgba(255,255,255,0.7);
+  border: 1px solid var(--border);
+}
+
+/* Scanline overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+[data-theme="light"] body::before {
+  display: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

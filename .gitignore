@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Environment variables — never commit these
+.env
+.env.local
+.env.*.local
+
+# Database and persistent data
+data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# TypeScript incremental build info
+tsconfig.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
