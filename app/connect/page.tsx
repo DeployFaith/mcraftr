@@ -117,7 +117,7 @@ function ConnectForm() {
             <input
               type="text"
               value={host}
-              onChange={e => setHost(e.target.value)}
+              onChange={e => { setHost(e.target.value); setTestState('idle'); setTestMsg('') }}
               placeholder="play.yourserver.com or 192.168.1.100"
               className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
               style={{
@@ -142,7 +142,7 @@ function ConnectForm() {
             <input
               type="number"
               value={port}
-              onChange={e => setPort(e.target.value)}
+              onChange={e => { setPort(e.target.value); setTestState('idle'); setTestMsg('') }}
               className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
               style={{
                 background: 'var(--panel)',
@@ -163,7 +163,7 @@ function ConnectForm() {
             <input
               type="password"
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={e => { setPassword(e.target.value); setTestState('idle'); setTestMsg('') }}
               placeholder="Found in your server control panel"
               className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
               style={{

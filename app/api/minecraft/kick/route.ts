@@ -1,11 +1,13 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { logAudit } from '@/lib/audit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  if (!await getSessionUserId(req)) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const userId = await getSessionUserId(req)
+  if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   try {
     const { player, reason } = await req.json()
     if (!player || typeof player !== 'string') {
@@ -26,6 +28,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, error: result.error || 'Kick failed' })
     }
 
+    logAudit(userId, 'kick', player, cleanReason || undefined)
     return Response.json({ ok: true, message: `Kicked ${player}${cleanReason ? `: ${cleanReason}` : ''}` })
   } catch (e: unknown) {
     return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Server error' }, { status: 500 })

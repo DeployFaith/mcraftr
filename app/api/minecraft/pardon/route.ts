@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { logAudit } from '@/lib/audit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -8,7 +9,8 @@ export const dynamic = 'force-dynamic'
 const PLAYER_RE = /^\.?[a-zA-Z0-9_]{1,16}$/
 
 export async function POST(req: NextRequest) {
-  if (!await getSessionUserId(req)) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const userId = await getSessionUserId(req)
+  if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   try {
     const { player, pardonIp } = await req.json()
     if (!player || typeof player !== 'string') {
@@ -28,6 +30,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, error: failed[0].error || 'Pardon failed' })
     }
 
+    logAudit(userId, 'pardon', player)
     return Response.json({
       ok: true,
       message: `Pardoned ${player}${pardonIp ? ' (+ IP)' : ''}`,

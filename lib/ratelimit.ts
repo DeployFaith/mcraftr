@@ -22,7 +22,7 @@ async function getRedisClient() {
 // ── Limiter factory ───────────────────────────────────────────────────────────
 // Falls back to in-memory if Redis isn't available (dev / cold start).
 
-type LimiterKey = 'register' | 'login' | 'account' | 'rcon' | 'inventory'
+type LimiterKey = 'register' | 'login' | 'account' | 'rcon' | 'inventory' | 'broadcast'
 
 const LIMITS: Record<LimiterKey, { points: number; duration: number }> = {
   register:  { points: 5,   duration: 15 * 60 }, // 5 attempts per 15 min
@@ -30,6 +30,7 @@ const LIMITS: Record<LimiterKey, { points: number; duration: number }> = {
   account:   { points: 5,   duration: 15 * 60 }, // 5 attempts per 15 min
   rcon:      { points: 300, duration: 60 },        // 300 RCON commands per 60s per user (admin panel use)
   inventory: { points: 500, duration: 60 },       // per-slot inventory fetches (up to ~120 calls/fetch)
+  broadcast: { points: 10,  duration: 60 },       // 10 broadcasts per 60s
 }
 
 const _limiters = new Map<LimiterKey, RateLimiterAbstract>()

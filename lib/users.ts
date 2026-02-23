@@ -3,6 +3,7 @@ import path from 'path'
 import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 import Database from 'better-sqlite3'
+import { getDb } from './db'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,50 +91,26 @@ export function decryptPassword(stored: string): string {
 
 // ── Database setup ────────────────────────────────────────────────────────────
 
-const DATA_DIR   = process.env.DATA_DIR || '/app/data'
-const DB_FILE    = path.join(DATA_DIR, 'mcraftr.db')
+const DATA_DIR    = process.env.DATA_DIR || '/app/data'
 const LEGACY_JSON = path.join(DATA_DIR, 'users.json')
 
-let _db: Database.Database | null = null
+let _initialized = false
 
-function getDb(): Database.Database {
-  if (_db) return _db
-
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
-
-  _db = new Database(DB_FILE)
-  _db.pragma('journal_mode = WAL')
-  _db.pragma('foreign_keys = ON')
-
-  // Create tables
-  _db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id           TEXT PRIMARY KEY,
-      email        TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      role         TEXT NOT NULL DEFAULT 'user',
-      use_sidecar  INTEGER NOT NULL DEFAULT 0,
-      created_at   INTEGER NOT NULL DEFAULT (unixepoch())
-    );
-
-    CREATE TABLE IF NOT EXISTS servers (
-      user_id      TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      host         TEXT NOT NULL,
-      port         INTEGER NOT NULL DEFAULT 25575,
-      password_enc TEXT NOT NULL
-    );
-  `)
+function initDb(): Database.Database {
+  const db = getDb()
+  if (_initialized) return db
+  _initialized = true
 
   // Migrate from users.json if it exists and DB is empty
-  migrateFromJson(_db)
+  migrateFromJson(db)
 
   // Re-encrypt any server passwords still using the legacy SHA-256 key
-  reEncryptLegacyPasswords(_db)
+  reEncryptLegacyPasswords(db)
 
   // Seed admin if table is still empty
-  seedAdmin(_db)
+  seedAdmin(db)
 
-  return _db
+  return db
 }
 
 // ── Re-encryption migration ───────────────────────────────────────────────────
@@ -269,7 +246,7 @@ function rowToUser(row: UserRow, serverRow: ServerRow | undefined | null): User 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export function getUserByEmail(email: string): User | undefined {
-  const db = getDb()
+  const db = initDb()
   const row = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as UserRow | undefined
   if (!row) return undefined
   const srv = db.prepare('SELECT * FROM servers WHERE user_id = ?').get(row.id) as ServerRow | undefined
@@ -277,7 +254,7 @@ export function getUserByEmail(email: string): User | undefined {
 }
 
 export function getUserById(id: string): User | undefined {
-  const db = getDb()
+  const db = initDb()
   const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined
   if (!row) return undefined
   const srv = db.prepare('SELECT * FROM servers WHERE user_id = ?').get(id) as ServerRow | undefined
@@ -285,7 +262,7 @@ export function getUserById(id: string): User | undefined {
 }
 
 export function updateUserServer(id: string, server: ServerConfig): User {
-  const db = getDb()
+  const db = initDb()
   const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined
   if (!row) throw new Error('User not found')
 
@@ -309,7 +286,7 @@ export function updateUserServer(id: string, server: ServerConfig): User {
 }
 
 export function clearUserServer(id: string): User {
-  const db = getDb()
+  const db = initDb()
   const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined
   if (!row) throw new Error('User not found')
   db.prepare('DELETE FROM servers WHERE user_id = ?').run(id)
@@ -317,7 +294,7 @@ export function clearUserServer(id: string): User {
 }
 
 export function createUser(email: string, password: string): User {
-  const db = getDb()
+  const db = initDb()
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
   if (existing) throw new Error('An account with that email already exists')
 
@@ -341,14 +318,14 @@ export function validatePassword(user: User, password: string): boolean {
 }
 
 export function updatePassword(id: string, newPassword: string): void {
-  const db = getDb()
+  const db = initDb()
   const hash = bcrypt.hashSync(newPassword, 10)
   const result = db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, id)
   if (result.changes === 0) throw new Error('User not found')
 }
 
 export function updateEmail(id: string, newEmail: string): void {
-  const db = getDb()
+  const db = initDb()
   const existing = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(newEmail, id)
   if (existing) throw new Error('That email is already in use')
   const result = db.prepare('UPDATE users SET email = ? WHERE id = ?').run(newEmail, id)
@@ -356,7 +333,7 @@ export function updateEmail(id: string, newEmail: string): void {
 }
 
 export function deleteUser(id: string): void {
-  const db = getDb()
+  const db = initDb()
   // servers row cascades via FK ON DELETE CASCADE
   const result = db.prepare('DELETE FROM users WHERE id = ?').run(id)
   if (result.changes === 0) throw new Error('User not found')

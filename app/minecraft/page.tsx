@@ -21,11 +21,11 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 
 export default function MinecraftPage() {
   const { data: session } = useSession()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const role = (session as any)?.role as string | undefined
+  const role = session?.role
 
-  const [activeTab, setActiveTab] = useState<TabId>('players')
-  const [players,   setPlayers]   = useState<string[]>([])
+  const [activeTab,  setActiveTab]  = useState<TabId>('players')
+  const [players,    setPlayers]    = useState<string[]>([])
+  const [whitelist,  setWhitelist]  = useState<string[] | null>(null)
 
   const handlePlayersChange = useCallback((list: string[]) => {
     setPlayers(list)
@@ -58,9 +58,9 @@ export default function MinecraftPage() {
       {/* Section content */}
       <div className="flex-1 max-w-4xl mx-auto w-full px-4 py-4 pb-24 md:pb-6">
         {activeTab === 'players'  && <PlayersSection    onPlayersChange={handlePlayersChange} />}
-        {activeTab === 'actions'  && <ActionsSection    players={players} role={role} />}
+        {activeTab === 'actions'  && <ActionsSection    players={players} role={role} whitelist={whitelist} onWhitelistChange={setWhitelist} />}
         {activeTab === 'server'   && <ServerInfoSection />}
-        {activeTab === 'settings' && <SettingsSection   />}
+        {activeTab === 'settings' && <SettingsSection role={role} />}
       </div>
 
       {/* Mobile bottom nav */}
@@ -71,7 +71,7 @@ export default function MinecraftPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex flex-col items-center gap-1 py-3 transition-all ${
+              className={`relative flex-1 flex flex-col items-center gap-1 py-3 transition-all ${
                 activeTab === tab.id
                   ? 'text-[var(--accent)]'
                   : 'text-[var(--text-dim)]'

@@ -16,6 +16,8 @@ type RconEntry = { ts: number; cmd: string; output: string; ok: boolean }
 type Props = {
   players: string[]  // live player list from PlayersSection
   role?: string      // current user role — 'admin' shows RCON console
+  whitelist?: string[] | null
+  onWhitelistChange?: (wl: string[] | null) => void
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -79,7 +81,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function ActionsSection({ players, role }: Props) {
+export default function ActionsSection({ players, role, whitelist, onWhitelistChange }: Props) {
   const addToast = (variant: Toast['variant'], message: string) => {
     const id = Date.now()
     setToasts(prev => [...prev, { id, variant, message }])
@@ -90,15 +92,13 @@ export default function ActionsSection({ players, role }: Props) {
 
   const [toasts,    setToasts]   = useState<Toast[]>([])
   const [busyCmd,   setBusyCmd]  = useState<string | null>(null)
-  const [cmdPlayer,    setCmdPlayer]    = useState('')
-  const [kitCmdPlayer, setKitCmdPlayer] = useState('')
+  const [cmdPlayer, setCmdPlayer] = useState('')
 
   // Reset selections if players go offline
   useEffect(() => {
     if (players.length === 0) return
     if (cmdPlayer && !players.includes(cmdPlayer)) setCmdPlayer('')
-    if (kitCmdPlayer && !players.includes(kitCmdPlayer)) setKitCmdPlayer('')
-  }, [players, cmdPlayer, kitCmdPlayer])
+  }, [players, cmdPlayer])
 
   // ── Effects state ────────────────────────────────────────────────────────────
 
@@ -122,6 +122,13 @@ export default function ActionsSection({ players, role }: Props) {
     const interval = setInterval(() => fetchEffects(cmdPlayer), 8000)
     return () => clearInterval(interval)
   }, [cmdPlayer, fetchEffects])
+
+  // Clear pending effects debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (effectsTimerRef.current) clearTimeout(effectsTimerRef.current)
+    }
+  }, [])
 
   const isActive = (effectId: string) =>
     cmdPlayer ? (activeEffects[cmdPlayer]?.has(effectId) ?? false) : false
@@ -185,6 +192,25 @@ export default function ActionsSection({ players, role }: Props) {
   const [modPardonIp, setModPardonIp] = useState(false)
   const [modBusy,     setModBusy]     = useState<'kick' | 'ban' | 'pardon' | null>(null)
 
+  // ── Ban list ──────────────────────────────────────────────────────────────────
+
+  const [banListPlayers, setBanListPlayers] = useState<string[] | null>(null)
+  const [banListLoading, setBanListLoading] = useState(false)
+
+  const fetchBanList = async () => {
+    setBanListLoading(true)
+    try {
+      const r = await fetch('/api/minecraft/banlist')
+      const d = await r.json()
+      if (d.ok) setBanListPlayers(d.players ?? [])
+      else addToast('error', d.error || 'Failed to fetch ban list')
+    } catch (e) {
+      addToast('error', e instanceof Error ? e.message : 'Network error')
+    } finally {
+      setBanListLoading(false)
+    }
+  }
+
   // ── Op / Deop ─────────────────────────────────────────────────────────────────
 
   const [opBusy, setOpBusy] = useState<'op' | 'deop' | null>(null)
@@ -209,7 +235,12 @@ export default function ActionsSection({ players, role }: Props) {
 
   // ── Whitelist ─────────────────────────────────────────────────────────────────
 
-  const [wlPlayers,  setWlPlayers]  = useState<string[] | null>(null)
+  const [wlPlayers,  setWlPlayers_]  = useState<string[] | null>(whitelist ?? null)
+  const setWlPlayers = (v: string[] | null | ((prev: string[] | null) => string[] | null)) => {
+    setWlPlayers_(v)
+    const next = typeof v === 'function' ? v(wlPlayers) : v
+    onWhitelistChange?.(next)
+  }
   const [wlLoading,  setWlLoading]  = useState(false)
   const [wlInput,    setWlInput]    = useState('')
   const [wlBusy,     setWlBusy]     = useState<string | null>(null)
@@ -258,6 +289,32 @@ export default function ActionsSection({ players, role }: Props) {
   const [bcMessage, setBcMessage] = useState('')
   const [bcBusy,    setBcBusy]    = useState(false)
 
+  // ── Private message ──────────────────────────────────────────────────────────
+
+  const [msgManual, setMsgManual] = useState('')
+  const [msgText,   setMsgText]   = useState('')
+  const [msgBusy,   setMsgBusy]   = useState(false)
+
+  const sendPrivateMsg = async () => {
+    const player = cmdPlayer || msgManual.trim()
+    if (!player || !msgText.trim()) return
+    setMsgBusy(true)
+    try {
+      const r = await fetch('/api/minecraft/msg', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player, message: msgText }),
+      })
+      const d = await r.json()
+      addToast(d.ok ? 'ok' : 'error', d.ok ? d.message : (d.error || 'Failed'))
+      if (d.ok) setMsgText('')
+    } catch (e) {
+      addToast('error', e instanceof Error ? e.message : 'Network error')
+    } finally {
+      setMsgBusy(false)
+    }
+  }
+
   const sendBroadcast = async () => {
     if (!bcMessage.trim()) return
     setBcBusy(true)
@@ -286,6 +343,74 @@ export default function ActionsSection({ players, role }: Props) {
   const rconOutputRef = useRef<HTMLDivElement>(null)
   const rconInputRef  = useRef<HTMLInputElement>(null)
   const isAdmin = role === 'admin'
+
+  // ── Server Config (admin only) ───────────────────────────────────────────────
+
+  const [difficulty,     setDifficulty]     = useState<string | null>(null)
+  const [difficultyBusy, setDifficultyBusy] = useState<string | null>(null)
+  const [gamerules,      setGamerules]      = useState<Record<string, string> | null>(null)
+  const [gamerulesLoading, setGamerulesLoading] = useState(false)
+  const [grBusy,         setGrBusy]         = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isAdmin) return
+    fetch('/api/minecraft/difficulty').then(r => r.json()).then(d => {
+      if (d.ok) setDifficulty(d.current)
+    }).catch(() => {})
+  }, [isAdmin])
+
+  const fetchGamerules = async () => {
+    setGamerulesLoading(true)
+    try {
+      const r = await fetch('/api/minecraft/gamerule')
+      const d = await r.json()
+      if (d.ok) setGamerules(d.gamerules)
+      else addToast('error', d.error || 'Failed to load gamerules')
+    } catch (e) {
+      addToast('error', e instanceof Error ? e.message : 'Network error')
+    } finally {
+      setGamerulesLoading(false)
+    }
+  }
+
+  const setDifficultyCmd = async (diff: string) => {
+    setDifficultyBusy(diff)
+    try {
+      const r = await fetch('/api/minecraft/difficulty', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ difficulty: diff }),
+      })
+      const d = await r.json()
+      if (d.ok) { setDifficulty(diff); addToast('ok', d.message) }
+      else addToast('error', d.error || 'Failed')
+    } catch (e) {
+      addToast('error', e instanceof Error ? e.message : 'Network error')
+    } finally {
+      setDifficultyBusy(null)
+    }
+  }
+
+  const toggleGamerule = async (rule: string, currentVal: string) => {
+    const newVal = currentVal === 'true' ? 'false' : 'true'
+    setGrBusy(rule)
+    try {
+      const r = await fetch('/api/minecraft/gamerule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rule, value: newVal }),
+      })
+      const d = await r.json()
+      if (d.ok) {
+        setGamerules(prev => prev ? { ...prev, [rule]: newVal } : prev)
+        addToast('ok', d.message)
+      } else addToast('error', d.error || 'Failed')
+    } catch (e) {
+      addToast('error', e instanceof Error ? e.message : 'Network error')
+    } finally {
+      setGrBusy(null)
+    }
+  }
 
   // Load history from localStorage on mount
   useEffect(() => {
@@ -362,6 +487,10 @@ export default function ActionsSection({ players, role }: Props) {
 
   const kickPlayer = async () => {
     if (!modTarget) return
+    if (!/^\.?[a-zA-Z0-9_]{1,16}$/.test(modTarget.trim())) {
+      addToast('error', 'Invalid player name')
+      return
+    }
     setModBusy('kick')
     try {
       const r = await fetch('/api/minecraft/kick', {
@@ -381,6 +510,10 @@ export default function ActionsSection({ players, role }: Props) {
 
   const banPlayer = async () => {
     if (!modTarget) return
+    if (!/^\.?[a-zA-Z0-9_]{1,16}$/.test(modTarget.trim())) {
+      addToast('error', 'Invalid player name')
+      return
+    }
     if (!confirm(`Ban ${modTarget}? This will prevent them from rejoining.`)) return
     setModBusy('ban')
     try {
@@ -401,6 +534,10 @@ export default function ActionsSection({ players, role }: Props) {
 
   const pardonPlayer = async () => {
     if (!modTarget) return
+    if (!/^\.?[a-zA-Z0-9_]{1,16}$/.test(modTarget.trim())) {
+      addToast('error', 'Invalid player name')
+      return
+    }
     setModBusy('pardon')
     try {
       const r = await fetch('/api/minecraft/pardon', {
@@ -410,7 +547,7 @@ export default function ActionsSection({ players, role }: Props) {
       })
       const d = await r.json()
       addToast(d.ok ? 'ok' : 'error', d.ok ? d.message : (d.error || 'Pardon failed'))
-      if (d.ok) { setModTarget(''); setModPardonIp(false) }
+      if (d.ok) { setModTarget(''); setModPardonIp(false); if (banListPlayers !== null) fetchBanList() }
     } catch (e) {
       addToast('error', e instanceof Error ? e.message : 'Network error')
     } finally {
@@ -487,7 +624,7 @@ export default function ActionsSection({ players, role }: Props) {
   const [assigning,   setAssigning]   = useState(false)
 
   const assignKit = async () => {
-    const player = kitCmdPlayer || kitManual.trim()
+    const player = cmdPlayer || kitManual.trim()
     if (!player || !selectedKit) return
     setAssigning(true)
     try {
@@ -508,7 +645,6 @@ export default function ActionsSection({ players, role }: Props) {
 
   // ── Catalog ───────────────────────────────────────────────────────────────────
 
-  const [catPlayer,   setCatPlayer]   = useState('')
   const [catManual,   setCatManual]   = useState('')
   const [catCatId,    setCatCatId]    = useState(CATALOG[0].id)
   const [catPage,     setCatPage]     = useState(0)
@@ -518,14 +654,15 @@ export default function ActionsSection({ players, role }: Props) {
   const [catGiving,   setCatGiving]   = useState(false)
 
   const activeCat   = CATALOG.find(c => c.id === catCatId) ?? CATALOG[0]
+  const allItems    = CATALOG.flatMap(c => c.items)
   const filtered    = catSearch.trim()
-    ? activeCat.items.filter(i => i.label.toLowerCase().includes(catSearch.toLowerCase()))
+    ? allItems.filter(i => i.label.toLowerCase().includes(catSearch.toLowerCase()))
     : activeCat.items
   const totalPages  = Math.ceil(filtered.length / CAT_PAGE_SIZE)
   const pageItems   = filtered.slice(catPage * CAT_PAGE_SIZE, (catPage + 1) * CAT_PAGE_SIZE)
 
   const giveItem = async () => {
-    const player = catPlayer || catManual.trim()
+    const player = cmdPlayer || catManual.trim()
     if (!player || !catSelected) return
     setCatGiving(true)
     try {
@@ -546,10 +683,12 @@ export default function ActionsSection({ players, role }: Props) {
 
   // ── Inventory ─────────────────────────────────────────────────────────────────
 
-  const [invPlayer,   setInvPlayer]   = useState('')
+  const [invManual,   setInvManual]   = useState('')
   const [invItems,    setInvItems]    = useState<InvItem[]>([])
   const [invLoading,  setInvLoading]  = useState(false)
   const [invDeleting, setInvDeleting] = useState<string | null>(null)
+
+  const invPlayer = cmdPlayer || invManual.trim()
 
   const loadInventory = async () => {
     if (!invPlayer) return
@@ -596,7 +735,7 @@ export default function ActionsSection({ players, role }: Props) {
     slot === 102 ? 'Chestplate' :
     slot === 101 ? 'Leggings' :
     slot === 100 ? 'Boots' :
-    slot < 9     ? `Hotbar ${slot}` :
+    slot < 9     ? `Hotbar ${slot + 1}` :
                    `Slot ${slot}`
 
   const noPlayers = players.length === 0
@@ -617,6 +756,111 @@ export default function ActionsSection({ players, role }: Props) {
           </div>
         </div>
       </div>
+
+      {/* ── SERVER CONFIG (admin only) ── */}
+      {isAdmin && (
+        <div className="glass-card p-4 space-y-4">
+          <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">SERVER CONFIG</div>
+
+          {/* Difficulty */}
+          <div>
+            <SectionLabel>DIFFICULTY</SectionLabel>
+            <div className="grid grid-cols-4 gap-2">
+              {(['peaceful', 'easy', 'normal', 'hard'] as const).map(d => {
+                const colors: Record<string, string> = { peaceful: '#4ade80', easy: '#60a5fa', normal: '#f59e0b', hard: '#f87171' }
+                const active = difficulty === d
+                return (
+                  <button
+                    key={d}
+                    onClick={() => setDifficultyCmd(d)}
+                    disabled={!!difficultyBusy}
+                    className="py-2 rounded-lg font-mono text-[9px] tracking-widest border transition-all disabled:opacity-40"
+                    style={active ? {
+                      borderColor: colors[d], background: colors[d] + '20', color: colors[d]
+                    } : {
+                      borderColor: 'var(--border)', color: 'var(--text-dim)'
+                    }}
+                  >
+                    {difficultyBusy === d ? '…' : d.toUpperCase()}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Gamerules */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <SectionLabel>GAMERULES</SectionLabel>
+              <button
+                onClick={fetchGamerules}
+                disabled={gamerulesLoading}
+                className="text-[9px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity"
+              >
+                {gamerulesLoading ? '…' : gamerules === null ? 'Load' : 'Refresh'}
+              </button>
+            </div>
+            {gamerules === null ? (
+              <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Click Load to fetch gamerules</div>
+            ) : (
+              <div className="space-y-1.5">
+                {(['keepInventory', 'mobGriefing', 'pvp', 'doDaylightCycle', 'doWeatherCycle', 'doFireTick', 'doMobSpawning', 'naturalRegeneration'] as const).map(rule => {
+                  const val = gamerules[rule]
+                  const isOn = val === 'true'
+                  const busy = grBusy === rule
+                  const labels: Record<string, string> = {
+                    keepInventory: 'Keep Inventory', mobGriefing: 'Mob Griefing', pvp: 'PvP',
+                    doDaylightCycle: 'Daylight Cycle', doWeatherCycle: 'Weather Cycle',
+                    doFireTick: 'Fire Tick', doMobSpawning: 'Mob Spawning', naturalRegeneration: 'Natural Regen',
+                  }
+                  return (
+                    <div key={rule} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
+                      <span className="text-[10px] font-mono text-[var(--text)]">{labels[rule] ?? rule}</span>
+                      <button
+                        onClick={() => val !== undefined && toggleGamerule(rule, val)}
+                        disabled={busy || val === undefined}
+                        className={`text-[9px] font-mono px-3 py-1 rounded border transition-all disabled:opacity-40 ${
+                          isOn ? 'border-green-700 text-green-400 bg-green-950/30' : 'border-[var(--border)] text-[var(--text-dim)]'
+                        }`}
+                      >
+                        {busy ? '…' : val === undefined ? '?' : isOn ? 'ON' : 'OFF'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Server controls */}
+          <div>
+            <SectionLabel>SERVER CONTROLS</SectionLabel>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={async () => {
+                  const r = await fetch('/api/minecraft/server-ctrl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: 'save-all' }) })
+                  const d = await r.json()
+                  addToast(d.ok ? 'ok' : 'error', d.ok ? 'World saved' : (d.error || 'Save failed'))
+                }}
+                className="py-2.5 rounded-lg font-mono text-xs tracking-widest border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] transition-all"
+              >
+                💾 Save World
+              </button>
+              <button
+                onClick={async () => {
+                  if (!confirm('Stop the server? This will kick all players and shut down Minecraft.')) return
+                  const r = await fetch('/api/minecraft/server-ctrl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: 'stop' }) })
+                  const d = await r.json()
+                  addToast(d.ok ? 'ok' : 'error', d.ok ? 'Server stopping…' : (d.error || 'Stop failed'))
+                }}
+                className="py-2.5 rounded-lg font-mono text-xs tracking-widest border border-red-900 text-red-400 hover:border-red-700 transition-all"
+              >
+                ⏹ Stop Server
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── PLAYER COMMANDS ── */}
       <div className="glass-card p-4 space-y-4">
@@ -680,22 +924,26 @@ export default function ActionsSection({ players, role }: Props) {
         <div>
           <SectionLabel>OPERATOR {cmdPlayer && <span className="text-[var(--accent)] normal-case">— {cmdPlayer}</span>}</SectionLabel>
           {cmdPlayer ? (
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => opAction('op')}
-                disabled={!!opBusy}
-                className="py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]"
-              >
-                {opBusy === 'op' ? '…' : '⭐ Op'}
-              </button>
-              <button
-                onClick={() => opAction('deop')}
-                disabled={!!opBusy}
-                className="py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-orange-800 hover:text-orange-400"
-              >
-                {opBusy === 'deop' ? '…' : '✕ Deop'}
-              </button>
-            </div>
+            isAdmin ? (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => opAction('op')}
+                  disabled={!!opBusy}
+                  className="py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]"
+                >
+                  {opBusy === 'op' ? '…' : '⭐ Op'}
+                </button>
+                <button
+                  onClick={() => opAction('deop')}
+                  disabled={!!opBusy}
+                  className="py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-orange-800 hover:text-orange-400"
+                >
+                  {opBusy === 'deop' ? '…' : '✕ Deop'}
+                </button>
+              </div>
+            ) : (
+              <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Admin only</div>
+            )
           ) : <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Select a player above</div>}
         </div>
       </div>
@@ -788,6 +1036,42 @@ export default function ActionsSection({ players, role }: Props) {
             {modBusy === 'pardon' ? 'Pardoning...' : 'Pardon'}
           </button>
         </div>
+
+        {/* Ban list */}
+        {isAdmin && (
+          <div className="border-t border-[var(--border)] pt-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <SectionLabel>BAN LIST</SectionLabel>
+              <button
+                onClick={fetchBanList}
+                disabled={banListLoading}
+                className="text-[9px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity"
+              >
+                {banListLoading ? '…' : banListPlayers === null ? 'Load' : 'Refresh'}
+              </button>
+            </div>
+            {banListPlayers === null ? (
+              <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Click Load to fetch ban list</div>
+            ) : banListPlayers.length === 0 ? (
+              <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">No players are banned</div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                {banListPlayers.map(p => (
+                  <div key={p} className="flex items-center gap-1 px-2 py-1 rounded border border-red-900/50 bg-red-950/20">
+                    <span className="text-[10px] font-mono text-red-300">{p}</span>
+                    <button
+                      onClick={() => { setModTarget(p); setModPardonIp(false) }}
+                      className="text-[9px] font-mono text-[var(--text-dim)] hover:text-[var(--accent)] ml-1 transition-colors"
+                      title="Set as pardon target"
+                    >
+                      ↑
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── WHITELIST ── */}
@@ -823,42 +1107,46 @@ export default function ActionsSection({ players, role }: Props) {
                   {wlPlayers.map(p => (
                     <div key={p} className="flex items-center gap-1 px-2 py-1 rounded border border-[var(--border)] bg-[var(--panel)]">
                       <span className="text-[10px] font-mono text-[var(--text)]">{p}</span>
-                      <button
-                        onClick={() => wlAction(p, 'remove')}
-                        disabled={wlBusy === p + 'remove'}
-                        className="text-[9px] font-mono text-red-400 opacity-60 hover:opacity-100 ml-1 disabled:opacity-20"
-                        title="Remove from whitelist"
-                      >
-                        ✕
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => wlAction(p, 'remove')}
+                          disabled={wlBusy === p + 'remove'}
+                          className="text-[9px] font-mono text-red-400 opacity-60 hover:opacity-100 ml-1 disabled:opacity-20"
+                          title="Remove from whitelist"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Add player */}
-            <div>
-              <SectionLabel>ADD PLAYER</SectionLabel>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Player name…"
-                  value={wlInput}
-                  onChange={e => setWlInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && wlInput.trim() && wlAction(wlInput.trim(), 'add')}
-                  className="flex-1 bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
-                  style={{ fontSize: '16px' }}
-                />
-                <button
-                  onClick={() => wlInput.trim() && wlAction(wlInput.trim(), 'add')}
-                  disabled={!wlInput.trim() || !!wlBusy}
-                  className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {wlBusy?.endsWith('add') ? '…' : 'Add'}
-                </button>
+            {/* Add player — admin only */}
+            {isAdmin && (
+              <div>
+                <SectionLabel>ADD PLAYER</SectionLabel>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Player name…"
+                    value={wlInput}
+                    onChange={e => setWlInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && wlInput.trim() && wlAction(wlInput.trim(), 'add')}
+                    className="flex-1 bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+                    style={{ fontSize: '16px' }}
+                  />
+                  <button
+                    onClick={() => wlInput.trim() && wlAction(wlInput.trim(), 'add')}
+                    disabled={!wlInput.trim() || !!wlBusy}
+                    className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {wlBusy?.endsWith('add') ? '…' : 'Add'}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
@@ -874,11 +1162,12 @@ export default function ActionsSection({ players, role }: Props) {
             onChange={e => setBcMessage(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBroadcast() } }}
             rows={3}
+            maxLength={256}
             className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)] resize-none"
             style={{ fontSize: '16px' }}
           />
           <div className="flex items-center justify-between mt-1">
-            <span className="text-[9px] font-mono text-[var(--text-dim)] opacity-40">{bcMessage.length}/256 · Enter to send · Shift+Enter for newline</span>
+            <span className={`text-[9px] font-mono ${bcMessage.length >= 256 ? 'text-red-400' : bcMessage.length >= 230 ? 'text-yellow-500 opacity-70' : 'text-[var(--text-dim)] opacity-40'}`}>{bcMessage.length}/256 · Enter to send · Shift+Enter for newline</span>
             <button
               onClick={sendBroadcast}
               disabled={!bcMessage.trim() || bcBusy}
@@ -886,6 +1175,48 @@ export default function ActionsSection({ players, role }: Props) {
             >
               {bcBusy ? 'Sending...' : 'Send'}
             </button>
+          </div>
+        </div>
+
+        {/* Private message */}
+        <div className="border-t border-[var(--border)] pt-3">
+          <SectionLabel>PRIVATE MESSAGE</SectionLabel>
+          <div className="space-y-2">
+            {cmdPlayer ? (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
+                <span className="text-[9px] font-mono text-[var(--text-dim)]">To:</span>
+                <span className="text-[10px] font-mono text-[var(--accent)]">{cmdPlayer}</span>
+                <span className="text-[9px] font-mono text-[var(--text-dim)] opacity-40 ml-auto">from Player Commands</span>
+              </div>
+            ) : (
+              <input
+                type="text"
+                placeholder="Type player name… (or select in Player Commands)"
+                value={msgManual}
+                onChange={e => setMsgManual(e.target.value)}
+                className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+                style={{ fontSize: '16px' }}
+              />
+            )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Message…"
+                value={msgText}
+                onChange={e => setMsgText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && sendPrivateMsg()}
+                maxLength={256}
+                className="flex-1 bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+                style={{ fontSize: '16px' }}
+              />
+              <button
+                onClick={sendPrivateMsg}
+                disabled={(!cmdPlayer && !msgManual.trim()) || !msgText.trim() || msgBusy}
+                className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {msgBusy ? '…' : 'Send'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -979,25 +1310,24 @@ export default function ActionsSection({ players, role }: Props) {
 
         <div>
           <SectionLabel>1 · SELECT PLAYER</SectionLabel>
-          {players.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2">
-              {players.map(p => (
-                <PlayerChip key={p} name={p} selected={kitCmdPlayer === p}
-                  onClick={() => { setKitCmdPlayer(s => s === p ? '' : p); setKitManual(''); setSelectedKit('') }} />
-              ))}
+          {cmdPlayer ? (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
+              <span className="text-[10px] font-mono text-[var(--accent)]">{cmdPlayer}</span>
+              <span className="text-[9px] font-mono text-[var(--text-dim)] opacity-40 ml-auto">from Player Commands</span>
             </div>
+          ) : (
+            <input
+              type="text"
+              placeholder="Type player name… (or select in Player Commands)"
+              value={kitManual}
+              onChange={e => { setKitManual(e.target.value); setSelectedKit('') }}
+              className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+              style={{ fontSize: '16px' }}
+            />
           )}
-          <input
-            type="text"
-            placeholder="Or type player name…"
-            value={kitManual}
-            onChange={e => { setKitManual(e.target.value); if (kitCmdPlayer) setKitCmdPlayer(''); setSelectedKit('') }}
-            className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
-            style={{ fontSize: '16px' }}
-          />
         </div>
 
-        {(kitCmdPlayer || kitManual.trim()) && (
+        {(cmdPlayer || kitManual.trim()) && (
           <>
             <div>
               <SectionLabel>2 · SELECT KIT</SectionLabel>
@@ -1039,7 +1369,7 @@ export default function ActionsSection({ players, role }: Props) {
                     className="w-full py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}
                   >
-                    {assigning ? 'Assigning...' : `Give ${kit.label} Kit → ${kitCmdPlayer || kitManual}`}
+                     {assigning ? 'Assigning...' : `Give ${kit.label} Kit → ${cmdPlayer || kitManual}`}
                   </button>
                 </div>
               )
@@ -1054,25 +1384,24 @@ export default function ActionsSection({ players, role }: Props) {
 
         <div>
           <SectionLabel>SELECT PLAYER</SectionLabel>
-          {players.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2">
-              {players.map(p => (
-                <PlayerChip key={p} name={p} selected={catPlayer === p}
-                  onClick={() => { setCatPlayer(s => s === p ? '' : p); setCatManual('') }} />
-              ))}
+          {cmdPlayer ? (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
+              <span className="text-[10px] font-mono text-[var(--accent)]">{cmdPlayer}</span>
+              <span className="text-[9px] font-mono text-[var(--text-dim)] opacity-40 ml-auto">from Player Commands</span>
             </div>
+          ) : (
+            <input
+              type="text"
+              placeholder="Type player name… (or select in Player Commands)"
+              value={catManual}
+              onChange={e => setCatManual(e.target.value)}
+              className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+              style={{ fontSize: '16px' }}
+            />
           )}
-          <input
-            type="text"
-            placeholder="Or type player name…"
-            value={catManual}
-            onChange={e => { setCatManual(e.target.value); if (catPlayer) setCatPlayer('') }}
-            className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
-            style={{ fontSize: '16px' }}
-          />
         </div>
 
-        {(catPlayer || catManual.trim()) && (
+        {(cmdPlayer || catManual.trim()) && (
           <>
             {/* Category tabs */}
             <div className="flex gap-1.5 flex-wrap">
@@ -1094,7 +1423,7 @@ export default function ActionsSection({ players, role }: Props) {
             {/* Search */}
             <input
               type="text"
-              placeholder={`Search ${activeCat.label}…`}
+              placeholder={catSearch ? 'Search all items…' : `Search ${activeCat.label}…`}
               value={catSearch}
               onChange={e => { setCatSearch(e.target.value); setCatPage(0); setCatSelected(null) }}
               className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
@@ -1151,7 +1480,7 @@ export default function ActionsSection({ players, role }: Props) {
                   className="w-full py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}
                 >
-                  {catGiving ? 'Giving...' : `Give ×${catQty} ${catSelected.label} → ${catPlayer || catManual}`}
+                  {catGiving ? 'Giving...' : `Give ×${catQty} ${catSelected.label} → ${cmdPlayer || catManual}`}
                 </button>
               </div>
             )}
@@ -1165,22 +1494,21 @@ export default function ActionsSection({ players, role }: Props) {
 
         <div>
           <SectionLabel>SELECT PLAYER</SectionLabel>
-          {players.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2">
-              {players.map(p => (
-                <PlayerChip key={p} name={p} selected={invPlayer === p}
-                  onClick={() => { setInvPlayer(s => s === p ? '' : p); setInvItems([]) }} />
-              ))}
+          {cmdPlayer ? (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
+              <span className="text-[10px] font-mono text-[var(--accent)]">{cmdPlayer}</span>
+              <span className="text-[9px] font-mono text-[var(--text-dim)] opacity-40 ml-auto">from Player Commands</span>
             </div>
+          ) : (
+            <input
+              type="text"
+              placeholder="Type player name… (or select in Player Commands)"
+              value={invManual}
+              onChange={e => { setInvManual(e.target.value); setInvItems([]) }}
+              className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+              style={{ fontSize: '16px' }}
+            />
           )}
-          <input
-            type="text"
-            placeholder="Or type player name…"
-            value={invPlayer}
-            onChange={e => { setInvPlayer(e.target.value); setInvItems([]) }}
-            className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
-            style={{ fontSize: '16px' }}
-          />
         </div>
 
         <button

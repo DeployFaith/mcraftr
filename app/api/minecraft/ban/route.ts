@@ -1,11 +1,13 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { logAudit } from '@/lib/audit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  if (!await getSessionUserId(req)) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const userId = await getSessionUserId(req)
+  if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   try {
     const { player, reason, banIp } = await req.json()
     if (!player || typeof player !== 'string') {
@@ -29,6 +31,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, error: failed[0].error || 'Ban failed' })
     }
 
+    logAudit(userId, 'ban', player, cleanReason || undefined)
     return Response.json({
       ok: true,
       message: `Banned ${player}${banIp ? ' (+ IP)' : ''}${cleanReason ? `: ${cleanReason}` : ''}`,

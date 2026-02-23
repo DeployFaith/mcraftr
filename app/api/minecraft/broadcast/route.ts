@@ -1,11 +1,18 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { checkRateLimit } from '@/lib/ratelimit'
+import { logAudit } from '@/lib/audit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  if (!await getSessionUserId(req)) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const userId = await getSessionUserId(req)
+  if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+
+  const rl = await checkRateLimit(req, 'broadcast', userId)
+  if (rl.limited) return rl.response
+
   try {
     const { message } = await req.json()
     if (!message || typeof message !== 'string') {
@@ -20,6 +27,7 @@ export async function POST(req: NextRequest) {
     const result = await rconForRequest(req, `say ${clean}`)
     if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
 
+    logAudit(userId, 'broadcast', undefined, clean)
     return Response.json({ ok: true, message: `Broadcast sent` })
   } catch (e: unknown) {
     return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Server error' }, { status: 500 })

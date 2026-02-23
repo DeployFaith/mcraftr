@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId } from '@/lib/rcon'
 import { getUserById } from '@/lib/users'
+import { logAudit } from '@/lib/audit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest) {
     const result = await rconForRequest(req, `${action} ${player}`)
     if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
 
+    logAudit(userId, action === 'op' ? 'op' : 'deop', player)
     return Response.json({
       ok: true,
       message: action === 'op' ? `Made ${player} an operator` : `Removed operator from ${player}`,
