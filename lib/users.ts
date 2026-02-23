@@ -23,7 +23,7 @@ export type User = {
 // ── Encryption helpers ────────────────────────────────────────────────────────
 // AES-256-GCM — authenticated encryption, safe for RCON passwords at rest.
 //
-// Key derivation: uses MCRAFTER_ENC_KEY if set (preferred — allows independent
+// Key derivation: uses MCRAFTR_ENC_KEY if set (preferred — allows independent
 // rotation from NEXTAUTH_SECRET). Falls back to NEXTAUTH_SECRET for existing
 // deployments. In both cases, HKDF-SHA256 with a fixed context label is used
 // to produce a proper 32-byte key with domain separation.
@@ -31,8 +31,8 @@ export type User = {
 const ALGO = 'aes-256-gcm'
 
 function getEncKey(): Buffer {
-  const raw = process.env.MCRAFTER_ENC_KEY || process.env.NEXTAUTH_SECRET
-  if (!raw) throw new Error('MCRAFTER_ENC_KEY (or NEXTAUTH_SECRET) is not set')
+  const raw = process.env.MCRAFTR_ENC_KEY || process.env.NEXTAUTH_SECRET
+  if (!raw) throw new Error('MCRAFTR_ENC_KEY (or NEXTAUTH_SECRET) is not set')
   // HKDF-SHA256: salt=empty (key material is already secret),
   // info label provides domain separation so this key can never be
   // confused with the JWT signing key even if the same secret is used.
@@ -137,7 +137,7 @@ function getDb(): Database.Database {
 }
 
 // ── Re-encryption migration ───────────────────────────────────────────────────
-// On first boot after MCRAFTER_ENC_KEY is introduced, server rows encrypted with
+// On first boot after MCRAFTR_ENC_KEY is introduced, server rows encrypted with
 // the old SHA-256-derived key are silently unreadable. This migration detects
 // those rows (new HKDF key fails, legacy key succeeds), decrypts with the old
 // key, and re-encrypts with the new key.
@@ -223,8 +223,8 @@ function migrateFromJson(db: Database.Database): void {
 // ── Seeding ───────────────────────────────────────────────────────────────────
 
 function seedAdmin(db: Database.Database): void {
-  const adminEmail = process.env.MCRAFTER_ADMIN_USER || ''
-  const adminPass  = process.env.MCRAFTER_ADMIN_PASS  || ''
+  const adminEmail = process.env.MCRAFTR_ADMIN_USER || ''
+  const adminPass  = process.env.MCRAFTR_ADMIN_PASS  || ''
   if (!adminEmail || !adminPass) return
 
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(adminEmail)
