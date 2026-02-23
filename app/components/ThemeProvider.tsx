@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 
 // ── Accent palette ─────────────────────────────────────────────────────────────
 
-export type AccentId = 'cyan' | 'blue' | 'purple' | 'pink' | 'orange' | 'yellow' | 'red' | 'white'
+export type AccentId = 'cyan' | 'blue' | 'purple' | 'pink' | 'orange' | 'yellow' | 'red'
 
 export const ACCENTS: { id: AccentId; label: string; color: string }[] = [
   { id: 'cyan',   label: 'Cyan',   color: '#00ffc8' },
@@ -13,7 +13,6 @@ export const ACCENTS: { id: AccentId; label: string; color: string }[] = [
   { id: 'orange', label: 'Orange', color: '#ff9500' },
   { id: 'yellow', label: 'Yellow', color: '#ffd60a' },
   { id: 'red',    label: 'Red',    color: '#ff453a' },
-  { id: 'white',  label: 'White',  color: '#e8e8f0' },
 ]
 
 // ── Context ───────────────────────────────────────────────────────────────────
