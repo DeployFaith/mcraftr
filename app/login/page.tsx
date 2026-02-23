@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import BrandLockup from '@/app/components/BrandLockup'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -51,9 +52,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo / title */}
         <div className="text-center mb-8">
-          <div className="text-2xl font-mono font-bold tracking-widest" style={{ color: 'var(--accent)' }}>
-            MCRAFTR
-          </div>
+          <BrandLockup size="hero" className="justify-center" />
           <div className="text-xs font-mono mt-1" style={{ color: 'var(--text-dim)' }}>
             minecraft server admin
           </div>

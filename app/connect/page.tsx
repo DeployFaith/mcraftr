@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import BrandLockup from '@/app/components/BrandLockup'
 
 type TestState = 'idle' | 'testing' | 'success' | 'fail'
 
@@ -92,9 +93,7 @@ function ConnectForm() {
       <div className="w-full max-w-md">
 
         <div className="text-center mb-8">
-          <div className="text-2xl font-mono font-bold tracking-widest" style={{ color: 'var(--accent)' }}>
-            MCRAFTR
-          </div>
+          <BrandLockup size="hero" className="justify-center" />
           <div className="text-xs font-mono mt-1" style={{ color: 'var(--text-dim)' }}>
             {isEdit ? 'update server connection' : 'connect your minecraft server'}
           </div>

@@ -1,6 +1,10 @@
 // Shared kit definitions — single source of truth for both the API route
 // and the client-side preview. Import from here, not duplicated anywhere.
 
+import { Axe, BrickWall, Compass, Swords, Crown, type LucideProps } from 'lucide-react'
+
+export type LucideIcon = React.ComponentType<LucideProps>
+
 export type KitItem = {
   name: string
   qty: number
@@ -10,7 +14,7 @@ export type KitItem = {
 export type KitDef = {
   id: string
   label: string
-  icon: string
+  Icon: LucideIcon
   items: KitItem[]
   // RCON give commands with {player} placeholder
   commands: string[]
@@ -21,7 +25,7 @@ export const KITS: KitDef[] = [
   {
     id: 'starter',
     label: 'Starter',
-    icon: '🪓',
+    Icon: Axe,
     items: [
       { name: 'Iron Sword',      qty: 1 },
       { name: 'Iron Pickaxe',    qty: 1 },
@@ -56,7 +60,7 @@ export const KITS: KitDef[] = [
   {
     id: 'builder',
     label: 'Builder',
-    icon: '🧱',
+    Icon: BrickWall,
     items: [
       { name: 'Oak Planks',   qty: 64 },
       { name: 'Stone Bricks', qty: 64 },
@@ -83,7 +87,7 @@ export const KITS: KitDef[] = [
   {
     id: 'explorer',
     label: 'Explorer',
-    icon: '🧭',
+    Icon: Compass,
     items: [
       { name: 'Diamond Sword',   qty: 1, enchants: 'Sharpness III · Unbreaking III' },
       { name: 'Bow',             qty: 1, enchants: 'Power III · Unbreaking III' },
@@ -116,7 +120,7 @@ export const KITS: KitDef[] = [
   {
     id: 'combat',
     label: 'Combat',
-    icon: '⚔️',
+    Icon: Swords,
     items: [
       { name: 'Diamond Sword',      qty: 1, enchants: 'Sharpness V · Fire Aspect II · Looting III · Unbreaking III' },
       { name: 'Bow',                qty: 1, enchants: 'Power V · Infinity · Flame · Unbreaking III' },
@@ -143,7 +147,7 @@ export const KITS: KitDef[] = [
   {
     id: 'admin',
     label: 'Admin',
-    icon: '👑',
+    Icon: Crown,
     adminOnly: true,
     items: [
       { name: 'Netherite Sword',      qty: 1, enchants: 'Sharpness V · Fire Aspect II · Looting III · Unbreaking III · Mending' },

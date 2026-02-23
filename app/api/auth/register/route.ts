@@ -1,15 +1,14 @@
+import crypto from 'crypto'
+import bcrypt from 'bcryptjs'
 import { NextRequest } from 'next/server'
 import { createUser } from '@/lib/users'
+import { getDb } from '@/lib/db'
 import { checkRateLimit } from '@/lib/ratelimit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  if (process.env.ALLOW_REGISTRATION !== 'true') {
-    return Response.json({ ok: false, error: 'Registration is not enabled' }, { status: 403 })
-  }
-
   const rl = await checkRateLimit(req, 'register')
   if (rl.limited) return rl.response
 
@@ -30,7 +29,22 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, error: 'Password must be 128 characters or fewer' }, { status: 400 })
     }
 
-    createUser(email.toLowerCase().trim(), password)
+    const normalized = email.toLowerCase().trim()
+    const db = getDb()
+    const userCount = (db.prepare('SELECT COUNT(*) as n FROM users').get() as { n: number }).n
+
+    if (userCount === 0) {
+      // First account ever — automatically admin, no env var required
+      db.prepare(`INSERT INTO users (id, email, password_hash, role) VALUES (?, ?, ?, 'admin')`)
+        .run(crypto.randomUUID(), normalized, bcrypt.hashSync(password, 10))
+      return Response.json({ ok: true, firstUser: true })
+    }
+
+    if (process.env.ALLOW_REGISTRATION !== 'true') {
+      return Response.json({ ok: false, error: 'Registration is not enabled' }, { status: 403 })
+    }
+
+    createUser(normalized, password)
     return Response.json({ ok: true })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Registration failed'

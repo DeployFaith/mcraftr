@@ -71,6 +71,19 @@ export async function GET(req: NextRequest) {
 
     const sessionStarts = getSessionStarts(userId, playerList)
 
+    // Update player directory — upsert last_seen for all currently online players
+    if (playerList.length > 0) {
+      const db = getDb()
+      const upsert = db.prepare(
+        `INSERT INTO player_directory (user_id, player_name, last_seen)
+         VALUES (?, ?, unixepoch())
+         ON CONFLICT(user_id, player_name) DO UPDATE SET last_seen = unixepoch()`
+      )
+      db.transaction((names: string[]) => {
+        for (const name of names) upsert.run(userId, name)
+      })(playerList)
+    }
+
     return Response.json({
       count,
       players: playerList.join(', '),

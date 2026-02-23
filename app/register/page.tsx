@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import BrandLockup from '@/app/components/BrandLockup'
 
 export default function RegisterPage() {
   const router  = useRouter()
@@ -62,9 +63,7 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg)' }}>
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="text-2xl font-mono font-bold tracking-widest" style={{ color: 'var(--accent)' }}>
-            MCRAFTR
-          </div>
+          <BrandLockup size="hero" className="justify-center" />
           <div className="text-xs font-mono mt-1" style={{ color: 'var(--text-dim)' }}>
             create your account
           </div>

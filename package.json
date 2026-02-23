@@ -13,6 +13,7 @@
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",
     "ioredis": "^5.9.3",
+    "lucide-react": "^0.575.0",
     "next": "^15.1.6",
     "next-auth": "^5.0.0-beta.25",
     "rate-limiter-flexible": "^9.1.1",

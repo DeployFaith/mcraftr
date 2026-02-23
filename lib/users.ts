@@ -338,3 +338,41 @@ export function deleteUser(id: string): void {
   const result = db.prepare('DELETE FROM users WHERE id = ?').run(id)
   if (result.changes === 0) throw new Error('User not found')
 }
+
+export type UserSummary = {
+  id: string
+  email: string
+  role: 'admin' | 'user'
+  created_at: number
+}
+
+export function listUsers(): UserSummary[] {
+  const db = initDb()
+  return db.prepare('SELECT id, email, role, created_at FROM users ORDER BY created_at ASC').all() as UserSummary[]
+}
+
+export function setUserRole(id: string, role: 'admin' | 'user'): void {
+  const db = initDb()
+  if (role === 'user') {
+    const adminCount = (db.prepare("SELECT COUNT(*) as n FROM users WHERE role = 'admin'").get() as { n: number }).n
+    const target = db.prepare('SELECT role FROM users WHERE id = ?').get(id) as { role: string } | undefined
+    if (!target) throw new Error('User not found')
+    if (target.role === 'admin' && adminCount <= 1) throw new Error('Cannot demote the last admin')
+  }
+  const result = db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id)
+  if (result.changes === 0) throw new Error('User not found')
+}
+
+export function createUserByAdmin(email: string, password: string): User {
+  const db = initDb()
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
+  if (existing) throw new Error('An account with that email already exists')
+
+  const id = crypto.randomUUID()
+  db.prepare(`
+    INSERT INTO users (id, email, password_hash, role)
+    VALUES (?, ?, ?, 'user')
+  `).run(id, email, bcrypt.hashSync(password, 10))
+
+  return { id, email, passwordHash: '', role: 'user', server: null }
+}

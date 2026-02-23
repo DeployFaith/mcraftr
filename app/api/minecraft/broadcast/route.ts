@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId } from '@/lib/rcon'
 import { checkRateLimit } from '@/lib/ratelimit'
 import { logAudit } from '@/lib/audit'
+import { getDb } from '@/lib/db'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -28,6 +29,9 @@ export async function POST(req: NextRequest) {
     if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
 
     logAudit(userId, 'broadcast', undefined, clean)
+    try {
+      getDb().prepare('INSERT INTO chat_log (user_id, type, player, message) VALUES (?, ?, NULL, ?)').run(userId, 'broadcast', clean)
+    } catch {}
     return Response.json({ ok: true, message: `Broadcast sent` })
   } catch (e: unknown) {
     return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Server error' }, { status: 500 })

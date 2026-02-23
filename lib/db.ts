@@ -41,6 +41,22 @@ export function getDb(): Database.Database {
       joined_at   INTEGER NOT NULL,
       PRIMARY KEY (user_id, player_name)
     );
+
+    CREATE TABLE IF NOT EXISTS player_directory (
+      user_id     TEXT NOT NULL,
+      player_name TEXT NOT NULL,
+      last_seen   INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (user_id, player_name)
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_log (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id   TEXT NOT NULL,
+      type      TEXT NOT NULL,
+      player    TEXT,
+      message   TEXT NOT NULL,
+      ts        INTEGER NOT NULL DEFAULT (unixepoch())
+    );
   `)
 
   return _db

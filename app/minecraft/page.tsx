@@ -1,20 +1,28 @@
 'use client'
 import { useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import PlayersSection    from './components/PlayersSection'
-import ActionsSection    from './components/ActionsSection'
-import SettingsSection   from './components/SettingsSection'
-import ServerInfoSection from './components/ServerInfoSection'
+import { Users, Zap, Shield, MessageSquare, Settings } from 'lucide-react'
+import PlayersSection  from './components/PlayersSection'
+import ActionsSection  from './components/ActionsSection'
+import ChatSection     from './components/ChatSection'
+import AdminSection    from './components/AdminSection'
+import SettingsSection from './components/SettingsSection'
 
 // ── Nav config ────────────────────────────────────────────────────────────────
 
-type TabId = 'players' | 'actions' | 'server' | 'settings'
+type TabId = 'players' | 'actions' | 'admin' | 'chat' | 'settings'
 
-const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: 'players',  label: 'Players',  icon: '👥' },
-  { id: 'actions',  label: 'Actions',  icon: '⚡' },
-  { id: 'server',   label: 'Server',   icon: '🖥' },
-  { id: 'settings', label: 'Settings', icon: '⚙️' },
+const ALL_TABS: {
+  id: TabId
+  label: string
+  Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>
+  adminOnly?: boolean
+}[] = [
+  { id: 'players',  label: 'Players',  Icon: Users },
+  { id: 'actions',  label: 'Actions',  Icon: Zap },
+  { id: 'admin',    label: 'Admin',    Icon: Shield,        adminOnly: true },
+  { id: 'chat',     label: 'Chat',     Icon: MessageSquare },
+  { id: 'settings', label: 'Settings', Icon: Settings },
 ]
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -23,13 +31,17 @@ export default function MinecraftPage() {
   const { data: session } = useSession()
   const role = session?.role
 
-  const [activeTab,  setActiveTab]  = useState<TabId>('players')
-  const [players,    setPlayers]    = useState<string[]>([])
-  const [whitelist,  setWhitelist]  = useState<string[] | null>(null)
+  const [activeTab, setActiveTab] = useState<TabId>('players')
+  const [players,   setPlayers]   = useState<string[]>([])
 
   const handlePlayersChange = useCallback((list: string[]) => {
     setPlayers(list)
   }, [])
+
+  const tabs = ALL_TABS.filter(t => !t.adminOnly || role === 'admin')
+
+  // If the active tab is no longer visible (e.g. role changed), fall back to players
+  const visibleTab = tabs.find(t => t.id === activeTab) ? activeTab : 'players'
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-48px)]">
@@ -38,56 +50,58 @@ export default function MinecraftPage() {
       <nav className="hidden md:flex border-b border-[var(--border)] sticky top-12 z-30 backdrop-blur-md"
         style={{ background: 'rgba(10,10,15,0.9)' }}>
         <div className="max-w-4xl mx-auto flex w-full">
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-3 text-xs font-mono tracking-widest transition-all border-b-2 ${
-                activeTab === tab.id
-                  ? 'border-[var(--accent)] text-[var(--accent)]'
-                  : 'border-transparent text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--border)]'
-              }`}
-            >
-              <span>{tab.icon}</span>
-              <span>{tab.label.toUpperCase()}</span>
-            </button>
-          ))}
+          {tabs.map(({ id, label, Icon }) => {
+            const active = visibleTab === id
+            return (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`flex items-center gap-2 px-5 py-3 text-xs font-mono tracking-widest transition-all border-b-2 ${
+                  active
+                    ? 'border-[var(--accent)] text-[var(--accent)]'
+                    : 'border-transparent text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--border)]'
+                }`}
+              >
+                <Icon size={14} color={active ? 'var(--accent)' : 'var(--text-dim)'} strokeWidth={1.75} />
+                <span>{label.toUpperCase()}</span>
+              </button>
+            )
+          })}
         </div>
       </nav>
 
       {/* Section content */}
       <div className="flex-1 max-w-4xl mx-auto w-full px-4 py-4 pb-24 md:pb-6">
-        {activeTab === 'players'  && <PlayersSection    onPlayersChange={handlePlayersChange} />}
-        {activeTab === 'actions'  && <ActionsSection    players={players} role={role} whitelist={whitelist} onWhitelistChange={setWhitelist} />}
-        {activeTab === 'server'   && <ServerInfoSection />}
-        {activeTab === 'settings' && <SettingsSection role={role} />}
+        {visibleTab === 'players'  && <PlayersSection  onPlayersChange={handlePlayersChange} />}
+        {visibleTab === 'actions'  && <ActionsSection  players={players} />}
+        {visibleTab === 'admin'    && role === 'admin' && <AdminSection players={players} />}
+        {visibleTab === 'chat'     && <ChatSection />}
+        {visibleTab === 'settings' && <SettingsSection role={role} />}
       </div>
 
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--border)]"
         style={{ background: 'rgba(10,10,15,0.95)', backdropFilter: 'blur(12px)' }}>
         <div className="flex">
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`relative flex-1 flex flex-col items-center gap-1 py-3 transition-all ${
-                activeTab === tab.id
-                  ? 'text-[var(--accent)]'
-                  : 'text-[var(--text-dim)]'
-              }`}
-            >
-              <span className="text-xl leading-none">{tab.icon}</span>
-              <span className={`text-[9px] font-mono tracking-widest ${
-                activeTab === tab.id ? 'text-[var(--accent)]' : 'text-[var(--text-dim)]'
-              }`}>
-                {tab.label.toUpperCase()}
-              </span>
-              {activeTab === tab.id && (
-                <span className="absolute bottom-0 w-8 h-0.5 rounded-full" style={{ background: 'var(--accent)' }} />
-              )}
-            </button>
-          ))}
+          {tabs.map(({ id, label, Icon }) => {
+            const active = visibleTab === id
+            return (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className="relative flex-1 flex flex-col items-center gap-1 py-3 transition-all"
+              >
+                <Icon size={20} color={active ? 'var(--accent)' : 'var(--text-dim)'} strokeWidth={1.75} />
+                <span className="text-[9px] font-mono tracking-widest"
+                  style={{ color: active ? 'var(--accent)' : 'var(--text-dim)' }}>
+                  {label.toUpperCase()}
+                </span>
+                {active && (
+                  <span className="absolute bottom-0 w-8 h-0.5 rounded-full" style={{ background: 'var(--accent)' }} />
+                )}
+              </button>
+            )
+          })}
         </div>
       </nav>
     </div>

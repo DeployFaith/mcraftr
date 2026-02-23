@@ -5,6 +5,11 @@ export default auth((req) => {
   const { nextUrl } = req
   const session = req.auth
 
+  // Allow static assets from /public (e.g. logos, icons) through.
+  if (/\.[^/]+$/.test(nextUrl.pathname)) {
+    return NextResponse.next()
+  }
+
   // Allow public routes through unconditionally
   const publicPaths = ['/login', '/register', '/api/auth']
   if (publicPaths.some(p => nextUrl.pathname.startsWith(p))) {

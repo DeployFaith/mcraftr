@@ -1,6 +1,7 @@
 import { auth } from '@/auth'
 import { signOut } from '@/auth.node'
 import { redirect } from 'next/navigation'
+import BrandLockup from '@/app/components/BrandLockup'
 
 export default async function MinecraftLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
@@ -14,9 +15,7 @@ export default async function MinecraftLayout({ children }: { children: React.Re
         style={{ background: 'rgba(10,10,15,0.85)' }}
       >
         <div className="max-w-4xl mx-auto px-4 h-12 flex items-center justify-between">
-          <span className="font-mono font-bold tracking-widest text-sm" style={{ color: 'var(--accent)' }}>
-            MCRAFTR
-          </span>
+          <BrandLockup size="header" />
           <div className="flex items-center gap-3">
             <span className="text-[10px] font-mono text-[var(--text-dim)] hidden sm:block">
               {session.user.email ?? session.user.name}

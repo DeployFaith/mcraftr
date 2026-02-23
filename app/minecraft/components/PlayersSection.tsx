@@ -126,7 +126,7 @@ function HungerBar({ value, max = 20 }: { value: number | null; max?: number }) 
   return (
     <div className="flex flex-wrap gap-0.5 items-center justify-end">
       {Array.from({ length: max / 2 }).map((_, i) => (
-        <span key={i} className="text-[11px] leading-none" style={{ color: i < value / 2 ? '#f59e0b' : 'var(--border)' }}>🍗</span>
+        <span key={i} className="inline-block w-2 h-2 rounded-sm" style={{ background: i < value / 2 ? '#f59e0b' : 'var(--border)' }} />
       ))}
       <span className="text-[10px] font-mono text-[var(--text-dim)] ml-1">{value}/{max}</span>
     </div>
@@ -559,7 +559,7 @@ export default function PlayersSection({ onPlayersChange }: Props) {
 
   return (
     <div className="space-y-4">
-      <h2 className="font-mono text-base tracking-widest text-[var(--accent)]">// PLAYERS</h2>
+      <h2 className="font-mono text-base tracking-widest text-[var(--accent)]">PLAYERS</h2>
 
       <div className="glass-card p-5">
         <div className="flex items-center justify-between mb-4">

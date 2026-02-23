@@ -5,6 +5,7 @@ export type AuditAction =
   | 'give' | 'clear_item' | 'gamemode' | 'difficulty'
   | 'gamerule' | 'save_all' | 'stop_server' | 'tp'
   | 'whitelist_add' | 'whitelist_remove' | 'broadcast' | 'cmd'
+  | 'create_user' | 'delete_user' | 'set_role'
 
 export type AuditEntry = {
   id: number

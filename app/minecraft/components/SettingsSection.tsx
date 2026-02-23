@@ -2,8 +2,6 @@
 import { useState, useEffect } from 'react'
 import { signOut } from 'next-auth/react'
 import { useTheme, ACCENTS } from '@/app/components/ThemeProvider'
-import type { AuditEntry } from '@/lib/audit'
-
 // ── Small helpers ─────────────────────────────────────────────────────────────
 
 function StatusMsg({ ok, msg }: { ok: boolean; msg: string }) {
@@ -23,26 +21,10 @@ function StatusMsg({ ok, msg }: { ok: boolean; msg: string }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function SettingsSection({ role }: { role?: string }) {
-  const isAdmin = role === 'admin'
+export default function SettingsSection({ role: _role }: { role?: string }) {
   const [serverInfo, setServerInfo] = useState<{ host: string | null; port: number } | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
   const { theme, setTheme, accent, setAccent } = useTheme()
-
-  // ── Audit log ────────────────────────────────────────────────────────────────
-
-  const [auditEntries, setAuditEntries] = useState<AuditEntry[] | null>(null)
-  const [auditLoading, setAuditLoading] = useState(false)
-
-  const fetchAuditLog = async () => {
-    setAuditLoading(true)
-    try {
-      const r = await fetch('/api/admin/audit?limit=100')
-      const d = await r.json()
-      if (d.ok) setAuditEntries(d.entries)
-    } catch {}
-    finally { setAuditLoading(false) }
-  }
 
   // Change password state
   const [pwCurrent, setPwCurrent] = useState('')
@@ -173,7 +155,7 @@ export default function SettingsSection({ role }: { role?: string }) {
 
   return (
     <div className="space-y-4">
-      <h2 className="font-mono text-base tracking-widest text-[var(--accent)]">// SETTINGS</h2>
+      <h2 className="font-mono text-base tracking-widest text-[var(--accent)]">SETTINGS</h2>
 
       {/* Appearance */}
       <div className="glass-card p-5 space-y-4">
@@ -332,40 +314,6 @@ export default function SettingsSection({ role }: { role?: string }) {
           {emailStatus && <StatusMsg ok={emailStatus.ok} msg={emailStatus.msg} />}
         </form>
       </div>
-
-      {/* Audit log (admin only) */}
-      {isAdmin && (
-        <div className="glass-card p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">AUDIT LOG</div>
-            <button
-              onClick={fetchAuditLog}
-              disabled={auditLoading}
-              className="text-[9px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity"
-            >
-              {auditLoading ? '…' : auditEntries === null ? 'Load' : 'Refresh'}
-            </button>
-          </div>
-          {auditEntries === null ? (
-            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Click Load to fetch audit log</div>
-          ) : auditEntries.length === 0 ? (
-            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">No audit entries yet</div>
-          ) : (
-            <div className="space-y-1 max-h-64 overflow-y-auto">
-              {auditEntries.map((e: AuditEntry) => (
-                <div key={e.id} className="flex items-start gap-2 px-2 py-1.5 rounded bg-[var(--panel)] border border-[var(--border)]">
-                  <span className="text-[8px] font-mono text-[var(--text-dim)] shrink-0 mt-0.5 w-16">
-                    {new Date(e.ts * 1000).toLocaleTimeString()}
-                  </span>
-                  <span className="text-[9px] font-mono text-[var(--accent)] shrink-0 w-20">{e.action}</span>
-                  {e.target && <span className="text-[9px] font-mono text-[var(--text)] shrink-0">{e.target}</span>}
-                  {e.detail && <span className="text-[9px] font-mono text-[var(--text-dim)] truncate opacity-60">{e.detail}</span>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Account — Danger Zone */}
       <div className="glass-card p-5 space-y-3" style={{ borderColor: '#ff335530' }}>
