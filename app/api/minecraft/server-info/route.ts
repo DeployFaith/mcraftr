@@ -43,6 +43,31 @@ function parseTps(raw: string): number | null {
   return isNaN(n) ? null : Math.min(n, 20)
 }
 
+function parseWeather(raw: string): string | null {
+  if (raw.toLowerCase().includes('clear')) return 'clear'
+  if (raw.toLowerCase().includes('thunder')) return 'thunder'
+  if (raw.toLowerCase().includes('rain')) return 'rain'
+  return null
+}
+
+function parseTime(raw: string): number | null {
+  const m = raw.match(/The time is (\d+)/)
+  if (!m) return null
+  return parseInt(m[1], 10)
+}
+
+function timeOfDay(ticks: number): string {
+  // 0=dawn, 6000=noon, 12000=dusk, 18000=midnight
+  const t = ticks % 24000
+  if (t < 1000)  return 'Dawn'
+  if (t < 6000)  return 'Morning'
+  if (t < 9000)  return 'Noon'
+  if (t < 12000) return 'Afternoon'
+  if (t < 13000) return 'Dusk'
+  if (t < 18000) return 'Night'
+  return 'Midnight'
+}
+
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
@@ -51,11 +76,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Fire all three in parallel — each opens its own RCON connection
-    const [listRes, versionRes, tpsRes] = await Promise.all([
+    // Fire all five in parallel — each opens its own RCON connection
+    const [listRes, versionRes, tpsRes, weatherRes, timeRes] = await Promise.all([
       rconForRequest(req, 'list'),
       rconForRequest(req, 'version'),
       rconForRequest(req, 'tps'),
+      rconForRequest(req, 'weather'),
+      rconForRequest(req, 'time query daytime'),
     ])
 
     if (!listRes.ok && !versionRes.ok) {
@@ -66,8 +93,11 @@ export async function GET(req: NextRequest) {
     const version = versionRes.ok ? parseVersion(versionRes.stdout) : null
     // tps command only exists on Paper/Spigot — graceful degradation if absent
     const tps = tpsRes.ok ? parseTps(tpsRes.stdout) : null
+    const weather = weatherRes.ok ? parseWeather(weatherRes.stdout) : null
+    const timeTicks = timeRes.ok ? parseTime(timeRes.stdout) : null
+    const tod = timeTicks !== null ? timeOfDay(timeTicks) : null
 
-    return Response.json({ ok: true, online, max, version, tps })
+    return Response.json({ ok: true, online, max, version, tps, weather, timeOfDay: tod })
   } catch (e: unknown) {
     return Response.json(
       { ok: false, error: e instanceof Error ? e.message : 'Server error' },

@@ -1,36 +1,13 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId } from '@/lib/rcon'
-import Database from 'better-sqlite3'
-import path from 'path'
-import fs from 'fs'
+import { getDb } from '@/lib/db'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 // ── Session tracking — SQLite-backed ─────────────────────────────────────────
 // Persists player join timestamps across container restarts.
-// Uses the same DB file as users/servers; schema is additive (CREATE IF NOT EXISTS).
-
-const DATA_DIR = process.env.DATA_DIR || '/app/data'
-const DB_FILE  = path.join(DATA_DIR, 'mcraftr.db')
-
-let _db: Database.Database | null = null
-
-function getDb(): Database.Database {
-  if (_db) return _db
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
-  _db = new Database(DB_FILE)
-  _db.pragma('journal_mode = WAL')
-  _db.exec(`
-    CREATE TABLE IF NOT EXISTS player_sessions (
-      user_id     TEXT NOT NULL,
-      player_name TEXT NOT NULL,
-      joined_at   INTEGER NOT NULL,
-      PRIMARY KEY (user_id, player_name)
-    )
-  `)
-  return _db
-}
+// Uses the shared DB singleton from lib/db.ts.
 
 function getSessionStarts(userId: string, playerList: string[]): Record<string, number> {
   const db  = getDb()

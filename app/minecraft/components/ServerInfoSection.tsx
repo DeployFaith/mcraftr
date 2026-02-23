@@ -8,6 +8,8 @@ type ServerInfo = {
   max: number
   version: string | null
   tps: number | null
+  weather: string | null
+  timeOfDay: string | null
 }
 
 // ── TPS gauge ─────────────────────────────────────────────────────────────────
@@ -44,6 +46,26 @@ function StatTile({ label, value, sub }: { label: string; value: React.ReactNode
       {sub && <div className="text-[9px] font-mono text-[var(--text-dim)] opacity-50">{sub}</div>}
     </div>
   )
+}
+
+// ── Weather / time helpers ─────────────────────────────────────────────────────
+
+function weatherIcon(w: string | null): string {
+  if (w === 'clear')   return '☀️'
+  if (w === 'rain')    return '🌧'
+  if (w === 'thunder') return '⛈'
+  return '—'
+}
+
+function timeIcon(t: string | null): string {
+  if (t === 'Dawn')      return '🌅'
+  if (t === 'Morning')   return '🌤'
+  if (t === 'Noon')      return '☀️'
+  if (t === 'Afternoon') return '🌤'
+  if (t === 'Dusk')      return '🌆'
+  if (t === 'Night')     return '🌙'
+  if (t === 'Midnight')  return '🌑'
+  return '—'
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -136,6 +158,34 @@ export default function ServerInfoSection() {
                 </span>
               }
               sub="server version"
+            />
+          </div>
+
+          {/* Weather + Time of Day row */}
+          <div className="grid grid-cols-2 gap-3">
+            <StatTile
+              label="WEATHER"
+              value={
+                <span className="text-sm">
+                  {info.weather !== null
+                    ? <>{weatherIcon(info.weather)} <span className="capitalize">{info.weather}</span></>
+                    : <span className="opacity-40 text-xs">—</span>
+                  }
+                </span>
+              }
+              sub="current conditions"
+            />
+            <StatTile
+              label="TIME OF DAY"
+              value={
+                <span className="text-sm">
+                  {info.timeOfDay !== null
+                    ? <>{timeIcon(info.timeOfDay)} {info.timeOfDay}</>
+                    : <span className="opacity-40 text-xs">—</span>
+                  }
+                </span>
+              }
+              sub="in-game time"
             />
           </div>
 

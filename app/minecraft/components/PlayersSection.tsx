@@ -219,7 +219,12 @@ function InvSlot({ item, onDelete, deleting }: {
       {/* Delete button — appears on hover when onDelete is provided */}
       {onDelete && !deleting && (
         <button
-          onClick={e => { e.stopPropagation(); onDelete(item) }}
+          onClick={e => {
+            e.stopPropagation()
+            if (confirm(`Clear ${item.label} from inventory? This cannot be undone.`)) {
+              onDelete(item)
+            }
+          }}
           className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-900 border border-red-700 text-red-300 text-[8px] font-mono leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-700"
           title={`Clear ${item.label}`}
         >
@@ -270,10 +275,13 @@ function PlayerPanel({
   const [invLoading, setInvLoading]     = useState(true)
   const [statsError, setStatsError]     = useState<string | null>(null)
   const [deletingSlot, setDeletingSlot] = useState<number | null>(null)
+  const [deleteError, setDeleteError]   = useState<string | null>(null)
+  const [refreshing, setRefreshing]     = useState(false)
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     setStats(null); setEffects([]); setInventory([])
     setStatsLoading(true); setInvLoading(true); setStatsError(null)
+    setRefreshing(true)
 
     Promise.all([
       fetch(`/api/minecraft/player?player=${encodeURIComponent(player)}`).then(r => r.json()),
@@ -283,7 +291,7 @@ function PlayerPanel({
       else setStatsError(statsData.error ?? 'Failed to load player data')
       if (effectsData.ok) setEffects(effectsData.active ?? [])
     }).catch(() => setStatsError('Could not reach server'))
-      .finally(() => setStatsLoading(false))
+      .finally(() => { setStatsLoading(false); setRefreshing(false) })
 
     fetch(`/api/minecraft/inventory?player=${encodeURIComponent(player)}`)
       .then(r => r.json())
@@ -291,6 +299,10 @@ function PlayerPanel({
       .catch(() => {})
       .finally(() => setInvLoading(false))
   }, [player])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
 
   const deleteItem = async (item: InvItem) => {
     setDeletingSlot(item.slot)
@@ -301,9 +313,16 @@ function PlayerPanel({
         body: JSON.stringify({ player, item: item.id, count: item.count }),
       })
       const d = await r.json()
-      if (d.ok) setInventory(prev => prev.filter(i => i.slot !== item.slot))
-    } catch { /* silent — item stays in list */ }
-    finally { setDeletingSlot(null) }
+      if (d.ok) {
+        setInventory(prev => prev.filter(i => i.slot !== item.slot))
+      } else {
+        setDeleteError(d.error || 'Failed to clear item')
+        setTimeout(() => setDeleteError(null), 4000)
+      }
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Failed to clear item')
+      setTimeout(() => setDeleteError(null), 4000)
+    } finally { setDeletingSlot(null) }
   }
 
   const bySlot  = new Map(inventory.map(i => [i.slot, i]))
@@ -355,12 +374,21 @@ function PlayerPanel({
             )}
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="text-[10px] font-mono text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border)] px-2 py-0.5 rounded transition-colors"
-        >
-          x close
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={refresh}
+            disabled={statsLoading || refreshing}
+            className="text-[10px] font-mono text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border)] px-2 py-0.5 rounded transition-colors disabled:opacity-40"
+          >
+            {refreshing ? '…' : 'Refresh'}
+          </button>
+          <button
+            onClick={onClose}
+            className="text-[10px] font-mono text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border)] px-2 py-0.5 rounded transition-colors"
+          >
+            x close
+          </button>
+        </div>
       </div>
 
       <div className="p-5 space-y-5">
@@ -442,6 +470,11 @@ function PlayerPanel({
             <div className="text-xs font-mono text-[var(--text-dim)] animate-pulse">Loading inventory...</div>
           ) : (
             <div className="space-y-3">
+              {deleteError && (
+                <div className="text-[10px] font-mono text-red-400 px-2 py-1 rounded border border-red-900/50 bg-red-950/30">
+                  ✗ {deleteError}
+                </div>
+              )}
               <div>
                 <div className="text-[8px] font-mono text-[var(--text-dim)] mb-1.5 opacity-50 tracking-widest">HOTBAR</div>
                 <div className="flex flex-wrap gap-1">

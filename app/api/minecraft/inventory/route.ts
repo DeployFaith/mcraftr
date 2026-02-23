@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getSessionUserId } from '@/lib/rcon'
+import { getSessionUserId, rconForRequest } from '@/lib/rcon'
 import { VALID_ITEM_IDS } from '@/lib/items'
 import { Rcon } from 'rcon-client'
 import { getUserById } from '@/lib/users'
@@ -171,7 +171,6 @@ export async function DELETE(req: NextRequest) {
     }
 
     const cmd = clearCount !== undefined ? `clear ${player} ${bareItem} ${clearCount}` : `clear ${player} ${bareItem}`
-    const { rconForRequest } = await import('@/lib/rcon')
     const result = await rconForRequest(req, cmd)
 
     if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
