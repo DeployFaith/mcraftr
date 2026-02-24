@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId } from '@/lib/rcon'
-import { getUserById } from '@/lib/users'
+import { getUserById, getUserFeatures } from '@/lib/users'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -19,7 +19,9 @@ function parseWhitelistOutput(stdout: string): string[] {
 }
 
 export async function GET(req: NextRequest) {
-  if (!await getSessionUserId(req)) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const userId = await getSessionUserId(req)
+  if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  if (!getUserFeatures(userId).enable_admin_whitelist) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   try {
     const result = await rconForRequest(req, 'whitelist list')
     if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
@@ -38,6 +40,7 @@ export async function POST(req: NextRequest) {
   if (getUserById(userId)?.role !== 'admin') {
     return Response.json({ ok: false, error: 'Admin role required' }, { status: 403 })
   }
+  if (!getUserFeatures(userId).enable_admin_whitelist) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   try {
     const { player, action } = await req.json()
     if (!player || typeof player !== 'string') {

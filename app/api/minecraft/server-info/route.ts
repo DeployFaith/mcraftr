@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { rconForRequest, getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -71,8 +71,14 @@ function timeOfDay(ticks: number): string {
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  if (!await getSessionUserId(req)) {
+  const userId = await getSessionUserId(req)
+  if (!userId) {
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_admin_server_info')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
 
   try {

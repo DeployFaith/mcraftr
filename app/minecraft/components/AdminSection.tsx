@@ -7,6 +7,7 @@ import {
 import PlayerPicker from './PlayerPicker'
 import type { AuditEntry } from '@/lib/audit'
 import type { UserSummary } from '@/lib/users'
+import { FEATURE_CATEGORIES, FEATURE_DEFS, type FeatureCategory, type FeatureKey } from '@/lib/features'
 import { useToast } from './useToast'
 import Toasts from './Toasts'
 import ConfirmModal from './ConfirmModal'
@@ -86,6 +87,33 @@ function StatTile({ label, value, sub }: { label: string; value: React.ReactNode
 export default function AdminSection({ players }: Props) {
   const { toasts, addToast } = useToast()
   const [confirmModal, setConfirmModal] = useState<Omit<ConfirmModalProps, 'onCancel'> | null>(null)
+  const [features, setFeatures] = useState<Record<FeatureKey, boolean> | null>(null)
+
+  const loadFeatures = useCallback(async () => {
+    try {
+      const r = await fetch('/api/account/preferences')
+      const d = await r.json()
+      if (d.ok && d.features) setFeatures(d.features as Record<FeatureKey, boolean>)
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    loadFeatures()
+    const onFeatures = () => { void loadFeatures() }
+    window.addEventListener('mcraftr:features-updated', onFeatures)
+    return () => window.removeEventListener('mcraftr:features-updated', onFeatures)
+  }, [loadFeatures])
+
+  const canServerInfo = features ? features.enable_admin_server_info : true
+  const canRules = features ? features.enable_admin_rules : true
+  const canServerControls = features ? features.enable_admin_server_controls : true
+  const canModeration = features ? features.enable_admin_moderation : true
+  const canWhitelist = features ? features.enable_admin_whitelist : true
+  const canOperator = features ? features.enable_admin_operator : true
+  const canRcon = features ? features.enable_rcon : true
+  const canAudit = features ? features.enable_admin_audit : true
+  const canUserMgmt = features ? features.enable_admin_user_management : true
+  const canFeaturePolicies = features ? features.enable_admin_feature_policies : true
 
 
   // ── Server Info ───────────────────────────────────────────────────────────────
@@ -111,10 +139,11 @@ export default function AdminSection({ players }: Props) {
   }, [])
 
   useEffect(() => {
+    if (!canServerInfo) return
     fetchInfo(true)
     const id = setInterval(() => fetchInfo(false), 30_000)
     return () => clearInterval(id)
-  }, [fetchInfo])
+  }, [fetchInfo, canServerInfo])
 
   // ── Server Config ─────────────────────────────────────────────────────────────
 
@@ -125,10 +154,11 @@ export default function AdminSection({ players }: Props) {
   const [grBusy,           setGrBusy]           = useState<string | null>(null)
 
   useEffect(() => {
+    if (!canRules) return
     fetch('/api/minecraft/difficulty').then(r => r.json()).then(d => {
       if (d.ok) setDifficulty(d.current)
     }).catch(() => {})
-  }, [])
+  }, [canRules])
 
   const fetchGamerules = async () => {
     setGamerulesLoading(true)
@@ -400,10 +430,11 @@ export default function AdminSection({ players }: Props) {
   const [userBusy,     setUserBusy]     = useState<string | null>(null)
 
   // ── Feature Policies ───────────────────────────────────────────────────────────
-  type UserWithFeatures = { user_id: string; email: string; role: string; features: Record<string, boolean> }
+  type UserWithFeatures = { user_id: string; email: string; role: string; features: Record<FeatureKey, boolean> }
   const [featureUsers, setFeatureUsers] = useState<UserWithFeatures[]>([])
   const [featureLoading, setFeatureLoading] = useState(false)
   const [selectedFeatureUser, setSelectedFeatureUser] = useState<string | null>(null)
+  const [expandedPolicyCats, setExpandedPolicyCats] = useState<Record<string, boolean>>({})
 
   const fetchFeatureUsers = async () => {
     setFeatureLoading(true)
@@ -414,9 +445,9 @@ export default function AdminSection({ players }: Props) {
     } catch {} finally { setFeatureLoading(false) }
   }
 
-  useEffect(() => { fetchFeatureUsers() }, [])
+  useEffect(() => { if (canFeaturePolicies) fetchFeatureUsers() }, [canFeaturePolicies])
 
-  const toggleFeaturePolicy = async (userId: string, feature: string, currentValue: boolean) => {
+  const toggleFeaturePolicy = async (userId: string, feature: FeatureKey, currentValue: boolean) => {
     const newValue = !currentValue
     try {
       const r = await fetch('/api/admin/preferences', {
@@ -431,6 +462,28 @@ export default function AdminSection({ players }: Props) {
     } catch {}
   }
 
+  const toggleFeatureCategoryPolicy = async (userId: string, category: FeatureCategory, targetOn: boolean) => {
+    const defs = FEATURE_DEFS.filter(f => f.category === category)
+    const payload: Record<string, boolean | string> = { user_id: userId }
+    for (const def of defs) payload[def.key] = targetOn
+    try {
+      const r = await fetch('/api/admin/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const d = await r.json()
+      if (d.ok) {
+        setFeatureUsers(prev => prev.map(u => {
+          if (u.user_id !== userId) return u
+          const next = { ...u.features }
+          for (const def of defs) next[def.key] = targetOn
+          return { ...u, features: next }
+        }))
+      }
+    } catch {}
+  }
+
   const fetchUsers = async () => {
     setUsersLoading(true)
     try {
@@ -440,7 +493,7 @@ export default function AdminSection({ players }: Props) {
     } catch {} finally { setUsersLoading(false) }
   }
 
-  useEffect(() => { fetchUsers() }, [])
+  useEffect(() => { if (canUserMgmt) fetchUsers() }, [canUserMgmt])
 
   const createUser = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -498,7 +551,12 @@ export default function AdminSection({ players }: Props) {
 
       <Toasts toasts={toasts} />
 
+      {!canServerInfo && !canRules && !canServerControls && !canModeration && !canWhitelist && !canOperator && !canRcon && !canAudit && !canUserMgmt && !canFeaturePolicies && (
+        <div className="glass-card p-4 text-[13px] font-mono text-[var(--text-dim)]">All admin features are disabled for this account.</div>
+      )}
+
       {/* ── SERVER INFO ── */}
+      {canServerInfo && (
       <div className="glass-card p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">SERVER INFO</div>
@@ -547,11 +605,14 @@ export default function AdminSection({ players }: Props) {
           </div>
         )}
       </div>
+      )}
 
       {/* ── SERVER CONFIG ── */}
+      {(canRules || canServerControls) && (
       <div className="glass-card p-4 space-y-4">
         <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">SERVER CONFIG</div>
 
+        {canRules && (
         <div>
           <SectionLabel>DIFFICULTY</SectionLabel>
           <div className="grid grid-cols-4 gap-2">
@@ -569,7 +630,9 @@ export default function AdminSection({ players }: Props) {
             })}
           </div>
         </div>
+        )}
 
+        {canRules && (
         <div>
           <div className="flex items-center justify-between mb-2">
             <SectionLabel>GAMERULES</SectionLabel>
@@ -606,7 +669,9 @@ export default function AdminSection({ players }: Props) {
             </div>
           )}
         </div>
+        )}
 
+        {canServerControls && (
         <div>
           <SectionLabel>SERVER CONTROLS</SectionLabel>
           <div className="grid grid-cols-2 gap-2">
@@ -633,9 +698,12 @@ export default function AdminSection({ players }: Props) {
             </button>
           </div>
         </div>
+        )}
       </div>
+      )}
 
       {/* ── MODERATION ── */}
+      {canModeration && (
       <div className="glass-card p-4 space-y-4">
         <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">MODERATION</div>
 
@@ -704,8 +772,10 @@ export default function AdminSection({ players }: Props) {
           )}
         </div>
       </div>
+      )}
 
       {/* ── WHITELIST ── */}
+      {canWhitelist && (
       <div className="glass-card p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">WHITELIST</div>
@@ -748,8 +818,10 @@ export default function AdminSection({ players }: Props) {
           </div>
         )}
       </div>
+      )}
 
       {/* ── OPERATOR ── */}
+      {canOperator && (
       <div className="glass-card p-4 space-y-4">
         <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">OPERATOR</div>
         <div>
@@ -767,8 +839,10 @@ export default function AdminSection({ players }: Props) {
           </button>
         </div>
       </div>
+      )}
 
       {/* ── RCON CONSOLE ── */}
+      {canRcon && (
       <div className="glass-card p-4 space-y-3">
         <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">RCON CONSOLE</div>
         <div ref={rconOutputRef} className="bg-black/40 rounded-lg border border-[var(--border)] p-3 h-48 overflow-y-auto font-mono text-[13px] space-y-2">
@@ -796,8 +870,10 @@ export default function AdminSection({ players }: Props) {
         </div>
         <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-30">↑↓ to navigate history · Enter to send</div>
       </div>
+      )}
 
       {/* ── AUDIT LOG ── */}
+      {canAudit && (
       <div className="glass-card p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">AUDIT LOG</div>
@@ -824,8 +900,10 @@ export default function AdminSection({ players }: Props) {
           </div>
         )}
       </div>
+      )}
 
       {/* ── USER MANAGEMENT ── */}
+      {canUserMgmt && (
       <div className="glass-card p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">USER MANAGEMENT</div>
@@ -889,8 +967,10 @@ export default function AdminSection({ players }: Props) {
           </form>
         </div>
       </div>
+      )}
 
       {/* ── FEATURE POLICIES ── */}
+      {canFeaturePolicies && (
       <div className="glass-card p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">FEATURE POLICIES</div>
@@ -918,21 +998,58 @@ export default function AdminSection({ players }: Props) {
                   }`}>{u.role.toUpperCase()}</span>
                 </button>
                 {selectedFeatureUser === u.user_id && (
-                  <div className="grid grid-cols-2 gap-2 px-2">
-                    {Object.entries(u.features).map(([key, val]) => (
-                      <div key={key} className="flex items-center justify-between px-2 py-1.5 rounded bg-[var(--bg)] border border-[var(--border)]">
-                        <span className="text-[11px] font-mono text-[var(--text-dim)]">{key.replace('enable_', '')}</span>
-                        <button
-                          onClick={() => toggleFeaturePolicy(u.user_id, key, val)}
-                          className={`w-8 h-4 rounded-full transition-all border ${
-                            val ? 'border-[var(--accent-mid)] bg-[var(--accent-dim)]' : 'border-[var(--border)] bg-[var(--bg)]'
-                          }`}
-                        >
-                          <div className={`w-3 h-3 rounded-full transition-all ${val ? 'translate-x-4' : 'translate-x-0.5'}`}
-                            style={{ background: val ? 'var(--accent)' : 'var(--text-dim)' }} />
-                        </button>
-                      </div>
-                    ))}
+                  <div className="space-y-2 px-2">
+                    {FEATURE_CATEGORIES.map(cat => {
+                      const defs = FEATURE_DEFS.filter(f => f.category === cat.id)
+                      const enabledCount = defs.filter(d => u.features[d.key]).length
+                      const allOn = enabledCount === defs.length
+                      const expanded = !!expandedPolicyCats[`${u.user_id}:${cat.id}`]
+                      return (
+                        <div key={cat.id} className="rounded border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
+                          <div className="flex items-center justify-between px-2 py-1.5">
+                            <button
+                              onClick={() => setExpandedPolicyCats(prev => ({ ...prev, [`${u.user_id}:${cat.id}`]: !prev[`${u.user_id}:${cat.id}`] }))}
+                              className="text-left"
+                            >
+                              <div className="text-[11px] font-mono text-[var(--text)]">{cat.label}</div>
+                              <div className="text-[11px] font-mono text-[var(--text-dim)] opacity-60">{enabledCount}/{defs.length}</div>
+                            </button>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => toggleFeatureCategoryPolicy(u.user_id, cat.id, !allOn)}
+                                className={`w-8 h-4 rounded-full transition-all border ${allOn ? 'border-[var(--accent-mid)] bg-[var(--accent-dim)]' : 'border-[var(--border)] bg-[var(--bg)]'}`}
+                              >
+                                <div className={`w-3 h-3 rounded-full transition-all ${allOn ? 'translate-x-4' : 'translate-x-0.5'}`} style={{ background: allOn ? 'var(--accent)' : 'var(--text-dim)' }} />
+                              </button>
+                              <button
+                                onClick={() => setExpandedPolicyCats(prev => ({ ...prev, [`${u.user_id}:${cat.id}`]: !prev[`${u.user_id}:${cat.id}`] }))}
+                                className="text-[11px] font-mono text-[var(--text-dim)]"
+                              >
+                                {expanded ? '▲' : '▼'}
+                              </button>
+                            </div>
+                          </div>
+                          {expanded && (
+                            <div className="border-t border-[var(--border)] p-2 space-y-1.5">
+                              {defs.map(def => {
+                                const val = u.features[def.key]
+                                return (
+                                  <div key={def.key} className="flex items-center justify-between px-2 py-1 rounded bg-[var(--panel)] border border-[var(--border)]">
+                                    <span className="text-[11px] font-mono text-[var(--text-dim)]">{def.label}</span>
+                                    <button
+                                      onClick={() => toggleFeaturePolicy(u.user_id, def.key, val)}
+                                      className={`w-8 h-4 rounded-full transition-all border ${val ? 'border-[var(--accent-mid)] bg-[var(--accent-dim)]' : 'border-[var(--border)] bg-[var(--bg)]'}`}
+                                    >
+                                      <div className={`w-3 h-3 rounded-full transition-all ${val ? 'translate-x-4' : 'translate-x-0.5'}`} style={{ background: val ? 'var(--accent)' : 'var(--text-dim)' }} />
+                                    </button>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -940,6 +1057,7 @@ export default function AdminSection({ players }: Props) {
           </div>
         )}
       </div>
+      )}
       {confirmModal && (
         <ConfirmModal
           {...confirmModal}

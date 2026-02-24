@@ -1,8 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { signOut } from 'next-auth/react'
 import { useTheme, ACCENTS } from '@/app/components/ThemeProvider'
-import { FEATURE_DEFS, type FeatureKey } from '@/lib/features'
+import { FEATURE_DEFS, FEATURE_CATEGORIES, type FeatureKey, type FeatureCategory } from '@/lib/features'
 // ── Small helpers ─────────────────────────────────────────────────────────────
 
 function StatusMsg({ ok, msg }: { ok: boolean; msg: string }) {
@@ -34,6 +34,27 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
   const [featuresLoading, setFeaturesLoading] = useState(true)
   const [featuresSaving, setFeaturesSaving] = useState(false)
   const [featuresStatus, setFeaturesStatus] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [expandedCategories, setExpandedCategories] = useState<Record<FeatureCategory, boolean>>({
+    tabs: false,
+    actions: true,
+    players: false,
+    chat: false,
+    admin: false,
+  })
+
+  const defsByCategory = useMemo(() => {
+    const grouped: Record<FeatureCategory, Array<{ key: FeatureKey; label: string; desc: string; category: FeatureCategory }>> = {
+      tabs: [],
+      actions: [],
+      players: [],
+      chat: [],
+      admin: [],
+    }
+    for (const def of FEATURE_DEFS) {
+      grouped[def.category].push(def)
+    }
+    return grouped
+  }, [])
 
   useEffect(() => {
     fetch('/api/account/preferences').then(r => r.json()).then(d => {
@@ -41,17 +62,16 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
     }).catch(() => {}).finally(() => setFeaturesLoading(false))
   }, [])
 
-  const toggleFeature = async (key: FeatureKey) => {
+  const saveFeatureUpdates = async (updates: Partial<FeatureFlags>, optimistic: FeatureFlags) => {
     if (!features || featuresSaving) return
-    const newFeatures = { ...features, [key]: !features[key] }
-    setFeatures(newFeatures)
+    setFeatures(optimistic)
     setFeaturesSaving(true)
     setFeaturesStatus(null)
     try {
       const res = await fetch('/api/account/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [key]: newFeatures[key] }),
+        body: JSON.stringify(updates),
       })
       const d = await res.json()
       if (d.ok) {
@@ -66,6 +86,24 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
       setFeatures(features)
       setFeaturesStatus({ ok: false, msg: 'Network error' })
     } finally { setFeaturesSaving(false) }
+  }
+
+  const toggleFeature = async (key: FeatureKey) => {
+    if (!features || featuresSaving) return
+    const optimistic = { ...features, [key]: !features[key] }
+    await saveFeatureUpdates({ [key]: optimistic[key] }, optimistic)
+  }
+
+  const toggleCategory = async (category: FeatureCategory, targetOn: boolean) => {
+    if (!features || featuresSaving) return
+    const defs = defsByCategory[category]
+    const updates: Partial<FeatureFlags> = {}
+    const optimistic = { ...features }
+    for (const def of defs) {
+      updates[def.key] = targetOn
+      optimistic[def.key] = targetOn
+    }
+    await saveFeatureUpdates(updates, optimistic)
   }
 
   // Change password state
@@ -260,34 +298,88 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
           <div className="text-[13px] font-mono text-[var(--text-dim)] animate-pulse">Loading...</div>
         ) : (
           <div className="space-y-2">
-            {FEATURE_DEFS.map(f => (
-              <div key={f.key} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
-                <div className="min-w-0">
-                  <div className="text-[13px] font-mono text-[var(--text)]">{f.label}</div>
-                  <div className="text-[11px] font-mono text-[var(--text-dim)]">{f.desc}</div>
+            {FEATURE_CATEGORIES.map(cat => {
+              const defs = defsByCategory[cat.id]
+              const onCount = defs.filter(d => features?.[d.key]).length
+              const allOn = onCount === defs.length
+              const allOff = onCount === 0
+              const mixed = !allOn && !allOff
+              const expanded = expandedCategories[cat.id]
+              return (
+                <div key={cat.id} className="rounded-lg bg-[var(--panel)] border border-[var(--border)] overflow-hidden">
+                  <div className="flex items-center justify-between gap-2 px-3 py-2">
+                    <button
+                      onClick={() => setExpandedCategories(prev => ({ ...prev, [cat.id]: !prev[cat.id] }))}
+                      className="text-left min-w-0"
+                    >
+                      <div className="text-[13px] font-mono text-[var(--text)]">{cat.label}</div>
+                      <div className="text-[11px] font-mono text-[var(--text-dim)]">{cat.desc}</div>
+                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[11px] font-mono text-[var(--text-dim)]">{onCount}/{defs.length}</span>
+                      <button
+                        onClick={() => toggleCategory(cat.id, !allOn)}
+                        disabled={featuresSaving}
+                        className={`w-12 h-6 rounded-full transition-all border ${
+                          allOn
+                            ? 'border-[var(--accent-mid)] bg-[var(--accent-dim)]'
+                            : mixed
+                              ? 'border-[var(--accent-mid)] bg-[var(--panel)]'
+                              : 'border-[var(--border)] bg-[var(--bg)]'
+                        }`}
+                        title={allOn ? 'Turn all off' : 'Turn all on'}
+                      >
+                        <div
+                          className={`w-5 h-5 rounded-full transition-all shadow-sm ${
+                            allOn ? 'translate-x-6' : mixed ? 'translate-x-3' : 'translate-x-0.5'
+                          }`}
+                          style={{ background: allOn || mixed ? 'var(--accent)' : 'var(--text-dim)' }}
+                        />
+                      </button>
+                      <button
+                        onClick={() => setExpandedCategories(prev => ({ ...prev, [cat.id]: !prev[cat.id] }))}
+                        className="text-[11px] font-mono text-[var(--text-dim)] px-1"
+                      >
+                        {expanded ? '▲' : '▼'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {expanded && (
+                    <div className="border-t border-[var(--border)] px-3 py-2 space-y-2">
+                      {defs.map(f => (
+                        <div key={f.key} className="flex items-center justify-between gap-3 px-2 py-1.5 rounded bg-[var(--bg)] border border-[var(--border)]">
+                          <div className="min-w-0">
+                            <div className="text-[13px] font-mono text-[var(--text)]">{f.label}</div>
+                            <div className="text-[11px] font-mono text-[var(--text-dim)]">{f.desc}</div>
+                          </div>
+                          <button
+                            onClick={() => toggleFeature(f.key)}
+                            disabled={featuresSaving}
+                            className={`w-12 h-6 rounded-full transition-all border ${
+                              features?.[f.key]
+                                ? 'border-[var(--accent-mid)] bg-[var(--accent-dim)]'
+                                : 'border-[var(--border)] bg-[var(--bg)]'
+                            }`}
+                          >
+                            <div
+                              className={`w-5 h-5 rounded-full transition-all shadow-sm ${
+                                features?.[f.key]
+                                  ? 'translate-x-6'
+                                  : 'translate-x-0.5'
+                              }`}
+                              style={{
+                                background: features?.[f.key] ? 'var(--accent)' : 'var(--text-dim)',
+                              }}
+                            />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={() => toggleFeature(f.key)}
-                  disabled={featuresSaving}
-                  className={`w-12 h-6 rounded-full transition-all border ${
-                    features?.[f.key]
-                      ? 'border-[var(--accent-mid)] bg-[var(--accent-dim)]'
-                      : 'border-[var(--border)] bg-[var(--bg)]'
-                  }`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded-full transition-all shadow-sm ${
-                      features?.[f.key]
-                        ? 'translate-x-6'
-                        : 'translate-x-0.5'
-                    }`}
-                    style={{
-                      background: features?.[f.key] ? 'var(--accent)' : 'var(--text-dim)',
-                    }}
-                  />
-                </button>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
         {featuresStatus && (

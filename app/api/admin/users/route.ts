@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   if (!adminId) return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })
 
   const features = getUserFeatures(adminId)
-  if (!features.enable_admin) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  if (!features.enable_admin_user_management) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
 
   const users = listUsers()
   return Response.json({ ok: true, users })
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   if (!adminId) return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })
 
   const features = getUserFeatures(adminId)
-  if (!features.enable_admin) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  if (!features.enable_admin_user_management) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
 
   try {
     const { email, password } = await req.json()

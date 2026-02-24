@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId } from '@/lib/rcon'
-import { getUserById } from '@/lib/users'
+import { getUserById, getUserFeatures } from '@/lib/users'
 import { logAudit } from '@/lib/audit'
 
 export const runtime = 'nodejs'
@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
   if (getUserById(userId)?.role !== 'admin') {
     return Response.json({ ok: false, error: 'Admin role required' }, { status: 403 })
   }
+  if (!getUserFeatures(userId).enable_admin_operator) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   try {
     const { player, action } = await req.json()
     if (!player || typeof player !== 'string') {

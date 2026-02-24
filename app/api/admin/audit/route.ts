@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   if (!user || user.role !== 'admin') return Response.json({ ok: false, error: 'Admin only' }, { status: 403 })
 
   const features = getUserFeatures(userId)
-  if (!features.enable_admin) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  if (!features.enable_admin_audit) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
 
   const limitParam = req.nextUrl.searchParams.get('limit')
   const limit = Math.min(parseInt(limitParam ?? '100'), 500)

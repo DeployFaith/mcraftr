@@ -20,7 +20,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!adminId) return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })
 
   const features = getUserFeatures(adminId)
-  if (!features.enable_admin) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  if (!features.enable_admin_user_management) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
 
   const { id } = await params
 

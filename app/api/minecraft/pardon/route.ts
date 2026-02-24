@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId } from '@/lib/rcon'
 import { logAudit } from '@/lib/audit'
+import { getUserFeatures } from '@/lib/users'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -11,6 +12,7 @@ const PLAYER_RE = /^\.?[a-zA-Z0-9_]{1,16}$/
 export async function POST(req: NextRequest) {
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  if (!getUserFeatures(userId).enable_admin_moderation) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   try {
     const { player, pardonIp } = await req.json()
     if (!player || typeof player !== 'string') {

@@ -16,6 +16,9 @@ export async function GET(req: NextRequest) {
   if (!user || user.role !== 'admin') {
     return Response.json({ ok: false, error: 'Admin only' }, { status: 403 })
   }
+  if (!getUserFeatures(userId).enable_admin_feature_policies) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
 
   const url = new URL(req.url)
   const targetId = url.searchParams.get('user_id')
@@ -47,6 +50,9 @@ export async function PUT(req: NextRequest) {
   const admin = getUserById(adminId)
   if (!admin || admin.role !== 'admin') {
     return Response.json({ ok: false, error: 'Admin only' }, { status: 403 })
+  }
+  if (!getUserFeatures(adminId).enable_admin_feature_policies) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
 
   const { user_id, ...features } = await req.json()

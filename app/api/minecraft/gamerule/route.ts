@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId } from '@/lib/rcon'
 import { getToken } from 'next-auth/jwt'
-import { getUserById } from '@/lib/users'
+import { getUserById, getUserFeatures } from '@/lib/users'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -13,6 +13,9 @@ const SAFE_GAMERULE = /^[a-zA-Z]+$/
 export async function GET(req: NextRequest) {
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  if (!getUserFeatures(userId).enable_admin_rules) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
 
   try {
     // Fetch all gamerules in parallel
@@ -40,6 +43,7 @@ export async function POST(req: NextRequest) {
   if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   const user = getUserById(userId)
   if (!user || user.role !== 'admin') return Response.json({ ok: false, error: 'Admin only' }, { status: 403 })
+  if (!getUserFeatures(userId).enable_admin_rules) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
 
   try {
     const { rule, value } = await req.json()
