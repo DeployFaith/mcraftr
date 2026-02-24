@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { ArrowLeftRight } from 'lucide-react'
 import type { InvItem } from '../../api/minecraft/inventory/route'
 
 export function slotLabel(slot: number): string {
@@ -13,43 +14,46 @@ export function slotLabel(slot: number): string {
   return `Slot ${slot}`
 }
 
-// Builds a flat array of slots in the canonical Minecraft layout order:
-// hotbar (0-8), main (9-35), armor (103,102,101,100), offhand (150)
 export function buildInventoryLayout(items: InvItem[]) {
   const bySlot = new Map(items.map(i => [i.slot, i]))
-
   const hotbar  = Array.from({ length: 9  }, (_, i) => bySlot.get(i))
   const main    = Array.from({ length: 27 }, (_, i) => bySlot.get(i + 9))
   const armor   = [103, 102, 101, 100].map(s => bySlot.get(s))
   const offhand = bySlot.get(150)
-
   return { hotbar, main, armor, offhand }
 }
 
 export default function InvSlot({
   item,
+  slotIndex,
+  selected = false,
+  moveTarget = false,
   onDelete,
-  deleting,
+  onSlotClick,
+  deleting = false,
 }: {
   item: InvItem | undefined
+  slotIndex?: number
+  selected?: boolean
+  moveTarget?: boolean
   onDelete?: (item: InvItem) => void
+  onSlotClick?: (slotIndex?: number) => void
   deleting?: boolean
 }) {
   const [hovered, setHovered] = useState(false)
 
-  // Border styles:
-  // empty  → very faint white (non-intrusive structure guide)
-  // filled → soft white (visible but not loud)
-  // hover  → accent color
-  const emptyBorder  = 'rgba(255,255,255,0.10)'
-  const filledBorder = 'rgba(255,255,255,0.22)'
-  const accentBorder = 'var(--accent)'
-
-  const borderColor = !item
-    ? emptyBorder
+  // Border logic
+  const borderColor = moveTarget
+    ? '#22c55e'                          // green — valid move destination
+    : selected
+    ? 'var(--accent)'                    // accent — this slot is the "from"
+    : !item
+    ? 'rgba(255,255,255,0.10)'           // faint white — empty, no state
     : hovered
-    ? accentBorder
-    : filledBorder
+    ? 'var(--accent)'                    // accent on hover for filled
+    : 'rgba(255,255,255,0.22)'           // soft white — filled, idle
+
+  const isClickable = !!onSlotClick || (!!item && (!!onDelete || !!onSlotClick))
 
   return (
     <div
@@ -58,10 +62,19 @@ export default function InvSlot({
       onMouseLeave={() => setHovered(false)}
     >
       <div
-        className="w-10 h-10 rounded bg-[var(--panel)] flex flex-col items-center justify-center cursor-default transition-colors"
+        className={`w-10 h-10 rounded bg-[var(--panel)] flex flex-col items-center justify-center transition-colors ${isClickable ? 'cursor-pointer' : 'cursor-default'}`}
         style={{ border: `1px solid ${borderColor}` }}
+        onClick={() => onSlotClick?.(slotIndex)}
       >
-        {!item ? null : deleting ? (
+        {moveTarget && !item ? (
+          // Empty slot that is a valid move target — show swap icon
+          <ArrowLeftRight
+            size={14}
+            strokeWidth={1.5}
+            color="#22c55e"
+            style={{ opacity: hovered ? 1 : 0.6, transition: 'opacity 0.15s' }}
+          />
+        ) : !item ? null : deleting ? (
           <span className="text-[11px] font-mono text-[var(--text-dim)] animate-pulse">…</span>
         ) : (
           <>
@@ -75,14 +88,12 @@ export default function InvSlot({
         )}
       </div>
 
-      {/* Delete button — appears on hover when onDelete is provided */}
-      {item && onDelete && !deleting && (
+      {/* Delete button — no confirm(); parent manages confirmation */}
+      {item && onDelete && !deleting && !moveTarget && (
         <button
           onClick={e => {
             e.stopPropagation()
-            if (confirm(`Clear ${item.label} from inventory? This cannot be undone.`)) {
-              onDelete(item)
-            }
+            onDelete(item)
           }}
           className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-900 border border-red-700 text-red-300 text-[10px] font-mono leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-700"
           title={`Clear ${item.label}`}
@@ -91,8 +102,8 @@ export default function InvSlot({
         </button>
       )}
 
-      {/* Tooltip */}
-      {item && hovered && !deleting && (
+      {/* Tooltip — not shown when move target active */}
+      {item && hovered && !deleting && !moveTarget && (
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-20 bg-[var(--bg)] border border-[var(--border)] rounded px-2 py-1.5 text-[11px] font-mono text-[var(--text)] whitespace-nowrap shadow-lg pointer-events-none">
           <div className="font-medium">{item.label}</div>
           {item.count > 1 && <div className="text-[var(--text-dim)]">×{item.count}</div>}

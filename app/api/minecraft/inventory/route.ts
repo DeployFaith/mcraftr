@@ -150,6 +150,41 @@ export async function GET(req: NextRequest) {
   }
 }
 
+function nbtSlotToCommandSlot(slot: number): string | null {
+  if (slot >= 0 && slot <= 8)   return `hotbar.${slot}`
+  if (slot >= 9 && slot <= 35)  return `inventory.${slot - 9}`
+  if (slot === 100) return 'armor.feet'
+  if (slot === 101) return 'armor.legs'
+  if (slot === 102) return 'armor.chest'
+  if (slot === 103) return 'armor.head'
+  if (slot === 150) return 'weapon.offhand'
+  return null
+}
+
+export async function POST(req: NextRequest) {
+  if (!await getSessionUserId(req)) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  try {
+    const { player, fromSlot, toSlot } = await req.json()
+    if (!player || fromSlot == null || toSlot == null) {
+      return Response.json({ ok: false, error: 'Missing player, fromSlot, or toSlot' }, { status: 400 })
+    }
+    if (!/^\.?[a-zA-Z0-9_]{1,16}$/.test(player)) {
+      return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
+    }
+    const src  = nbtSlotToCommandSlot(Number(fromSlot))
+    const dest = nbtSlotToCommandSlot(Number(toSlot))
+    if (!src || !dest) {
+      return Response.json({ ok: false, error: 'Invalid slot number' }, { status: 400 })
+    }
+    const cmd = `item entity @a[name=${player},limit=1] ${dest} from entity @a[name=${player},limit=1] ${src}`
+    const result = await rconForRequest(req, cmd)
+    if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
+    return Response.json({ ok: true })
+  } catch (e: unknown) {
+    return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Server error' }, { status: 500 })
+  }
+}
+
 export async function DELETE(req: NextRequest) {
   if (!await getSessionUserId(req)) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   try {
@@ -162,8 +197,8 @@ export async function DELETE(req: NextRequest) {
       return Response.json({ ok: false, error: 'Invalid item ID' }, { status: 400 })
     }
     const bareItem = item.replace(/[\[{].*$/, '')
-    if (!VALID_ITEM_IDS.has(bareItem)) {
-      return Response.json({ ok: false, error: 'Unknown item ID' }, { status: 400 })
+    if (!/^(minecraft:)?[a-z][a-z0-9_]*$/.test(bareItem)) {
+      return Response.json({ ok: false, error: 'Invalid item ID format' }, { status: 400 })
     }
     const clearCount = count != null ? Number(count) : undefined
     if (clearCount !== undefined && (!Number.isInteger(clearCount) || clearCount < 1 || clearCount > 64)) {

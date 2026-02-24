@@ -82,3 +82,12 @@ body::before {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* Teleport "to" player — pulsing glow border */
+@keyframes tp-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+  50%       { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent); }
+}
+.tp-target {
+  animation: tp-pulse 1.4s ease-in-out infinite;
+}

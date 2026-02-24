@@ -12,6 +12,8 @@ import type { InvItem } from '../../api/minecraft/inventory/route'
 import { useToast } from './useToast'
 import Toasts from './Toasts'
 import InvSlot, { buildInventoryLayout } from './InvSlot'
+import ConfirmModal from './ConfirmModal'
+import type { ConfirmModalProps } from './ConfirmModal'
 
 type LucideIcon = React.ComponentType<LucideProps>
 
@@ -55,9 +57,9 @@ function PlayerChip({ name, selected, variant = 'default', onClick }: {
 }) {
   const base = 'px-3 py-1.5 rounded-lg text-[13px] font-mono border transition-all cursor-pointer select-none'
   if (variant === 'from')
-    return <button onClick={onClick} className={`${base} ${selected ? 'border-[var(--border)] bg-[var(--panel)] text-[var(--text)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)] hover:text-[var(--text)]'}`}>{name}</button>
+    return <button onClick={onClick} className={`${base} ${selected ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] hover:text-[var(--text)]'}`}>{name}</button>
   if (variant === 'to')
-    return <button onClick={onClick} className={`${base} ${selected ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]'}`}>{name}</button>
+    return <button onClick={onClick} className={`${base} ${selected ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)] tp-target' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]'}`}>{name}</button>
   return (
     <button onClick={onClick} className={`${base} ${selected ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]'}`}>
       {name}
@@ -323,16 +325,18 @@ export default function ActionsSection({ players }: Props) {
 
   // ── Inventory ─────────────────────────────────────────────────────────────────
 
-  const [invManual,   setInvManual]   = useState('')
-  const [invItems,    setInvItems]    = useState<InvItem[]>([])
-  const [invLoading,  setInvLoading]  = useState(false)
-  const [invDeleting, setInvDeleting] = useState<string | null>(null)
+  const [invManual,      setInvManual]      = useState('')
+  const [invItems,       setInvItems]       = useState<InvItem[]>([])
+  const [invLoading,     setInvLoading]     = useState(false)
+  const [invDeleting,    setInvDeleting]    = useState<string | null>(null)
+  const [selectedInvSlot, setSelectedInvSlot] = useState<InvItem | null>(null)
+  const [confirmModal,   setConfirmModal]   = useState<Omit<ConfirmModalProps, 'onCancel'> | null>(null)
 
   const invPlayer = cmdPlayer || invManual.trim()
 
   const loadInventory = async () => {
     if (!invPlayer) return
-    setInvLoading(true); setInvItems([])
+    setInvLoading(true); setInvItems([]); setSelectedInvSlot(null)
     try {
       const r = await fetch(`/api/minecraft/inventory?player=${encodeURIComponent(invPlayer)}`)
       const d = await r.json()
@@ -359,8 +363,8 @@ export default function ActionsSection({ players }: Props) {
     } finally { setInvDeleting(null) }
   }
 
-  const clearAllInventory = async (player: string) => {
-    if (!confirm(`Clear ALL items from ${player}'s inventory? This cannot be undone.`)) return
+  const doClearAll = async (player: string) => {
+    setConfirmModal(null)
     setInvDeleting('all')
     let cleared = 0; let failed = 0
     for (const item of invItems) {
@@ -377,6 +381,44 @@ export default function ActionsSection({ players }: Props) {
     setInvDeleting(null)
     if (failed === 0) addToast('ok', `Cleared ${cleared} item${cleared !== 1 ? 's' : ''} from ${player}`)
     else addToast('error', `Cleared ${cleared}, failed ${failed}`)
+  }
+
+  const moveInvItem = async (player: string, fromSlot: number, toSlot: number) => {
+    setSelectedInvSlot(null)
+    try {
+      const r = await fetch('/api/minecraft/inventory', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player, fromSlot, toSlot }),
+      })
+      const d = await r.json()
+      if (d.ok) {
+        const ri = await fetch(`/api/minecraft/inventory?player=${encodeURIComponent(player)}`)
+        const di = await ri.json()
+        if (di.ok) setInvItems(di.items ?? [])
+      } else {
+        addToast('error', d.error || 'Failed to move item')
+      }
+    } catch {
+      addToast('error', 'Failed to move item')
+    }
+  }
+
+  const handleInvSlotClick = (player: string, clickedItem: InvItem | undefined, clickedSlot: number) => {
+    if (selectedInvSlot) {
+      if (clickedItem && clickedItem.slot === selectedInvSlot.slot) {
+        setSelectedInvSlot(null)
+      } else {
+        setConfirmModal({
+          title: 'Move item?',
+          body: 'Confirm move',
+          confirmLabel: 'Move',
+          destructive: false,
+          onConfirm: () => { setConfirmModal(null); moveInvItem(player, selectedInvSlot.slot, clickedItem?.slot ?? clickedSlot) },
+        })
+      }
+    } else if (clickedItem) {
+      setSelectedInvSlot(clickedItem)
+    }
   }
 
   const noPlayers = players.length === 0
@@ -785,18 +827,26 @@ export default function ActionsSection({ players }: Props) {
               <div className="flex items-center justify-between">
                 <div className="text-[13px] font-mono text-[var(--text-dim)]">{invItems.length} item{invItems.length !== 1 ? 's' : ''}</div>
                 <button
-                  onClick={() => clearAllInventory(invPlayer)}
+                  onClick={() => setConfirmModal({ title: 'Clear all items?', body: `This will remove all ${invItems.length} items from ${invPlayer}'s inventory.`, confirmLabel: 'Clear All', destructive: true, onConfirm: () => doClearAll(invPlayer) })}
                   disabled={!!invDeleting}
                   className="text-[13px] font-mono px-2 py-1 rounded border border-red-900/50 text-red-400 hover:border-red-700 transition-all disabled:opacity-30">
                   Clear All
                 </button>
               </div>
+              {selectedInvSlot && (
+                <div className="text-[11px] font-mono text-[var(--text-dim)] px-2 py-1 rounded border border-[var(--accent-mid)] bg-[var(--accent-dim)]">
+                  <span className="text-[var(--accent)]">{selectedInvSlot.label}</span> selected — click another slot to move, or click it again to deselect
+                </div>
+              )}
               <div>
                 <div className="text-[11px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">HOTBAR</div>
                 <div className="flex flex-wrap gap-1">
                   {hotbar.map((item, i) => (
-                    <InvSlot key={i} item={item}
-                      onDelete={item ? (it) => deleteItem(invPlayer, it) : undefined}
+                    <InvSlot key={i} item={item} slotIndex={i}
+                      selected={!!item && selectedInvSlot?.slot === item.slot}
+                      moveTarget={!!selectedInvSlot && !item}
+                      onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
+                      onSlotClick={() => handleInvSlotClick(invPlayer, item, item?.slot ?? i)}
                       deleting={item ? invDeleting === `${item.slot}` : false}
                     />
                   ))}
@@ -805,15 +855,25 @@ export default function ActionsSection({ players }: Props) {
               <div>
                 <div className="text-[11px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">ARMOR / OFFHAND</div>
                 <div className="flex gap-1 flex-wrap items-center">
-                  {armor.map((item, i) => (
-                    <InvSlot key={i} item={item}
-                      onDelete={item ? (it) => deleteItem(invPlayer, it) : undefined}
-                      deleting={item ? invDeleting === `${item.slot}` : false}
-                    />
-                  ))}
+                  {armor.map((item, i) => {
+                    const armorSlots = [103, 102, 101, 100]
+                    const s = armorSlots[i]
+                    return (
+                      <InvSlot key={i} item={item} slotIndex={s}
+                        selected={!!item && selectedInvSlot?.slot === item.slot}
+                        moveTarget={!!selectedInvSlot && !item}
+                        onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
+                        onSlotClick={() => handleInvSlotClick(invPlayer, item, item?.slot ?? s)}
+                        deleting={item ? invDeleting === `${item.slot}` : false}
+                      />
+                    )
+                  })}
                   <div className="w-px h-8 bg-[var(--border)] mx-1.5" />
-                  <InvSlot item={offhand}
-                    onDelete={offhand ? (it) => deleteItem(invPlayer, it) : undefined}
+                  <InvSlot item={offhand} slotIndex={150}
+                    selected={!!offhand && selectedInvSlot?.slot === 150}
+                    moveTarget={!!selectedInvSlot && !offhand}
+                    onDelete={offhand ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
+                    onSlotClick={() => handleInvSlotClick(invPlayer, offhand, offhand?.slot ?? 150)}
                     deleting={offhand ? invDeleting === `${offhand.slot}` : false}
                   />
                 </div>
@@ -822,8 +882,11 @@ export default function ActionsSection({ players }: Props) {
                 <div className="text-[11px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">MAIN</div>
                 <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(9, 2.5rem)' }}>
                   {main.map((item, i) => (
-                    <InvSlot key={i} item={item}
-                      onDelete={item ? (it) => deleteItem(invPlayer, it) : undefined}
+                    <InvSlot key={i} item={item} slotIndex={i + 9}
+                      selected={!!item && selectedInvSlot?.slot === item.slot}
+                      moveTarget={!!selectedInvSlot && !item}
+                      onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
+                      onSlotClick={() => handleInvSlotClick(invPlayer, item, item?.slot ?? (i + 9))}
                       deleting={item ? invDeleting === `${item.slot}` : false}
                     />
                   ))}
@@ -841,6 +904,12 @@ export default function ActionsSection({ players }: Props) {
       </div>
 
       <Toasts toasts={toasts} />
+      {confirmModal && (
+        <ConfirmModal
+          {...confirmModal}
+          onCancel={() => { setConfirmModal(null); setSelectedInvSlot(null) }}
+        />
+      )}
     </div>
   )
 }

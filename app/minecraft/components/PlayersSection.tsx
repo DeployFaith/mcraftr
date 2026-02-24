@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import InvSlot, { slotLabel, buildInventoryLayout } from './InvSlot'
 import type { InvItem } from '../../api/minecraft/inventory/route'
+import ConfirmModal from './ConfirmModal'
+import type { ConfirmModalProps } from './ConfirmModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -208,6 +210,8 @@ function PlayerPanel({
   const [deleteError, setDeleteError]   = useState<string | null>(null)
   const [refreshing, setRefreshing]     = useState(false)
   const [invOpen, setInvOpen]           = useState(true)
+  const [selectedSlot, setSelectedSlot] = useState<InvItem | null>(null)
+  const [confirmModal, setConfirmModal] = useState<Omit<ConfirmModalProps, 'onCancel'> | null>(null)
 
   const refresh = useCallback(() => {
     setStats(null); setEffects([]); setInventory([])
@@ -254,6 +258,61 @@ function PlayerPanel({
       setDeleteError(e instanceof Error ? e.message : 'Failed to clear item')
       setTimeout(() => setDeleteError(null), 4000)
     } finally { setDeletingSlot(null) }
+  }
+
+  const moveItem = async (fromSlot: number, toSlot: number) => {
+    setSelectedSlot(null)
+    try {
+      const r = await fetch('/api/minecraft/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player, fromSlot, toSlot }),
+      })
+      const d = await r.json()
+      if (d.ok) {
+        // Refresh inventory to reflect server state
+        const ri = await fetch(`/api/minecraft/inventory?player=${encodeURIComponent(player)}`)
+        const di = await ri.json()
+        if (di.ok) setInventory(di.items ?? [])
+      } else {
+        setDeleteError(d.error || 'Failed to move item')
+        setTimeout(() => setDeleteError(null), 4000)
+      }
+    } catch {
+      setDeleteError('Failed to move item')
+      setTimeout(() => setDeleteError(null), 4000)
+    }
+  }
+
+  // Slot click handler — manages select/deselect and move-target logic
+  const handleSlotClick = (clickedItem: InvItem | undefined, clickedSlotIndex: number | undefined) => {
+    if (clickedSlotIndex === undefined) return
+    if (selectedSlot) {
+      if (clickedItem && clickedItem.slot === selectedSlot.slot) {
+        // Deselect
+        setSelectedSlot(null)
+      } else if (!clickedItem) {
+        // Empty slot while something selected — open move confirm
+        setConfirmModal({
+          title: 'Move item?',
+          body: 'Confirm move',
+          confirmLabel: 'Move',
+          destructive: false,
+          onConfirm: () => { setConfirmModal(null); moveItem(selectedSlot.slot, clickedSlotIndex) },
+        })
+      } else {
+        // Swap to a different filled slot
+        setConfirmModal({
+          title: 'Move item?',
+          body: 'Confirm move',
+          confirmLabel: 'Move',
+          destructive: false,
+          onConfirm: () => { setConfirmModal(null); moveItem(selectedSlot.slot, clickedItem.slot) },
+        })
+      }
+    } else if (clickedItem) {
+      setSelectedSlot(clickedItem)
+    }
   }
 
   const { hotbar, main, armor, offhand } = buildInventoryLayout(inventory)
@@ -408,6 +467,11 @@ function PlayerPanel({
             <div className="text-[13px] font-mono text-[var(--text-dim)] animate-pulse">Loading inventory…</div>
           ) : (
             <div className="space-y-3">
+              {selectedSlot && (
+                <div className="text-[11px] font-mono text-[var(--text-dim)] px-2 py-1 rounded border border-[var(--accent-mid)] bg-[var(--accent-dim)]">
+                  <span className="text-[var(--accent)]">{selectedSlot.label}</span> selected — click an empty slot to move, or click it again to deselect
+                </div>
+              )}
               {deleteError && (
                 <div className="text-[13px] font-mono text-red-400 px-2 py-1 rounded border border-red-900/50 bg-red-950/30">
                   ✗ {deleteError}
@@ -417,8 +481,11 @@ function PlayerPanel({
                 <div className="text-[13px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">HOTBAR</div>
                 <div className="flex flex-wrap gap-1">
                   {hotbar.map((item, i) => (
-                    <InvSlot key={i} item={item}
-                      onDelete={item ? deleteItem : undefined}
+                    <InvSlot key={i} item={item} slotIndex={i}
+                      selected={!!item && selectedSlot?.slot === item.slot}
+                      moveTarget={!!selectedSlot && !item}
+                      onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
+                      onSlotClick={() => handleSlotClick(item, item?.slot ?? i)}
                       deleting={item ? deletingSlot === item.slot : false}
                     />
                   ))}
@@ -427,16 +494,26 @@ function PlayerPanel({
               <div>
                 <div className="text-[13px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">ARMOR / OFFHAND</div>
                 <div className="flex gap-1 flex-wrap items-center">
-                  {armor.map((item, i) => (
-                    <InvSlot key={i} item={item}
-                      onDelete={item ? deleteItem : undefined}
-                      deleting={item ? deletingSlot === item.slot : false}
-                    />
-                  ))}
+                  {armor.map((item, i) => {
+                    const armorSlots = [103, 102, 101, 100]
+                    const s = armorSlots[i]
+                    return (
+                      <InvSlot key={i} item={item} slotIndex={s}
+                        selected={!!item && selectedSlot?.slot === item.slot}
+                        moveTarget={!!selectedSlot && !item}
+                        onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
+                        onSlotClick={() => handleSlotClick(item, item?.slot ?? s)}
+                        deleting={item ? deletingSlot === item.slot : false}
+                      />
+                    )
+                  })}
                   <div className="w-px h-8 bg-[var(--border)] mx-1.5" />
-                  <InvSlot item={offhand}
-                    onDelete={offhand ? deleteItem : undefined}
-                    deleting={offhand ? deletingSlot === offhand.slot : false}
+                  <InvSlot item={offhand} slotIndex={150}
+                    selected={!!offhand && selectedSlot?.slot === 150}
+                    moveTarget={!!selectedSlot && !offhand}
+                    onDelete={offhand ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
+                    onSlotClick={() => handleSlotClick(offhand, offhand?.slot ?? 150)}
+                    deleting={offhand ? deletingSlot === 150 : false}
                   />
                 </div>
               </div>
@@ -444,8 +521,11 @@ function PlayerPanel({
                 <div className="text-[13px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">MAIN</div>
                 <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(9, 2.5rem)' }}>
                   {main.map((item, i) => (
-                    <InvSlot key={i} item={item}
-                      onDelete={item ? deleteItem : undefined}
+                    <InvSlot key={i} item={item} slotIndex={i + 9}
+                      selected={!!item && selectedSlot?.slot === item.slot}
+                      moveTarget={!!selectedSlot && !item}
+                      onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
+                      onSlotClick={() => handleSlotClick(item, item?.slot ?? (i + 9))}
                       deleting={item ? deletingSlot === item.slot : false}
                     />
                   ))}
@@ -458,6 +538,12 @@ function PlayerPanel({
           ))}
         </div>
       </div>
+      {confirmModal && (
+        <ConfirmModal
+          {...confirmModal}
+          onCancel={() => { setConfirmModal(null); setSelectedSlot(null) }}
+        />
+      )}
     </div>
   )
 }
@@ -554,7 +640,10 @@ export default function PlayersSection({ onPlayersChange }: Props) {
                     color: 'var(--text)',
                   }}
                 >
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: 'var(--accent)' }} />
+                  <span className="relative flex w-2 h-2 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-30" style={{ background: 'var(--accent)' }} />
+                    <span className="relative inline-flex rounded-full w-2 h-2" style={{ background: 'var(--accent)' }} />
+                  </span>
                   <span className="text-[13px] font-mono">{p}</span>
                   {joinedAt && (
                     <span className="text-[13px] font-mono opacity-60 ml-0.5">

@@ -9,6 +9,8 @@ import type { AuditEntry } from '@/lib/audit'
 import type { UserSummary } from '@/lib/users'
 import { useToast } from './useToast'
 import Toasts from './Toasts'
+import ConfirmModal from './ConfirmModal'
+import type { ConfirmModalProps } from './ConfirmModal'
 
 const RCON_HISTORY_KEY = 'mcraftr:rcon:history'
 const RCON_HISTORY_MAX = 20
@@ -83,6 +85,7 @@ function StatTile({ label, value, sub }: { label: string; value: React.ReactNode
 
 export default function AdminSection({ players }: Props) {
   const { toasts, addToast } = useToast()
+  const [confirmModal, setConfirmModal] = useState<Omit<ConfirmModalProps, 'onCancel'> | null>(null)
 
 
   // ── Server Info ───────────────────────────────────────────────────────────────
@@ -582,12 +585,18 @@ export default function AdminSection({ players }: Props) {
             }} className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] transition-all">
               <span className="flex items-center justify-center gap-1.5"><Save size={13} strokeWidth={1.5} />Save World</span>
             </button>
-            <button onClick={async () => {
-              if (!confirm('Stop the server? This will kick all players and shut down Minecraft.')) return
-              const r = await fetch('/api/minecraft/server-ctrl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: 'stop' }) })
-              const d = await r.json()
-              addToast(d.ok ? 'ok' : 'error', d.ok ? 'Server stopping…' : (d.error || 'Stop failed'))
-            }} className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest border border-red-900 text-red-400 hover:border-red-700 transition-all">
+            <button onClick={() => setConfirmModal({
+              title: 'Stop the server?',
+              body: 'This will kick all players and shut down Minecraft.',
+              confirmLabel: 'Stop Server',
+              destructive: true,
+              onConfirm: async () => {
+                setConfirmModal(null)
+                const r = await fetch('/api/minecraft/server-ctrl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: 'stop' }) })
+                const d = await r.json()
+                addToast(d.ok ? 'ok' : 'error', d.ok ? 'Server stopping…' : (d.error || 'Stop failed'))
+              },
+            })} className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest border border-red-900 text-red-400 hover:border-red-700 transition-all">
               <span className="flex items-center justify-center gap-1.5"><Square size={13} strokeWidth={1.5} />Stop Server</span>
             </button>
           </div>
@@ -848,6 +857,12 @@ export default function AdminSection({ players }: Props) {
           </form>
         </div>
       </div>
+      {confirmModal && (
+        <ConfirmModal
+          {...confirmModal}
+          onCancel={() => setConfirmModal(null)}
+        />
+      )}
     </div>
   )
 }
