@@ -335,20 +335,24 @@ function PlayerPanel({
     }
   }
 
-  // Slot click handler — click to select, click another slot to move immediately (no modal)
+  // Slot click handler — click selects/deselects; moving to empty slot uses hold gesture
   const handleSlotClick = (clickedItem: InvItem | undefined, clickedSlotIndex: number | undefined, currentSelected: InvItem | null) => {
     if (clickedSlotIndex === undefined) return
     if (currentSelected) {
       if (clickedItem && clickedItem.slot === currentSelected.slot) {
-        // Same slot — deselect
         setSelectedSlot(null)
-      } else {
-        // Different slot (empty or filled) — move immediately
-        moveItem(currentSelected.slot, clickedItem?.slot ?? clickedSlotIndex)
+      } else if (clickedItem) {
+        // Switch selected source item
+        setSelectedSlot(clickedItem)
       }
     } else if (clickedItem) {
       setSelectedSlot(clickedItem)
     }
+  }
+
+  const handleSlotHoldToMove = (targetSlot: number | undefined, currentSelected: InvItem | null) => {
+    if (!currentSelected || targetSlot === undefined) return
+    moveItem(currentSelected.slot, targetSlot)
   }
 
   const { hotbar, main, armor, offhand } = buildInventoryLayout(inventory)
@@ -536,7 +540,7 @@ function PlayerPanel({
             <div className="space-y-3">
               {selectedSlot && (
                 <div className="text-[11px] font-mono text-[var(--text-dim)] px-2 py-1 rounded border border-[var(--accent-mid)] bg-[var(--accent-dim)]">
-                  <span className="text-[var(--accent)]">{selectedSlot.label}</span> selected — click an empty slot to move, or click it again to deselect
+                  <span className="text-[var(--accent)]">{selectedSlot.label}</span> selected — hold an empty slot for 1s to move, or click selected item to deselect
                 </div>
               )}
               {deleteError && (
@@ -551,6 +555,7 @@ function PlayerPanel({
                     <InvSlot key={i} item={item} slotIndex={i}
                       selected={!!item && selectedSlot?.slot === item.slot}
                       moveTarget={!!selectedSlot && !item}
+                      onMoveTargetHold={() => handleSlotHoldToMove(item?.slot ?? i, selectedSlot)}
                       onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
                       onSlotClick={() => handleSlotClick(item, item?.slot ?? i, selectedSlot)}
                       deleting={item ? deletingSlot === item.slot : false}
@@ -568,6 +573,7 @@ function PlayerPanel({
                       <InvSlot key={i} item={item} slotIndex={s}
                         selected={!!item && selectedSlot?.slot === item.slot}
                         moveTarget={!!selectedSlot && !item}
+                        onMoveTargetHold={() => handleSlotHoldToMove(item?.slot ?? s, selectedSlot)}
                         onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
                         onSlotClick={() => handleSlotClick(item, item?.slot ?? s, selectedSlot)}
                         deleting={item ? deletingSlot === item.slot : false}
@@ -578,6 +584,7 @@ function PlayerPanel({
                   <InvSlot item={offhand} slotIndex={150}
                     selected={!!offhand && selectedSlot?.slot === 150}
                     moveTarget={!!selectedSlot && !offhand}
+                    onMoveTargetHold={() => handleSlotHoldToMove(offhand?.slot ?? 150, selectedSlot)}
                     onDelete={offhand ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
                     onSlotClick={() => handleSlotClick(offhand, offhand?.slot ?? 150, selectedSlot)}
                     deleting={offhand ? deletingSlot === 150 : false}
@@ -591,6 +598,7 @@ function PlayerPanel({
                     <InvSlot key={i} item={item} slotIndex={i + 9}
                       selected={!!item && selectedSlot?.slot === item.slot}
                       moveTarget={!!selectedSlot && !item}
+                      onMoveTargetHold={() => handleSlotHoldToMove(item?.slot ?? (i + 9), selectedSlot)}
                       onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
                       onSlotClick={() => handleSlotClick(item, item?.slot ?? (i + 9), selectedSlot)}
                       deleting={item ? deletingSlot === item.slot : false}

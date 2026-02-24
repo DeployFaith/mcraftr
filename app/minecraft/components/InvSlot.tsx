@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ArrowLeftRight } from 'lucide-react'
 import type { InvItem } from '../../api/minecraft/inventory/route'
 
@@ -30,6 +30,7 @@ export default function InvSlot({
   moveTarget = false,
   onDelete,
   onSlotClick,
+  onMoveTargetHold,
   deleting = false,
 }: {
   item: InvItem | undefined
@@ -38,13 +39,16 @@ export default function InvSlot({
   moveTarget?: boolean
   onDelete?: (item: InvItem) => void
   onSlotClick?: (slotIndex?: number) => void
+  onMoveTargetHold?: (slotIndex?: number) => void
   deleting?: boolean
 }) {
   const [hovered, setHovered] = useState(false)
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const firedHoldRef = useRef(false)
 
   // Border logic
   const borderColor = moveTarget
-    ? '#22c55e'                          // green — valid move destination
+    ? 'var(--accent-mid)'                // accent-mid — valid move destination
     : selected
     ? 'var(--accent)'                    // accent — this slot is the "from"
     : !item
@@ -55,6 +59,22 @@ export default function InvSlot({
 
   const isClickable = !!onSlotClick || (!!item && (!!onDelete || !!onSlotClick))
 
+  const startHold = () => {
+    if (!moveTarget || item || !onMoveTargetHold) return
+    firedHoldRef.current = false
+    holdTimerRef.current = setTimeout(() => {
+      firedHoldRef.current = true
+      onMoveTargetHold(slotIndex)
+    }, 1000)
+  }
+
+  const clearHold = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current)
+      holdTimerRef.current = null
+    }
+  }
+
   return (
     <div
       className="relative group"
@@ -62,16 +82,26 @@ export default function InvSlot({
       onMouseLeave={() => setHovered(false)}
     >
       <div
-        className={`w-10 h-10 rounded bg-[var(--panel)] flex flex-col items-center justify-center transition-colors ${isClickable ? 'cursor-pointer' : 'cursor-default'}`}
+        className={`w-10 h-10 rounded bg-[var(--panel)] flex flex-col items-center justify-center transition-colors ${moveTarget && !item ? 'slot-target-pulse' : ''} ${isClickable ? 'cursor-pointer' : 'cursor-default'}`}
         style={{ border: `1px solid ${borderColor}` }}
-        onClick={() => onSlotClick?.(slotIndex)}
+        onPointerDown={startHold}
+        onPointerUp={clearHold}
+        onPointerLeave={clearHold}
+        onPointerCancel={clearHold}
+        onClick={() => {
+          if (firedHoldRef.current) {
+            firedHoldRef.current = false
+            return
+          }
+          onSlotClick?.(slotIndex)
+        }}
       >
         {moveTarget && !item ? (
           // Empty slot that is a valid move target — show swap icon
           <ArrowLeftRight
             size={14}
             strokeWidth={1.5}
-            color="#22c55e"
+            color="var(--accent)"
             style={{ opacity: hovered ? 1 : 0.6, transition: 'opacity 0.15s' }}
           />
         ) : !item ? null : deleting ? (

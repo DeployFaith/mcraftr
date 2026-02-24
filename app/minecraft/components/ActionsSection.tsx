@@ -427,12 +427,17 @@ export default function ActionsSection({ players }: Props) {
     if (currentSelected) {
       if (clickedItem && clickedItem.slot === currentSelected.slot) {
         setSelectedInvSlot(null)
-      } else {
-        moveInvItem(player, currentSelected.slot, clickedItem?.slot ?? clickedSlot)
+      } else if (clickedItem) {
+        setSelectedInvSlot(clickedItem)
       }
     } else if (clickedItem) {
       setSelectedInvSlot(clickedItem)
     }
+  }
+
+  const handleInvSlotHoldToMove = (player: string, targetSlot: number | undefined, currentSelected: InvItem | null) => {
+    if (!currentSelected || targetSlot === undefined) return
+    moveInvItem(player, currentSelected.slot, targetSlot)
   }
 
   const noPlayers = players.length === 0
@@ -876,7 +881,7 @@ export default function ActionsSection({ players }: Props) {
               </div>
               {selectedInvSlot && (
                 <div className="text-[11px] font-mono text-[var(--text-dim)] px-2 py-1 rounded border border-[var(--accent-mid)] bg-[var(--accent-dim)]">
-                  <span className="text-[var(--accent)]">{selectedInvSlot.label}</span> selected — click another slot to move, or click it again to deselect
+                  <span className="text-[var(--accent)]">{selectedInvSlot.label}</span> selected — hold an empty slot for 1s to move, or click selected item to deselect
                 </div>
               )}
               <div>
@@ -886,6 +891,7 @@ export default function ActionsSection({ players }: Props) {
                     <InvSlot key={i} item={item} slotIndex={i}
                       selected={!!item && selectedInvSlot?.slot === item.slot}
                       moveTarget={!!selectedInvSlot && !item}
+                      onMoveTargetHold={() => handleInvSlotHoldToMove(invPlayer, item?.slot ?? i, selectedInvSlot)}
                       onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
                       onSlotClick={() => handleInvSlotClick(invPlayer, item, item?.slot ?? i, selectedInvSlot)}
                       deleting={item ? invDeleting === `${item.slot}` : false}
@@ -903,6 +909,7 @@ export default function ActionsSection({ players }: Props) {
                       <InvSlot key={i} item={item} slotIndex={s}
                         selected={!!item && selectedInvSlot?.slot === item.slot}
                         moveTarget={!!selectedInvSlot && !item}
+                        onMoveTargetHold={() => handleInvSlotHoldToMove(invPlayer, item?.slot ?? s, selectedInvSlot)}
                         onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
                         onSlotClick={() => handleInvSlotClick(invPlayer, item, item?.slot ?? s, selectedInvSlot)}
                         deleting={item ? invDeleting === `${item.slot}` : false}
@@ -913,6 +920,7 @@ export default function ActionsSection({ players }: Props) {
                   <InvSlot item={offhand} slotIndex={150}
                     selected={!!offhand && selectedInvSlot?.slot === 150}
                     moveTarget={!!selectedInvSlot && !offhand}
+                    onMoveTargetHold={() => handleInvSlotHoldToMove(invPlayer, offhand?.slot ?? 150, selectedInvSlot)}
                     onDelete={offhand ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
                     onSlotClick={() => handleInvSlotClick(invPlayer, offhand, offhand?.slot ?? 150, selectedInvSlot)}
                     deleting={offhand ? invDeleting === `${offhand.slot}` : false}
@@ -926,6 +934,7 @@ export default function ActionsSection({ players }: Props) {
                     <InvSlot key={i} item={item} slotIndex={i + 9}
                       selected={!!item && selectedInvSlot?.slot === item.slot}
                       moveTarget={!!selectedInvSlot && !item}
+                      onMoveTargetHold={() => handleInvSlotHoldToMove(invPlayer, item?.slot ?? (i + 9), selectedInvSlot)}
                       onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
                       onSlotClick={() => handleInvSlotClick(invPlayer, item, item?.slot ?? (i + 9), selectedInvSlot)}
                       deleting={item ? invDeleting === `${item.slot}` : false}
