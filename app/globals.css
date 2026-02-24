@@ -36,6 +36,19 @@ html, body {
   color: var(--text);
   font-family: system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+#__next {
+  min-height: 100%;
+}
+
+.tap-target {
+  min-height: 44px;
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* Glassmorphism card */

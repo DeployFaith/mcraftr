@@ -58,7 +58,7 @@ const CAT_PAGE_SIZE = 24
 function PlayerChip({ name, selected, variant = 'default', bothSelected = false, onClick }: {
   name: string; selected: boolean; variant?: 'default' | 'from' | 'to'; bothSelected?: boolean; onClick: () => void
 }) {
-  const base = 'px-3 py-1.5 rounded-lg text-[13px] font-mono border transition-all cursor-pointer select-none'
+  const base = 'tap-target px-3 py-2 rounded-lg text-[13px] font-mono border transition-all cursor-pointer select-none'
   if (variant === 'from') {
     if (!selected)
       return <button onClick={onClick} className={`${base} border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] hover:text-[var(--text)]`}>{name}</button>
@@ -177,7 +177,7 @@ export default function ActionsSection({ players }: Props) {
     const busy = busyCmd === key
     return (
       <button key={id} onClick={() => issueCmd(id, player)} disabled={busy || !!busyCmd}
-        className="flex flex-col items-center gap-1 px-2 py-3 rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:border-[var(--accent-mid)] border-[var(--border)] text-[var(--text-dim)]">
+        className="tap-target flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:border-[var(--accent-mid)] border-[var(--border)] text-[var(--text-dim)]">
         <span className="flex items-center justify-center h-5">
           {busy ? <span className="text-[15px] font-mono">…</span> : <Icon size={16} color="var(--text-dim)" strokeWidth={1.5} />}
         </span>
@@ -463,7 +463,7 @@ export default function ActionsSection({ players }: Props) {
         <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">WORLD</div>
         <div>
           <SectionLabel>WEATHER / TIME</SectionLabel>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {WEATHER_CMDS.map(c => cmdBtn(c.id, c.Icon, c.label))}
           </div>
         </div>
@@ -491,7 +491,7 @@ export default function ActionsSection({ players }: Props) {
         <div>
           <SectionLabel>GAMEMODE {cmdPlayer && <span className="text-[var(--accent)] normal-case">— {cmdPlayer}</span>}</SectionLabel>
           {cmdPlayer ? (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {GAMEMODE_CMDS.map(c => cmdBtn(c.id, c.Icon, c.label, cmdPlayer))}
             </div>
           ) : <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">Select a player above</div>}
@@ -500,7 +500,7 @@ export default function ActionsSection({ players }: Props) {
         <div>
           <SectionLabel>ABILITIES {cmdPlayer && <span className="text-[var(--accent)] normal-case">— {cmdPlayer}</span>}</SectionLabel>
           {cmdPlayer ? (
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-2">
               {ABILITY_CMDS.map(c => {
                 const key    = c.id + cmdPlayer
                 const busy   = busyCmd === key
@@ -564,13 +564,13 @@ export default function ActionsSection({ players }: Props) {
                 className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
                 style={{ fontSize: '16px' }} />
             )}
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input type="text" placeholder="Message…" value={msgText} onChange={e => setMsgText(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && sendPrivateMsg()} maxLength={256}
                 className="flex-1 bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
                 style={{ fontSize: '16px' }} />
               <button onClick={sendPrivateMsg} disabled={(!cmdPlayer && !msgManual.trim()) || !msgText.trim() || msgBusy}
-                className="px-4 py-2 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                className="tap-target px-4 py-2 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 {msgBusy ? '…' : 'Send'}
               </button>
             </div>
@@ -626,7 +626,7 @@ export default function ActionsSection({ players }: Props) {
             <input type="text" placeholder="Or type player name…" value={tpLocPlayer} onChange={e => setTpLocPlayer(e.target.value)}
               className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
               style={{ fontSize: '16px' }} />
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {(['X', 'Y', 'Z'] as const).map((axis, i) => (
                 <div key={axis}>
                   <div className="text-[13px] font-mono text-[var(--text-dim)] mb-1">{axis}</div>
@@ -681,7 +681,7 @@ export default function ActionsSection({ players }: Props) {
           <>
             <div>
               <SectionLabel>2 · SELECT KIT</SectionLabel>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                 {KITS.map(k => {
                   const active = selectedKit === k.id
                   const iconColor = active ? 'var(--bg)' : 'var(--text-dim)'
@@ -776,7 +776,7 @@ export default function ActionsSection({ players }: Props) {
               className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
               style={{ fontSize: '16px' }} />
 
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
               {pageItems.map(item => (
                 <button key={item.id} onClick={() => { setCatSelected(s => s?.id === item.id ? null : item); setCatQty(1) }}
                   className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-lg border transition-all ${

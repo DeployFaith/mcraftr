@@ -579,7 +579,7 @@ export default function AdminSection({ players }: Props) {
         )}
         {info && (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <StatTile label="PLAYERS ONLINE"
                 value={<span><span className="text-[var(--accent)]">{info.online}</span><span className="text-[var(--text-dim)] text-[15px]"> / {info.max}</span></span>}
                 sub="currently connected" />
@@ -587,7 +587,7 @@ export default function AdminSection({ players }: Props) {
                 value={<span className="text-[15px] break-all">{info.version ?? <span className="opacity-40 text-[13px]">Unknown</span>}</span>}
                 sub="server version" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <StatTile label="WEATHER"
                 value={<span className="flex items-center gap-1.5 text-[15px]">{info.weather !== null ? <><WeatherIcon w={info.weather} /><span className="capitalize">{info.weather}</span></> : <span className="opacity-40 text-[13px]">—</span>}</span>}
                 sub="current conditions" />
@@ -615,7 +615,7 @@ export default function AdminSection({ players }: Props) {
         {canRules && (
         <div>
           <SectionLabel>DIFFICULTY</SectionLabel>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {(['peaceful', 'easy', 'normal', 'hard'] as const).map(d => {
               const colors: Record<string, string> = { peaceful: '#4ade80', easy: '#60a5fa', normal: '#f59e0b', hard: '#f87171' }
               const active = difficulty === d
@@ -674,7 +674,7 @@ export default function AdminSection({ players }: Props) {
         {canServerControls && (
         <div>
           <SectionLabel>SERVER CONTROLS</SectionLabel>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button onClick={async () => {
               const r = await fetch('/api/minecraft/server-ctrl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: 'save-all' }) })
               const d = await r.json()
@@ -724,7 +724,7 @@ export default function AdminSection({ players }: Props) {
           <label htmlFor="mod-ban-ip" className="text-[13px] font-mono text-[var(--text-dim)] cursor-pointer">Also ban IP address</label>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button onClick={kickPlayer} disabled={!modTarget || !!modBusy}
             className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-yellow-800 text-yellow-400 hover:border-yellow-600">
             {modBusy === 'kick' ? 'Kicking…' : 'Kick'}
@@ -828,7 +828,7 @@ export default function AdminSection({ players }: Props) {
           <SectionLabel>SELECT PLAYER</SectionLabel>
           <PlayerPicker online={players} selected={opTarget} onSelect={setOpTarget} placeholder="Or type player name…" />
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button onClick={() => opAction('op')} disabled={!opTarget || !!opBusy}
             className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]">
             {opBusy === 'op' ? '…' : <span className="flex items-center justify-center gap-1.5"><Star size={13} strokeWidth={1.5} />Op</span>}
@@ -889,12 +889,12 @@ export default function AdminSection({ players }: Props) {
         ) : (
           <div className="space-y-1 max-h-64 overflow-y-auto">
             {auditEntries.map((e: AuditEntry) => (
-              <div key={e.id} className="flex items-start gap-2 px-2 py-1.5 rounded bg-[var(--panel)] border border-[var(--border)]">
-                <span className="text-[13px] font-mono text-[var(--text-dim)] shrink-0 mt-0.5 w-16">{new Date(e.ts * 1000).toLocaleTimeString()}</span>
-                <span className="text-[13px] font-mono text-[var(--accent)] shrink-0 w-20">{e.action}</span>
-                <span className="text-[13px] font-mono text-[var(--text-dim)] shrink-0 w-20 truncate" title={e.user_id}>{e.user_id}</span>
-                {e.target && <span className="text-[13px] font-mono text-[var(--text)] shrink-0">{e.target}</span>}
-                {e.detail && <span className="text-[13px] font-mono text-[var(--text-dim)] truncate opacity-60">{e.detail}</span>}
+              <div key={e.id} className="flex flex-col sm:flex-row sm:items-start gap-1.5 sm:gap-2 px-2 py-1.5 rounded bg-[var(--panel)] border border-[var(--border)]">
+                <span className="text-[13px] font-mono text-[var(--text-dim)] shrink-0 sm:mt-0.5 sm:w-16">{new Date(e.ts * 1000).toLocaleTimeString()}</span>
+                <span className="text-[13px] font-mono text-[var(--accent)] shrink-0 sm:w-20">{e.action}</span>
+                <span className="text-[13px] font-mono text-[var(--text-dim)] shrink-0 sm:w-20 break-all" title={e.user_id}>{e.user_id}</span>
+                {e.target && <span className="text-[13px] font-mono text-[var(--text)] shrink-0 break-all">{e.target}</span>}
+                {e.detail && <span className="text-[13px] font-mono text-[var(--text-dim)] break-words opacity-60">{e.detail}</span>}
               </div>
             ))}
           </div>
@@ -916,13 +916,14 @@ export default function AdminSection({ players }: Props) {
         {users && users.length > 0 && (
           <div className="space-y-1.5">
             {users.map(u => (
-              <div key={u.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
+              <div key={u.id} className="flex flex-col sm:flex-row sm:items-center gap-2 px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
                 <div className="flex-1 min-w-0">
                   <div className="text-[13px] font-mono text-[var(--text)] truncate">{u.email}</div>
                   <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">
                     {new Date(u.created_at * 1000).toLocaleDateString()}
                   </div>
                 </div>
+                <div className="flex items-center gap-2 sm:gap-1.5">
                 <span className={`text-[13px] font-mono px-2 py-0.5 rounded border shrink-0 ${
                   u.role === 'admin'
                     ? 'border-[var(--accent-mid)] text-[var(--accent)] bg-[var(--accent-dim)]'
@@ -941,6 +942,7 @@ export default function AdminSection({ players }: Props) {
                   className="text-[13px] font-mono px-2 py-1 rounded border border-red-900/50 text-red-400 hover:border-red-700 transition-all disabled:opacity-40 shrink-0">
                   ✕
                 </button>
+                </div>
               </div>
             ))}
           </div>

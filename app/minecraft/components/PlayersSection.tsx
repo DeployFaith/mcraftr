@@ -214,6 +214,12 @@ function PlayerPanel({
   const [invOpen, setInvOpen]           = useState(true)
   const [selectedSlot, setSelectedSlot] = useState<InvItem | null>(null)
   const [confirmModal, setConfirmModal] = useState<Omit<ConfirmModalProps, 'onCancel'> | null>(null)
+  const [sectionsOpen, setSectionsOpen] = useState({
+    session: true,
+    vitals: false,
+    effects: false,
+    location: false,
+  })
   const [features, setFeatures]         = useState<FeatureFlags | null>(null)
   const [featuresLoaded, setFeaturesLoaded] = useState(false)
 
@@ -419,7 +425,11 @@ function PlayerPanel({
             {/* SESSION */}
             {canSession && (
             <div className="space-y-1.5">
-              <SectionTitle>SESSION</SectionTitle>
+              <button onClick={() => setSectionsOpen(s => ({ ...s, session: !s.session }))} className="w-full text-left flex items-center gap-2">
+                <SectionTitle>SESSION</SectionTitle>
+                <span className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">{sectionsOpen.session ? '▲' : '▼'}</span>
+              </button>
+              {sectionsOpen.session && (
               <div className="bg-[var(--panel)] rounded-lg border border-[var(--border)] px-3 divide-y divide-[var(--border)]">
                 <Row label="ONLINE FOR">
                   <OnlineTimer joinedAtMs={joinedAtMs} />
@@ -443,43 +453,59 @@ function PlayerPanel({
                   }
                 </Row>
               </div>
+              )}
             </div>
             )}
 
             {/* VITALS */}
             {canVitals && (
             <div className="space-y-1.5">
-              <SectionTitle>VITALS</SectionTitle>
+              <button onClick={() => setSectionsOpen(s => ({ ...s, vitals: !s.vitals }))} className="w-full text-left flex items-center gap-2">
+                <SectionTitle>VITALS</SectionTitle>
+                <span className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">{sectionsOpen.vitals ? '▲' : '▼'}</span>
+              </button>
+              {sectionsOpen.vitals && (
               <div className="bg-[var(--panel)] rounded-lg border border-[var(--border)] px-3 divide-y divide-[var(--border)]">
                 <Row label="HEALTH"><HeartBar value={stats?.health ?? null} /></Row>
                 <Row label="HUNGER"><HungerBar value={stats?.food ?? null} /></Row>
                 <Row label="EXPERIENCE"><XpRow level={stats?.xpLevel ?? null} progress={stats?.xpP ?? null} /></Row>
               </div>
+              )}
             </div>
             )}
 
             {/* ACTIVE EFFECTS — only shown if any */}
             {canEffects && effects.length > 0 && (
               <div className="space-y-1.5">
-                <SectionTitle>ACTIVE EFFECTS</SectionTitle>
-                <div className="flex flex-wrap gap-1.5">
-                  {effects.map(e => (
-                    <Badge key={e} color="var(--accent)">{EFFECT_LABELS[e] ?? e}</Badge>
-                  ))}
-                </div>
+                <button onClick={() => setSectionsOpen(s => ({ ...s, effects: !s.effects }))} className="w-full text-left flex items-center gap-2">
+                  <SectionTitle>ACTIVE EFFECTS</SectionTitle>
+                  <span className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">{sectionsOpen.effects ? '▲' : '▼'}</span>
+                </button>
+                {sectionsOpen.effects && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {effects.map(e => (
+                      <Badge key={e} color="var(--accent)">{EFFECT_LABELS[e] ?? e}</Badge>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
             {/* LOCATION */}
             {canLocation && (
             <div className="space-y-1.5">
-              <SectionTitle>LOCATION</SectionTitle>
-              <div className="space-y-2">
-                <CoordBlock label="CURRENT POSITION" pos={stats?.pos ?? null} />
-                {stats?.spawnPos && (
-                  <CoordBlock label="BED / ANCHOR SPAWN" pos={stats.spawnPos} />
-                )}
-              </div>
+              <button onClick={() => setSectionsOpen(s => ({ ...s, location: !s.location }))} className="w-full text-left flex items-center gap-2">
+                <SectionTitle>LOCATION</SectionTitle>
+                <span className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">{sectionsOpen.location ? '▲' : '▼'}</span>
+              </button>
+              {sectionsOpen.location && (
+                <div className="space-y-2">
+                  <CoordBlock label="CURRENT POSITION" pos={stats?.pos ?? null} />
+                  {stats?.spawnPos && (
+                    <CoordBlock label="BED / ANCHOR SPAWN" pos={stats.spawnPos} />
+                  )}
+                </div>
+              )}
             </div>
             )}
 
@@ -671,7 +697,7 @@ export default function PlayersSection({ onPlayersChange }: Props) {
                 <button
                   key={p}
                   onClick={() => setSelected(prev => prev === p ? null : p)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all"
+                  className="tap-target flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all"
                   style={selected ? {
                     borderColor: 'var(--accent)',
                     background: 'var(--accent-dim)',

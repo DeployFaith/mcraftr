@@ -18,14 +18,15 @@ type FeatureFlags = Record<FeatureKey, boolean>
 const ALL_TABS: {
   id: TabId
   label: string
+  mobileLabel: string
   Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>
   adminOnly?: boolean
 }[] = [
-  { id: 'players', label: 'Players', Icon: Users },
-  { id: 'actions', label: 'Actions', Icon: Zap },
-  { id: 'admin', label: 'Admin', Icon: Shield, adminOnly: true },
-  { id: 'chat', label: 'Chat', Icon: MessageSquare },
-  { id: 'settings', label: 'Settings', Icon: Settings },
+  { id: 'players', label: 'Players', mobileLabel: 'PLYR', Icon: Users },
+  { id: 'actions', label: 'Actions', mobileLabel: 'ACT', Icon: Zap },
+  { id: 'admin', label: 'Admin', mobileLabel: 'ADM', Icon: Shield, adminOnly: true },
+  { id: 'chat', label: 'Chat', mobileLabel: 'CHAT', Icon: MessageSquare },
+  { id: 'settings', label: 'Settings', mobileLabel: 'SET', Icon: Settings },
 ]
 
 const VALID_TABS: TabId[] = ['players', 'actions', 'admin', 'chat', 'settings']
@@ -118,7 +119,7 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
         </div>
       </nav>
 
-      <div className="flex-1 max-w-4xl mx-auto w-full px-4 py-4 pb-24 md:pb-6">
+      <div className="flex-1 max-w-4xl mx-auto w-full px-3 sm:px-4 py-3 md:py-4 md:pb-6" style={{ paddingBottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}>
         {visibleTab === 'players' && <PlayersSection onPlayersChange={handlePlayersChange} />}
         {visibleTab === 'actions' && <ActionsSection players={players} />}
         {visibleTab === 'admin' && role === 'admin' && <AdminSection players={players} />}
@@ -126,15 +127,16 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
         {visibleTab === 'settings' && <SettingsSection role={role} />}
       </div>
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--border)]" style={{ background: 'rgba(10,10,15,0.95)', backdropFilter: 'blur(12px)' }}>
-        <div className="flex">
-          {tabs.map(({ id, label, Icon }) => {
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--border)] safe-bottom" style={{ background: 'rgba(10,10,15,0.95)', backdropFilter: 'blur(12px)' }}>
+        <div className="flex px-1.5 pt-1.5">
+          {tabs.map(({ id, label, mobileLabel, Icon }) => {
             const active = visibleTab === id
             return (
-              <button key={id} onClick={() => handleTabChange(id)} className="relative flex-1 flex flex-col items-center gap-1 py-3 transition-all">
-                <Icon size={20} color={active ? 'var(--accent)' : 'var(--text-dim)'} strokeWidth={1.75} />
-                <span className="text-[13px] font-mono tracking-widest" style={{ color: active ? 'var(--accent)' : 'var(--text-dim)' }}>
-                  {label.toUpperCase()}
+              <button key={id} onClick={() => handleTabChange(id)} className="tap-target relative flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 transition-all rounded-lg">
+                <Icon size={18} color={active ? 'var(--accent)' : 'var(--text-dim)'} strokeWidth={1.75} />
+                <span className="text-[11px] font-mono tracking-widest" style={{ color: active ? 'var(--accent)' : 'var(--text-dim)' }}>
+                  <span className="sm:hidden">{mobileLabel}</span>
+                  <span className="hidden sm:inline">{label.toUpperCase()}</span>
                 </span>
                 {active && <span className="absolute bottom-0 w-8 h-0.5 rounded-full" style={{ background: 'var(--accent)' }} />}
               </button>

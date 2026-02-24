@@ -290,7 +290,23 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
 
       {/* Feature Toggles */}
       <div className="glass-card p-5 space-y-4">
-        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">FEATURE TOGGLES</div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">FEATURE TOGGLES</div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setExpandedCategories({ tabs: true, actions: true, players: true, chat: true, admin: true })}
+              className="text-[11px] font-mono text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border)] rounded px-2 py-1"
+            >
+              Expand all
+            </button>
+            <button
+              onClick={() => setExpandedCategories({ tabs: false, actions: false, players: false, chat: false, admin: false })}
+              className="text-[11px] font-mono text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border)] rounded px-2 py-1"
+            >
+              Collapse all
+            </button>
+          </div>
+        </div>
         <div className="text-[11px] font-mono text-[var(--text-dim)] opacity-60 mb-2">
           Turn off features you don't need. Admins can also restrict features for other users.
         </div>
@@ -305,6 +321,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
               const allOff = onCount === 0
               const mixed = !allOn && !allOff
               const expanded = expandedCategories[cat.id]
+              const status = allOn ? 'ON' : allOff ? 'OFF' : 'MIXED'
               return (
                 <div key={cat.id} className="rounded-lg bg-[var(--panel)] border border-[var(--border)] overflow-hidden">
                   <div className="flex items-center justify-between gap-2 px-3 py-2">
@@ -317,6 +334,13 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
                     </button>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-[11px] font-mono text-[var(--text-dim)]">{onCount}/{defs.length}</span>
+                      <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded border ${
+                        allOn
+                          ? 'border-[var(--accent-mid)] text-[var(--accent)] bg-[var(--accent-dim)]'
+                          : mixed
+                            ? 'border-[var(--accent-mid)] text-[var(--accent)]'
+                            : 'border-[var(--border)] text-[var(--text-dim)]'
+                      }`}>{status}</span>
                       <button
                         onClick={() => toggleCategory(cat.id, !allOn)}
                         disabled={featuresSaving}
