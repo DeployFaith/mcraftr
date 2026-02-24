@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { rconForRequest, getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -7,7 +7,14 @@ export const dynamic = 'force-dynamic'
 const PLAYER_RE = /^[a-zA-Z0-9_]{1,16}$/
 
 export async function POST(req: NextRequest) {
-  if (!await getSessionUserId(req)) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const userId = await getSessionUserId(req)
+  if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_teleport')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
+
   try {
     const { player, x, y, z } = await req.json()
     if (!player || typeof player !== 'string') return Response.json({ ok: false, error: 'Missing player' }, { status: 400 })

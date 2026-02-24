@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
-import { getUserById, setUserRole, deleteUser, updatePassword } from '@/lib/users'
+import { getUserById, getUserFeatures, setUserRole, deleteUser, updatePassword } from '@/lib/users'
 import { logAudit } from '@/lib/audit'
 
 export const runtime = 'nodejs'
@@ -18,6 +18,9 @@ async function requireAdmin(req: NextRequest): Promise<string | null> {
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const adminId = await requireAdmin(req)
   if (!adminId) return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })
+
+  const features = getUserFeatures(adminId)
+  if (!features.enable_admin) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
 
   const { id } = await params
 

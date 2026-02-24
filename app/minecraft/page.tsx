@@ -23,5 +23,5 @@ export default async function MinecraftPage({
   const tabParam = Array.isArray(params.tab) ? params.tab[0] : params.tab
   const initialTab = normalizeTab(tabParam, isAdmin)
 
-  return <MinecraftClientPage initialTab={initialTab} />
+  return <MinecraftClientPage initialTab={initialTab} initialRole={session?.role} />
 }

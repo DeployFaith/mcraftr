@@ -376,3 +376,78 @@ export function createUserByAdmin(email: string, password: string): User {
 
   return { id, email, passwordHash: '', role: 'user', server: null }
 }
+
+export type UserFeatures = {
+  enable_chat: boolean
+  enable_chat_read: boolean
+  enable_chat_write: boolean
+  enable_teleport: boolean
+  enable_inventory: boolean
+  enable_rcon: boolean
+  enable_admin: boolean
+}
+
+export function getUserFeatures(id: string): UserFeatures {
+  const db = initDb()
+  const row = db.prepare('SELECT * FROM user_features WHERE user_id = ?').get(id) as {
+    enable_chat: number
+    enable_chat_read: number
+    enable_chat_write: number
+    enable_teleport: number
+    enable_inventory: number
+    enable_rcon: number
+    enable_admin: number
+  } | undefined
+  if (!row) {
+    return {
+      enable_chat: true,
+      enable_chat_read: true,
+      enable_chat_write: true,
+      enable_teleport: true,
+      enable_inventory: true,
+      enable_rcon: true,
+      enable_admin: true,
+    }
+  }
+  return {
+    enable_chat: !!row.enable_chat,
+    enable_chat_read: !!row.enable_chat_read,
+    enable_chat_write: !!row.enable_chat_write,
+    enable_teleport: !!row.enable_teleport,
+    enable_inventory: !!row.enable_inventory,
+    enable_rcon: !!row.enable_rcon,
+    enable_admin: !!row.enable_admin,
+  }
+}
+
+export function updateUserFeatures(id: string, features: Partial<UserFeatures>): void {
+  const db = initDb()
+  const existing = db.prepare('SELECT user_id FROM user_features WHERE user_id = ?').get(id)
+  const setClauses: string[] = []
+  const values: (string | number)[] = []
+  if (features.enable_chat !== undefined) { setClauses.push('enable_chat = ?'); values.push(features.enable_chat ? 1 : 0) }
+  if (features.enable_chat_read !== undefined) { setClauses.push('enable_chat_read = ?'); values.push(features.enable_chat_read ? 1 : 0) }
+  if (features.enable_chat_write !== undefined) { setClauses.push('enable_chat_write = ?'); values.push(features.enable_chat_write ? 1 : 0) }
+  if (features.enable_teleport !== undefined) { setClauses.push('enable_teleport = ?'); values.push(features.enable_teleport ? 1 : 0) }
+  if (features.enable_inventory !== undefined) { setClauses.push('enable_inventory = ?'); values.push(features.enable_inventory ? 1 : 0) }
+  if (features.enable_rcon !== undefined) { setClauses.push('enable_rcon = ?'); values.push(features.enable_rcon ? 1 : 0) }
+  if (features.enable_admin !== undefined) { setClauses.push('enable_admin = ?'); values.push(features.enable_admin ? 1 : 0) }
+  if (setClauses.length === 0) return
+  setClauses.push('updated_at = unixepoch()')
+  values.push(id)
+  if (existing) {
+    db.prepare(`UPDATE user_features SET ${setClauses.join(', ')} WHERE user_id = ?`).run(...values)
+  } else {
+    const cols = ['user_id']
+    const qmarks = ['?']
+    if (features.enable_chat !== undefined) { cols.push('enable_chat'); qmarks.push('?') }
+    if (features.enable_chat_read !== undefined) { cols.push('enable_chat_read'); qmarks.push('?') }
+    if (features.enable_chat_write !== undefined) { cols.push('enable_chat_write'); qmarks.push('?') }
+    if (features.enable_teleport !== undefined) { cols.push('enable_teleport'); qmarks.push('?') }
+    if (features.enable_inventory !== undefined) { cols.push('enable_inventory'); qmarks.push('?') }
+    if (features.enable_rcon !== undefined) { cols.push('enable_rcon'); qmarks.push('?') }
+    if (features.enable_admin !== undefined) { cols.push('enable_admin'); qmarks.push('?') }
+    const insertVals = values.slice(0, -1)
+    db.prepare(`INSERT INTO user_features (${cols.join(', ')}) VALUES (${qmarks.join(', ')})`).run(...insertVals)
+  }
+}

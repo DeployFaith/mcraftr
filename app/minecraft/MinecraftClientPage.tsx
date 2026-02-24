@@ -32,15 +32,20 @@ function normalizeTab(raw: string | null | undefined): TabId {
   return VALID_TABS.includes(raw as TabId) ? (raw as TabId) : 'players'
 }
 
-export default function MinecraftClientPage({ initialTab }: { initialTab: TabId }) {
-  const { data: session } = useSession()
-  const role = session?.role
+export default function MinecraftClientPage({ initialTab, initialRole }: { initialTab: TabId; initialRole?: string }) {
+  const { data: session, update: updateSession } = useSession()
+  const role = session?.role ?? initialRole
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
   const [activeTab, setActiveTab] = useState<TabId>(initialTab)
   const [players, setPlayers] = useState<string[]>([])
+  const [hydrated, setHydrated] = useState(false)
+
+  useEffect(() => {
+    setHydrated(true)
+  }, [])
 
   useEffect(() => {
     const urlTab = normalizeTab(searchParams.get('tab'))

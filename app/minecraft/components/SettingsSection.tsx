@@ -19,12 +19,69 @@ function StatusMsg({ ok, msg }: { ok: boolean; msg: string }) {
   )
 }
 
+type FeatureFlags = {
+  enable_chat: boolean
+  enable_chat_read: boolean
+  enable_chat_write: boolean
+  enable_teleport: boolean
+  enable_inventory: boolean
+  enable_rcon: boolean
+  enable_admin: boolean
+}
+
+const FEATURE_LIST: { key: keyof FeatureFlags; label: string; desc: string }[] = [
+  { key: 'enable_chat', label: 'Chat Tab', desc: 'Show/hide the Chat tab in the navigation' },
+  { key: 'enable_chat_read', label: 'View Chat Logs', desc: 'Allow viewing player chat history' },
+  { key: 'enable_chat_write', label: 'Send Messages', desc: 'Allow sending messages to players' },
+  { key: 'enable_teleport', label: 'Teleport', desc: 'Use teleport commands (tp, tploc)' },
+  { key: 'enable_inventory', label: 'Inventory', desc: 'View and manage player inventories' },
+  { key: 'enable_rcon', label: 'RCON Console', desc: 'Use the raw RCON console' },
+  { key: 'enable_admin', label: 'Admin Panel', desc: 'Access the Admin tab and user management' },
+]
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function SettingsSection({ role: _role }: { role?: string }) {
   const [serverInfo, setServerInfo] = useState<{ host: string | null; port: number } | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
   const { theme, setTheme, accent, setAccent } = useTheme()
+
+  // Feature flags state
+  const [features, setFeatures] = useState<FeatureFlags | null>(null)
+  const [featuresLoading, setFeaturesLoading] = useState(true)
+  const [featuresSaving, setFeaturesSaving] = useState(false)
+  const [featuresStatus, setFeaturesStatus] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  useEffect(() => {
+    fetch('/api/account/preferences').then(r => r.json()).then(d => {
+      if (d.ok && d.features) setFeatures(d.features)
+    }).catch(() => {}).finally(() => setFeaturesLoading(false))
+  }, [])
+
+  const toggleFeature = async (key: keyof FeatureFlags) => {
+    if (!features || featuresSaving) return
+    const newFeatures = { ...features, [key]: !features[key] }
+    setFeatures(newFeatures)
+    setFeaturesSaving(true)
+    setFeaturesStatus(null)
+    try {
+      const res = await fetch('/api/account/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: newFeatures[key] }),
+      })
+      const d = await res.json()
+      if (d.ok) {
+        setFeaturesStatus({ ok: true, msg: 'Preferences saved' })
+      } else {
+        setFeatures(d.features ? newFeatures : features)
+        setFeaturesStatus({ ok: false, msg: d.error || 'Failed to save' })
+      }
+    } catch {
+      setFeatures(features)
+      setFeaturesStatus({ ok: false, msg: 'Network error' })
+    } finally { setFeaturesSaving(false) }
+  }
 
   // Change password state
   const [pwCurrent, setPwCurrent] = useState('')
@@ -206,6 +263,57 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Feature Toggles */}
+      <div className="glass-card p-5 space-y-4">
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">FEATURE TOGGLES</div>
+        <div className="text-[11px] font-mono text-[var(--text-dim)] opacity-60 mb-2">
+          Turn off features you don't need. Admins can also restrict features for other users.
+        </div>
+        {featuresLoading ? (
+          <div className="text-[13px] font-mono text-[var(--text-dim)] animate-pulse">Loading...</div>
+        ) : (
+          <div className="space-y-2">
+            {FEATURE_LIST.map(f => (
+              <div key={f.key} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
+                <div className="min-w-0">
+                  <div className="text-[13px] font-mono text-[var(--text)]">{f.label}</div>
+                  <div className="text-[11px] font-mono text-[var(--text-dim)]">{f.desc}</div>
+                </div>
+                <button
+                  onClick={() => toggleFeature(f.key)}
+                  disabled={featuresSaving}
+                  className={`w-12 h-6 rounded-full transition-all border ${
+                    features?.[f.key]
+                      ? 'border-[var(--accent-mid)] bg-[var(--accent-dim)]'
+                      : 'border-[var(--border)] bg-[var(--bg)]'
+                  }`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full transition-all shadow-sm ${
+                      features?.[f.key]
+                        ? 'translate-x-6'
+                        : 'translate-x-0.5'
+                    }`}
+                    style={{
+                      background: features?.[f.key] ? 'var(--accent)' : 'var(--text-dim)',
+                    }}
+                  />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {featuresStatus && (
+          <div className={`text-[11px] font-mono px-2 py-1 rounded ${
+            featuresStatus.ok
+              ? 'text-[var(--accent)] bg-[var(--accent-dim)]'
+              : 'text-red-400 bg-red-950/30'
+          }`}>
+            {featuresStatus.msg}
+          </div>
+        )}
       </div>
 
       {/* Server connection info */}

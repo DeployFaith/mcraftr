@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getSessionUserId } from '@/lib/rcon'
+import { getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 import { getDb } from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -16,6 +16,11 @@ export type ChatEntry = {
 export async function GET(req: NextRequest) {
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_chat') || !checkFeatureAccess(features, 'enable_chat_read')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
 
   const since = parseInt(req.nextUrl.searchParams.get('since') ?? '0', 10)
 

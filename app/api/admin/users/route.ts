@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
-import { getUserById, listUsers, createUserByAdmin } from '@/lib/users'
+import { getUserById, getUserFeatures, listUsers, createUserByAdmin } from '@/lib/users'
 import { logAudit } from '@/lib/audit'
 
 export const runtime = 'nodejs'
@@ -19,6 +19,9 @@ export async function GET(req: NextRequest) {
   const adminId = await requireAdmin(req)
   if (!adminId) return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })
 
+  const features = getUserFeatures(adminId)
+  if (!features.enable_admin) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+
   const users = listUsers()
   return Response.json({ ok: true, users })
 }
@@ -26,6 +29,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const adminId = await requireAdmin(req)
   if (!adminId) return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })
+
+  const features = getUserFeatures(adminId)
+  if (!features.enable_admin) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
 
   try {
     const { email, password } = await req.json()

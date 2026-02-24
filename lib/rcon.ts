@@ -4,7 +4,7 @@
  * All users connect directly via the RCON TCP protocol (rcon-client).
  */
 import { Rcon } from 'rcon-client'
-import { getUserById } from './users'
+import { getUserById, getUserFeatures, type UserFeatures } from './users'
 import { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { checkRateLimit } from './ratelimit'
@@ -13,6 +13,24 @@ export type RconResult = {
   ok: boolean
   stdout: string
   error?: string
+}
+
+// ── Feature flag helpers ─────────────────────────────────────────────────────────
+
+export async function getUserFeatureFlags(req: NextRequest): Promise<UserFeatures | null> {
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+    cookieName: 'authjs.session-token',
+  })
+  const userId = token?.id as string | undefined
+  if (!userId) return null
+  return getUserFeatures(userId)
+}
+
+export function checkFeatureAccess(features: UserFeatures | null, feature: keyof UserFeatures): boolean {
+  if (!features) return true
+  return features[feature]
 }
 
 // ── Direct RCON path ──────────────────────────────────────────────────────────

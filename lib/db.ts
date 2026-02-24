@@ -57,6 +57,18 @@ export function getDb(): Database.Database {
       message   TEXT NOT NULL,
       ts        INTEGER NOT NULL DEFAULT (unixepoch())
     );
+
+    CREATE TABLE IF NOT EXISTS user_features (
+      user_id           TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      enable_chat       INTEGER NOT NULL DEFAULT 1,
+      enable_chat_read  INTEGER NOT NULL DEFAULT 1,
+      enable_chat_write INTEGER NOT NULL DEFAULT 1,
+      enable_teleport   INTEGER NOT NULL DEFAULT 1,
+      enable_inventory  INTEGER NOT NULL DEFAULT 1,
+      enable_rcon       INTEGER NOT NULL DEFAULT 1,
+      enable_admin      INTEGER NOT NULL DEFAULT 1,
+      updated_at        INTEGER NOT NULL DEFAULT (unixepoch())
+    );
   `)
 
   return _db

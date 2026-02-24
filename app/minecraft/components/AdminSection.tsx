@@ -399,6 +399,38 @@ export default function AdminSection({ players }: Props) {
   const [createStatus, setCreateStatus] = useState<{ ok: boolean; msg: string } | null>(null)
   const [userBusy,     setUserBusy]     = useState<string | null>(null)
 
+  // ── Feature Policies ───────────────────────────────────────────────────────────
+  type UserWithFeatures = { user_id: string; email: string; role: string; features: Record<string, boolean> }
+  const [featureUsers, setFeatureUsers] = useState<UserWithFeatures[]>([])
+  const [featureLoading, setFeatureLoading] = useState(false)
+  const [selectedFeatureUser, setSelectedFeatureUser] = useState<string | null>(null)
+
+  const fetchFeatureUsers = async () => {
+    setFeatureLoading(true)
+    try {
+      const r = await fetch('/api/admin/preferences')
+      const d = await r.json()
+      if (d.ok) setFeatureUsers(d.users || [])
+    } catch {} finally { setFeatureLoading(false) }
+  }
+
+  useEffect(() => { fetchFeatureUsers() }, [])
+
+  const toggleFeaturePolicy = async (userId: string, feature: string, currentValue: boolean) => {
+    const newValue = !currentValue
+    try {
+      const r = await fetch('/api/admin/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, [feature]: newValue }),
+      })
+      const d = await r.json()
+      if (d.ok) {
+        setFeatureUsers(prev => prev.map(u => u.user_id === userId ? { ...u, features: { ...u.features, [feature]: newValue } } : u))
+      }
+    } catch {}
+  }
+
   const fetchUsers = async () => {
     setUsersLoading(true)
     try {
@@ -856,6 +888,57 @@ export default function AdminSection({ players }: Props) {
             )}
           </form>
         </div>
+      </div>
+
+      {/* ── FEATURE POLICIES ── */}
+      <div className="glass-card p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">FEATURE POLICIES</div>
+          <button onClick={fetchFeatureUsers} disabled={featureLoading}
+            className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
+            {featureLoading ? '…' : 'Refresh'}
+          </button>
+        </div>
+        <div className="text-[11px] font-mono text-[var(--text-dim)] opacity-60 mb-2">
+          Restrict features for sub-accounts. Disabled features are hidden/denied for that user.
+        </div>
+        {featureUsers.length === 0 ? (
+          <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">No users found</div>
+        ) : (
+          <div className="space-y-3">
+            {featureUsers.map(u => (
+              <div key={u.user_id} className="space-y-2">
+                <button
+                  onClick={() => setSelectedFeatureUser(selectedFeatureUser === u.user_id ? null : u.user_id)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)] hover:border-[var(--accent-mid)] transition-colors"
+                >
+                  <div className="text-[13px] font-mono text-[var(--text)] truncate">{u.email}</div>
+                  <span className={`text-[11px] font-mono px-2 py-0.5 rounded ${
+                    u.role === 'admin' ? 'text-[var(--accent)] bg-[var(--accent-dim)]' : 'text-[var(--text-dim)]'
+                  }`}>{u.role.toUpperCase()}</span>
+                </button>
+                {selectedFeatureUser === u.user_id && (
+                  <div className="grid grid-cols-2 gap-2 px-2">
+                    {Object.entries(u.features).map(([key, val]) => (
+                      <div key={key} className="flex items-center justify-between px-2 py-1.5 rounded bg-[var(--bg)] border border-[var(--border)]">
+                        <span className="text-[11px] font-mono text-[var(--text-dim)]">{key.replace('enable_', '')}</span>
+                        <button
+                          onClick={() => toggleFeaturePolicy(u.user_id, key, val)}
+                          className={`w-8 h-4 rounded-full transition-all border ${
+                            val ? 'border-[var(--accent-mid)] bg-[var(--accent-dim)]' : 'border-[var(--border)] bg-[var(--bg)]'
+                          }`}
+                        >
+                          <div className={`w-3 h-3 rounded-full transition-all ${val ? 'translate-x-4' : 'translate-x-0.5'}`}
+                            style={{ background: val ? 'var(--accent)' : 'var(--text-dim)' }} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       {confirmModal && (
         <ConfirmModal

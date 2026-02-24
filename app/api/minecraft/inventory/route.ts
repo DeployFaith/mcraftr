@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getSessionUserId, rconForRequest } from '@/lib/rcon'
+import { getSessionUserId, rconForRequest, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 import { VALID_ITEM_IDS } from '@/lib/items'
 import { Rcon } from 'rcon-client'
 import { getUserById } from '@/lib/users'
@@ -96,7 +96,14 @@ async function rconInventory(req: NextRequest, cmds: string[]): Promise<{ ok: bo
 }
 
 export async function GET(req: NextRequest) {
-  if (!await getSessionUserId(req)) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const userId = await getSessionUserId(req)
+  if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_inventory')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
+
   const player = req.nextUrl.searchParams.get('player')
   if (!player) return Response.json({ ok: false, error: 'Missing player' }, { status: 400 })
   if (!/^\.?[a-zA-Z0-9_]{1,16}$/.test(player)) {
@@ -162,7 +169,14 @@ function nbtSlotToCommandSlot(slot: number): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  if (!await getSessionUserId(req)) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const userId = await getSessionUserId(req)
+  if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_inventory')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
+
   try {
     const { player, fromSlot, toSlot } = await req.json()
     if (!player || fromSlot == null || toSlot == null) {
@@ -186,7 +200,14 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!await getSessionUserId(req)) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const userId = await getSessionUserId(req)
+  if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_inventory')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
+
   try {
     const { player, item, count } = await req.json()
     if (!player || !item) return Response.json({ ok: false, error: 'Missing player or item' }, { status: 400 })

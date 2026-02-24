@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { rconForRequest, getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 import { checkRateLimit } from '@/lib/ratelimit'
 import { logAudit } from '@/lib/audit'
 import { getDb } from '@/lib/db'
@@ -10,6 +10,11 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_chat') || !checkFeatureAccess(features, 'enable_chat_write')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
 
   const rl = await checkRateLimit(req, 'broadcast', userId)
   if (rl.limited) return rl.response
