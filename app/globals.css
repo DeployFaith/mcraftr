@@ -8,8 +8,8 @@
   --bg2:         #111119;
   --panel:       #16161f;
   --border:      #22223a;
-  --text:        #d8d8e8;
-  --text-dim:    #6a6a85;
+  --text:        #e8e8f4;
+  --text-dim:    #9898b4;
   --red:         #ff3355;
   --accent:      #00ffc8;
   --accent-dim:  color-mix(in srgb, var(--accent) 18%, transparent);

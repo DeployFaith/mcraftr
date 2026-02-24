@@ -53,7 +53,7 @@ const CAT_PAGE_SIZE = 24
 function PlayerChip({ name, selected, variant = 'default', onClick }: {
   name: string; selected: boolean; variant?: 'default' | 'from' | 'to'; onClick: () => void
 }) {
-  const base = 'px-3 py-1.5 rounded-lg text-xs font-mono border transition-all cursor-pointer select-none'
+  const base = 'px-3 py-1.5 rounded-lg text-[13px] font-mono border transition-all cursor-pointer select-none'
   if (variant === 'from')
     return <button onClick={onClick} className={`${base} ${selected ? 'border-[var(--border)] bg-[var(--panel)] text-[var(--text)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)] hover:text-[var(--text)]'}`}>{name}</button>
   if (variant === 'to')
@@ -67,7 +67,7 @@ function PlayerChip({ name, selected, variant = 'default', onClick }: {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[9px] font-mono text-[var(--text-dim)] tracking-widest pb-1 border-b border-[var(--border)] mb-2">
+    <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest pb-1 border-b border-[var(--border)] mb-2">
       {children}
     </div>
   )
@@ -157,9 +157,9 @@ export default function ActionsSection({ players }: Props) {
       <button key={id} onClick={() => issueCmd(id, player)} disabled={busy || !!busyCmd}
         className="flex flex-col items-center gap-1 px-2 py-3 rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:border-[var(--accent-mid)] border-[var(--border)] text-[var(--text-dim)]">
         <span className="flex items-center justify-center h-5">
-          {busy ? <span className="text-sm font-mono">…</span> : <Icon size={16} color="var(--text-dim)" strokeWidth={1.5} />}
+          {busy ? <span className="text-[15px] font-mono">…</span> : <Icon size={16} color="var(--text-dim)" strokeWidth={1.5} />}
         </span>
-        <span className="text-[9px] font-mono tracking-wide">{label}</span>
+        <span className="text-[13px] font-mono tracking-wide">{label}</span>
       </button>
     )
   }
@@ -393,7 +393,7 @@ export default function ActionsSection({ players }: Props) {
 
       {/* ── WORLD COMMANDS ── */}
       <div className="glass-card p-4 space-y-4">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">WORLD</div>
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">WORLD</div>
         <div>
           <SectionLabel>WEATHER / TIME</SectionLabel>
           <div className="grid grid-cols-4 gap-2">
@@ -404,12 +404,12 @@ export default function ActionsSection({ players }: Props) {
 
       {/* ── PLAYER COMMANDS ── */}
       <div className="glass-card p-4 space-y-4">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">PLAYER COMMANDS</div>
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">PLAYER COMMANDS</div>
 
         <div>
           <SectionLabel>SELECT PLAYER</SectionLabel>
           {noPlayers ? (
-            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-50">No players online — the world is your oyster</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)]">No players online — the world is your oyster</div>
           ) : (
             <div className="flex flex-wrap gap-2">
               {players.map(p => (
@@ -425,7 +425,7 @@ export default function ActionsSection({ players }: Props) {
             <div className="grid grid-cols-3 gap-2">
               {GAMEMODE_CMDS.map(c => cmdBtn(c.id, c.Icon, c.label, cmdPlayer))}
             </div>
-          ) : <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Select a player above</div>}
+          ) : <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">Select a player above</div>}
         </div>
 
         <div>
@@ -445,34 +445,34 @@ export default function ActionsSection({ players }: Props) {
                       : { borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
                     <span className="flex items-center justify-center h-5">
                       {busy
-                        ? <span className="text-sm font-mono" style={{ color: iconColor }}>…</span>
+                        ? <span className="text-[15px] font-mono" style={{ color: iconColor }}>…</span>
                         : <c.Icon size={16} color={iconColor} strokeWidth={1.5} />}
                     </span>
-                    <span className="text-[9px] font-mono tracking-wide" style={{ color: iconColor }}>{c.label}</span>
+                    <span className="text-[13px] font-mono tracking-wide" style={{ color: iconColor }}>{c.label}</span>
                   </button>
                 )
               })}
             </div>
-          ) : <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Select a player above</div>}
+          ) : <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">Select a player above</div>}
         </div>
       </div>
 
       {/* ── BROADCAST ── */}
       <div className="glass-card p-4 space-y-4">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">BROADCAST</div>
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">BROADCAST</div>
         <div>
           <SectionLabel>MESSAGE TO ALL PLAYERS</SectionLabel>
           <textarea placeholder="Type a message…" value={bcMessage} onChange={e => setBcMessage(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBroadcast() } }}
             rows={3} maxLength={256}
-            className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)] resize-none"
+            className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)] resize-none"
             style={{ fontSize: '16px' }} />
           <div className="flex items-center justify-between mt-1">
-            <span className={`text-[9px] font-mono ${bcMessage.length >= 256 ? 'text-red-400' : bcMessage.length >= 230 ? 'text-yellow-500 opacity-70' : 'text-[var(--text-dim)] opacity-40'}`}>
+            <span className={`text-[13px] font-mono ${bcMessage.length >= 256 ? 'text-red-400' : bcMessage.length >= 230 ? 'text-yellow-500 opacity-70' : 'text-[var(--text-dim)] opacity-60'}`}>
               {bcMessage.length}/256 · Enter to send · Shift+Enter for newline
             </span>
             <button onClick={sendBroadcast} disabled={!bcMessage.trim() || bcBusy}
-              className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              className="px-4 py-2 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
               {bcBusy ? 'Sending...' : 'Send'}
             </button>
           </div>
@@ -483,23 +483,23 @@ export default function ActionsSection({ players }: Props) {
           <div className="space-y-2">
             {cmdPlayer ? (
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
-                <span className="text-[9px] font-mono text-[var(--text-dim)]">To:</span>
-                <span className="text-[10px] font-mono text-[var(--accent)]">{cmdPlayer}</span>
-                <span className="text-[9px] font-mono text-[var(--text-dim)] opacity-40 ml-auto">from Player Commands</span>
+                <span className="text-[13px] font-mono text-[var(--text-dim)]">To:</span>
+                <span className="text-[13px] font-mono text-[var(--accent)]">{cmdPlayer}</span>
+                <span className="text-[13px] font-mono text-[var(--text-dim)] opacity-60 ml-auto">from Player Commands</span>
               </div>
             ) : (
               <input type="text" placeholder="Type player name… (or select in Player Commands)"
                 value={msgManual} onChange={e => setMsgManual(e.target.value)}
-                className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+                className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
                 style={{ fontSize: '16px' }} />
             )}
             <div className="flex gap-2">
               <input type="text" placeholder="Message…" value={msgText} onChange={e => setMsgText(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && sendPrivateMsg()} maxLength={256}
-                className="flex-1 bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+                className="flex-1 bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
                 style={{ fontSize: '16px' }} />
               <button onClick={sendPrivateMsg} disabled={(!cmdPlayer && !msgManual.trim()) || !msgText.trim() || msgBusy}
-                className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                className="px-4 py-2 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 {msgBusy ? '…' : 'Send'}
               </button>
             </div>
@@ -509,15 +509,15 @@ export default function ActionsSection({ players }: Props) {
 
       {/* ── TELEPORT ── */}
       <div className="glass-card p-4 space-y-4">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">TELEPORT</div>
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">TELEPORT</div>
 
         <div>
           <SectionLabel>PLAYER → PLAYER</SectionLabel>
           {players.length < 2 ? (
-            <div className="text-xs font-mono text-[var(--text-dim)] opacity-50">Need at least 2 players online</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)]">Need at least 2 players online</div>
           ) : (
             <div className="space-y-3">
-              <div className="text-[10px] font-mono text-[var(--text-dim)]">
+              <div className="text-[13px] font-mono text-[var(--text-dim)]">
                 Tap <span className="text-[var(--text-dim)]">FROM</span> then <span className="text-[var(--accent)]">TO</span>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -526,13 +526,13 @@ export default function ActionsSection({ players }: Props) {
                   return <PlayerChip key={p} name={p} selected={!!role} variant={role ?? 'default'} onClick={() => handleTpClick(p)} />
                 })}
               </div>
-              <div className="flex items-center gap-3 py-2 px-3 rounded-lg bg-[var(--panel)] border border-[var(--border)] font-mono text-xs min-h-[38px]">
-                {tpFrom ? <span className="text-[var(--text)]">{tpFrom}</span> : <span className="text-[var(--text-dim)] opacity-40">from</span>}
+              <div className="flex items-center gap-3 py-2 px-3 rounded-lg bg-[var(--panel)] border border-[var(--border)] font-mono text-[13px] min-h-[38px]">
+                {tpFrom ? <span className="text-[var(--text)]">{tpFrom}</span> : <span className="text-[var(--text-dim)] opacity-60">from</span>}
                 <span className="text-[var(--text-dim)]">→</span>
-                {tpTo   ? <span className="text-[var(--accent)]">{tpTo}</span>   : <span className="text-[var(--text-dim)] opacity-40">to</span>}
+                {tpTo   ? <span className="text-[var(--accent)]">{tpTo}</span>   : <span className="text-[var(--text-dim)] opacity-60">to</span>}
               </div>
               <button onClick={teleport} disabled={tping || !tpFrom || !tpTo}
-                className="w-full py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}>
                 {tping ? 'Teleporting...' : 'Teleport'}
               </button>
@@ -551,21 +551,21 @@ export default function ActionsSection({ players }: Props) {
               </div>
             )}
             <input type="text" placeholder="Or type player name…" value={tpLocPlayer} onChange={e => setTpLocPlayer(e.target.value)}
-              className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+              className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
               style={{ fontSize: '16px' }} />
             <div className="grid grid-cols-3 gap-2">
               {(['X', 'Y', 'Z'] as const).map((axis, i) => (
                 <div key={axis}>
-                  <div className="text-[9px] font-mono text-[var(--text-dim)] mb-1">{axis}</div>
+                  <div className="text-[13px] font-mono text-[var(--text-dim)] mb-1">{axis}</div>
                   <input type="number" placeholder="0"
                     value={[tpX, tpY, tpZ][i]} onChange={e => [setTpX, setTpY, setTpZ][i](e.target.value)}
-                    className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-2 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+                    className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-2 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
                     style={{ fontSize: '16px' }} />
                 </div>
               ))}
             </div>
             <button onClick={teleportToCoords} disabled={tpLocing || !tpLocPlayer || !tpX || !tpY || !tpZ}
-              className="w-full py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}>
               {tpLocing ? 'Teleporting...' : 'Teleport to Coordinates'}
             </button>
@@ -575,14 +575,14 @@ export default function ActionsSection({ players }: Props) {
 
       {/* ── KIT ASSIGNMENT ── */}
       <div className="glass-card p-4 space-y-4">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">KIT ASSIGNMENT</div>
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">KIT ASSIGNMENT</div>
 
         <div>
           <SectionLabel>1 · SELECT PLAYER</SectionLabel>
           {cmdPlayer ? (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
-              <span className="text-[10px] font-mono text-[var(--accent)]">{cmdPlayer}</span>
-              <span className="text-[9px] font-mono text-[var(--text-dim)] opacity-40 ml-auto">from Player Commands</span>
+              <span className="text-[13px] font-mono text-[var(--accent)]">{cmdPlayer}</span>
+              <span className="text-[13px] font-mono text-[var(--text-dim)] opacity-60 ml-auto">from Player Commands</span>
             </div>
           ) : (
             <div className="space-y-2">
@@ -596,7 +596,7 @@ export default function ActionsSection({ players }: Props) {
               )}
               <input type="text" placeholder="Or type player name…"
                 value={kitManual} onChange={e => { setKitManual(e.target.value); setSelectedKit('') }}
-                className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+                className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
                 style={{ fontSize: '16px' }} />
             </div>
           )}
@@ -617,7 +617,7 @@ export default function ActionsSection({ players }: Props) {
                         ? { borderColor: 'var(--accent)', background: 'var(--accent)', color: 'var(--bg)' }
                         : { borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
                       <k.Icon size={18} color={iconColor} strokeWidth={1.5} />
-                      <span className="text-[9px] font-mono tracking-wide" style={{ color: iconColor }}>{k.label}</span>
+                      <span className="text-[13px] font-mono tracking-wide" style={{ color: iconColor }}>{k.label}</span>
                     </button>
                   )
                 })}
@@ -631,15 +631,15 @@ export default function ActionsSection({ players }: Props) {
                   <SectionLabel>3 · PREVIEW — {kit.label.toUpperCase()}</SectionLabel>
                   <div className="space-y-1 mb-3 max-h-48 overflow-y-auto">
                     {kit.items.map((item, i) => (
-                      <div key={i} className="flex items-baseline gap-2 px-2 py-1 rounded bg-[var(--panel)] text-xs font-mono">
+                      <div key={i} className="flex items-baseline gap-2 px-2 py-1 rounded bg-[var(--panel)] text-[13px] font-mono">
                         <span className="text-[var(--accent)] shrink-0">×{item.qty}</span>
                         <span className="text-[var(--text)]">{item.name}</span>
-                        {item.enchants && <span className="text-purple-400 text-[9px] opacity-70">{item.enchants}</span>}
+                        {item.enchants && <span className="text-purple-400 text-[13px] opacity-70">{item.enchants}</span>}
                       </div>
                     ))}
                   </div>
                   <button onClick={assignKit} disabled={assigning}
-                    className="w-full py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="w-full py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}>
                     {assigning ? 'Assigning...' : `Give ${kit.label} Kit → ${cmdPlayer || kitManual}`}
                   </button>
@@ -652,14 +652,14 @@ export default function ActionsSection({ players }: Props) {
 
       {/* ── ITEM CATALOG ── */}
       <div className="glass-card p-4 space-y-4">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">ITEM CATALOG</div>
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">ITEM CATALOG</div>
 
         <div>
           <SectionLabel>SELECT PLAYER</SectionLabel>
           {cmdPlayer ? (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
-              <span className="text-[10px] font-mono text-[var(--accent)]">{cmdPlayer}</span>
-              <span className="text-[9px] font-mono text-[var(--text-dim)] opacity-40 ml-auto">from Player Commands</span>
+              <span className="text-[13px] font-mono text-[var(--accent)]">{cmdPlayer}</span>
+              <span className="text-[13px] font-mono text-[var(--text-dim)] opacity-60 ml-auto">from Player Commands</span>
             </div>
           ) : (
             <div className="space-y-2">
@@ -673,7 +673,7 @@ export default function ActionsSection({ players }: Props) {
               )}
               <input type="text" placeholder="Or type player name…"
                 value={catManual} onChange={e => setCatManual(e.target.value)}
-                className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+                className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
                 style={{ fontSize: '16px' }} />
             </div>
           )}
@@ -684,7 +684,7 @@ export default function ActionsSection({ players }: Props) {
             <div className="flex gap-1.5 flex-wrap">
               {CATALOG.map(cat => (
                 <button key={cat.id} onClick={() => { setCatCatId(cat.id); setCatPage(0); setCatSearch(''); setCatSelected(null) }}
-                  className={`px-2 py-1 rounded text-[9px] font-mono transition-all border ${
+                  className={`px-2 py-1 rounded text-[13px] font-mono transition-all border ${
                     catCatId === cat.id
                       ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]'
                       : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]'
@@ -696,7 +696,7 @@ export default function ActionsSection({ players }: Props) {
 
             <input type="text" placeholder={catSearch ? 'Search all items…' : `Search ${activeCat.label}…`}
               value={catSearch} onChange={e => { setCatSearch(e.target.value); setCatPage(0); setCatSelected(null) }}
-              className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+              className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
               style={{ fontSize: '16px' }} />
 
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
@@ -707,7 +707,7 @@ export default function ActionsSection({ players }: Props) {
                       ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]'
                       : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]'
                   }`}>
-                  <span className="text-[8px] font-mono leading-tight text-center line-clamp-2">{item.label}</span>
+                  <span className="text-[13px] font-mono leading-tight text-center line-clamp-2">{item.label}</span>
                 </button>
               ))}
             </div>
@@ -715,10 +715,10 @@ export default function ActionsSection({ players }: Props) {
             {totalPages > 1 && (
               <div className="flex items-center justify-between">
                 <button onClick={() => setCatPage(p => Math.max(0, p - 1))} disabled={catPage === 0}
-                  className="text-[10px] font-mono text-[var(--accent)] disabled:opacity-30">← Prev</button>
-                <span className="text-[9px] font-mono text-[var(--text-dim)]">{catPage + 1} / {totalPages}</span>
+                  className="text-[13px] font-mono text-[var(--accent)] disabled:opacity-30">← Prev</button>
+                <span className="text-[13px] font-mono text-[var(--text-dim)]">{catPage + 1} / {totalPages}</span>
                 <button onClick={() => setCatPage(p => Math.min(totalPages - 1, p + 1))} disabled={catPage === totalPages - 1}
-                  className="text-[10px] font-mono text-[var(--accent)] disabled:opacity-30">Next →</button>
+                  className="text-[13px] font-mono text-[var(--accent)] disabled:opacity-30">Next →</button>
               </div>
             )}
 
@@ -727,18 +727,18 @@ export default function ActionsSection({ players }: Props) {
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-[var(--panel)] border border-[var(--accent-mid)]">
                   <span className="text-2xl">{activeCat.icon}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-mono text-[var(--text)] truncate">{catSelected.label}</div>
-                    <div className="text-[9px] font-mono text-[var(--text-dim)]">minecraft:{catSelected.id}</div>
+                    <div className="text-[13px] font-mono text-[var(--text)] truncate">{catSelected.label}</div>
+                    <div className="text-[13px] font-mono text-[var(--text-dim)]">minecraft:{catSelected.id}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <button onClick={() => setCatQty(q => Math.max(1, q - 1))} className="w-8 h-8 rounded border border-[var(--border)] text-[var(--text-dim)] font-mono hover:border-[var(--accent-mid)]">−</button>
-                  <span className="flex-1 text-center font-mono text-sm text-[var(--text)]">{catQty}</span>
+                  <span className="flex-1 text-center font-mono text-[15px] text-[var(--text)]">{catQty}</span>
                   <button onClick={() => setCatQty(q => Math.min(catSelected.maxStack ?? 64, q + 1))} className="w-8 h-8 rounded border border-[var(--border)] text-[var(--text-dim)] font-mono hover:border-[var(--accent-mid)]">+</button>
-                  <button onClick={() => setCatQty(catSelected.maxStack ?? 64)} className="px-3 py-1.5 rounded border border-[var(--border)] text-[9px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Max</button>
+                  <button onClick={() => setCatQty(catSelected.maxStack ?? 64)} className="px-3 py-1.5 rounded border border-[var(--border)] text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Max</button>
                 </div>
                 <button onClick={giveItem} disabled={catGiving}
-                  className="w-full py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}>
                   {catGiving ? 'Giving...' : `Give ×${catQty} ${catSelected.label} → ${cmdPlayer || catManual}`}
                 </button>
@@ -750,14 +750,14 @@ export default function ActionsSection({ players }: Props) {
 
       {/* ── INVENTORY VIEWER ── */}
       <div className="glass-card p-4 space-y-4">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">INVENTORY VIEWER</div>
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">INVENTORY VIEWER</div>
 
         <div>
           <SectionLabel>SELECT PLAYER</SectionLabel>
           {cmdPlayer ? (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
-              <span className="text-[10px] font-mono text-[var(--accent)]">{cmdPlayer}</span>
-              <span className="text-[9px] font-mono text-[var(--text-dim)] opacity-40 ml-auto">from Player Commands</span>
+              <span className="text-[13px] font-mono text-[var(--accent)]">{cmdPlayer}</span>
+              <span className="text-[13px] font-mono text-[var(--text-dim)] opacity-60 ml-auto">from Player Commands</span>
             </div>
           ) : (
             <div className="space-y-2">
@@ -771,25 +771,25 @@ export default function ActionsSection({ players }: Props) {
               )}
               <input type="text" placeholder="Or type player name…"
                 value={invManual} onChange={e => { setInvManual(e.target.value); setInvItems([]) }}
-                className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+                className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
                 style={{ fontSize: '16px' }} />
             </div>
           )}
         </div>
 
         <button onClick={loadInventory} disabled={invLoading || !invPlayer}
-          className="w-full py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]">
+          className="w-full py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]">
           {invLoading ? 'Loading…' : 'Load Inventory'}
         </button>
 
         {invItems.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <div className="text-[9px] font-mono text-[var(--text-dim)]">{invItems.length} item{invItems.length !== 1 ? 's' : ''}</div>
+              <div className="text-[13px] font-mono text-[var(--text-dim)]">{invItems.length} item{invItems.length !== 1 ? 's' : ''}</div>
               <button
                 onClick={() => clearAllInventory(invPlayer)}
                 disabled={!!invDeleting}
-                className="text-[9px] font-mono px-2 py-1 rounded border border-red-900/50 text-red-400 hover:border-red-700 transition-all disabled:opacity-30">
+                className="text-[13px] font-mono px-2 py-1 rounded border border-red-900/50 text-red-400 hover:border-red-700 transition-all disabled:opacity-30">
                 Clear All
               </button>
             </div>
@@ -800,19 +800,19 @@ export default function ActionsSection({ players }: Props) {
                   <div key={key} className="flex items-start justify-between gap-2 px-3 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--panel)]">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline gap-2">
-                        <span className="text-[9px] font-mono text-[var(--text-dim)] shrink-0">{slotLabel(item.slot)}</span>
-                        <span className="text-xs font-mono text-[var(--text)] truncate">{item.label}</span>
-                        {item.count > 1 && <span className="text-[9px] font-mono text-[var(--accent)] shrink-0">×{item.count}</span>}
+                        <span className="text-[13px] font-mono text-[var(--text-dim)] shrink-0">{slotLabel(item.slot)}</span>
+                        <span className="text-[13px] font-mono text-[var(--text)] truncate">{item.label}</span>
+                        {item.count > 1 && <span className="text-[13px] font-mono text-[var(--accent)] shrink-0">×{item.count}</span>}
                       </div>
                       {item.enchants && (
-                        <div className="text-[9px] font-mono text-purple-400 opacity-80 mt-0.5 leading-relaxed">{item.enchants}</div>
+                        <div className="text-[13px] font-mono text-purple-400 opacity-80 mt-0.5 leading-relaxed">{item.enchants}</div>
                       )}
                     </div>
                     <button onClick={() => deleteItem(invPlayer, item)} disabled={!!invDeleting}
                       className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-dim)] hover:border-red-700 disabled:opacity-30 transition-all group"
                       title={`Clear ${item.label}`}>
                       {invDeleting === key
-                        ? <span className="text-xs font-mono">…</span>
+                        ? <span className="text-[13px] font-mono">…</span>
                         : <Trash2 size={13} className="group-hover:text-red-400 transition-colors" strokeWidth={1.5} />}
                     </button>
                   </div>
@@ -823,7 +823,7 @@ export default function ActionsSection({ players }: Props) {
         )}
 
         {!invLoading && invPlayer && invItems.length === 0 && (
-          <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-50 text-center py-4">
+          <div className="text-[13px] font-mono text-[var(--text-dim)] text-center py-4">
             Pockets empty — player may be offline or carrying nothing
           </div>
         )}

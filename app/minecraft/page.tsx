@@ -56,7 +56,7 @@ export default function MinecraftPage() {
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
-                className={`flex items-center gap-2 px-5 py-3 text-xs font-mono tracking-widest transition-all border-b-2 ${
+                className={`flex items-center gap-2 px-5 py-3 text-[13px] font-mono tracking-widest transition-all border-b-2 ${
                   active
                     ? 'border-[var(--accent)] text-[var(--accent)]'
                     : 'border-transparent text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--border)]'
@@ -92,7 +92,7 @@ export default function MinecraftPage() {
                 className="relative flex-1 flex flex-col items-center gap-1 py-3 transition-all"
               >
                 <Icon size={20} color={active ? 'var(--accent)' : 'var(--text-dim)'} strokeWidth={1.75} />
-                <span className="text-[9px] font-mono tracking-widest"
+                <span className="text-[13px] font-mono tracking-widest"
                   style={{ color: active ? 'var(--accent)' : 'var(--text-dim)' }}>
                   {label.toUpperCase()}
                 </span>

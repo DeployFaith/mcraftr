@@ -18,7 +18,7 @@ export default function Toasts({ toasts }: { toasts: Toast[] }) {
         return (
           <div
             key={toast.id}
-            className="px-4 py-3 rounded-lg font-mono text-xs shadow-lg pointer-events-auto max-w-xs"
+            className="px-4 py-3 rounded-lg font-mono text-[13px] shadow-lg pointer-events-auto max-w-xs"
             style={styles}
           >
             {prefix}{toast.message}

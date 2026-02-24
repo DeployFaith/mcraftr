@@ -51,16 +51,16 @@ export default function ChatSection() {
       <h2 className="font-mono text-base tracking-widest text-[var(--accent)]">CHAT</h2>
 
       <div className="glass-card p-4 flex flex-col" style={{ minHeight: '60vh' }}>
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)] mb-3">OUTBOUND MESSAGES</div>
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)] mb-3">OUTBOUND MESSAGES</div>
 
         {loading ? (
-          <div className="flex-1 flex items-center justify-center text-[10px] font-mono text-[var(--text-dim)] opacity-40 tracking-widest animate-pulse">
+          <div className="flex-1 flex items-center justify-center text-[13px] font-mono text-[var(--text-dim)] opacity-60 tracking-widest animate-pulse">
             Loading…
           </div>
         ) : entries.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center">
-            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40 tracking-widest">The chat is quieter than a creeper in water</div>
-            <div className="text-[9px] font-mono text-[var(--text-dim)] opacity-30">
+            <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60 tracking-widest">The chat is quieter than a creeper in water</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-30">
               Use Broadcast or Private Message in Actions — messages will appear here.
             </div>
           </div>
@@ -73,25 +73,25 @@ export default function ChatSection() {
                   : 'border-[var(--border)] bg-[var(--panel)]'
               }`}>
                 <div className="flex items-center justify-between gap-2">
-                  <span className={`text-[9px] font-mono tracking-widest ${
+                  <span className={`text-[13px] font-mono tracking-widest ${
                     entry.type === 'broadcast' ? 'text-[var(--accent)]' : 'text-[var(--text-dim)]'
                   }`}>
                     {entry.type === 'broadcast'
                       ? <span className="flex items-center gap-1"><Megaphone size={10} strokeWidth={1.5} />BROADCAST</span>
                       : <span className="flex items-center gap-1"><MessageSquare size={10} strokeWidth={1.5} />→ {entry.player}</span>}
                   </span>
-                  <span className="text-[9px] font-mono text-[var(--text-dim)] opacity-40 shrink-0">
+                  <span className="text-[13px] font-mono text-[var(--text-dim)] opacity-60 shrink-0">
                     {formatTime(entry.ts)}
                   </span>
                 </div>
-                <div className="text-sm font-mono text-[var(--text)]">{entry.message}</div>
+                <div className="text-[15px] font-mono text-[var(--text)]">{entry.message}</div>
               </div>
             ))}
             <div ref={bottomRef} />
           </div>
         )}
 
-        <div className="mt-3 pt-3 border-t border-[var(--border)] text-[9px] font-mono text-[var(--text-dim)] opacity-30 text-right">
+        <div className="mt-3 pt-3 border-t border-[var(--border)] text-[13px] font-mono text-[var(--text-dim)] opacity-30 text-right">
           Polls every 10s · Shows messages sent from this session
         </div>
       </div>

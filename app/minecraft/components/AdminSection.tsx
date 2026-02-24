@@ -25,7 +25,7 @@ type Props = { players: string[] }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[9px] font-mono text-[var(--text-dim)] tracking-widest pb-1 border-b border-[var(--border)] mb-2">
+    <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest pb-1 border-b border-[var(--border)] mb-2">
       {children}
     </div>
   )
@@ -59,12 +59,12 @@ function TpsGauge({ tps }: { tps: number }) {
     <div className="space-y-2">
       <div className="flex items-baseline justify-between">
         <span className="font-mono text-2xl font-bold" style={{ color }}>{tps.toFixed(2)}</span>
-        <span className="text-[9px] font-mono tracking-widest" style={{ color }}>{label}</span>
+        <span className="text-[13px] font-mono tracking-widest" style={{ color }}>{label}</span>
       </div>
       <div className="h-1.5 rounded-full bg-[var(--panel)] overflow-hidden border border-[var(--border)]">
         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
       </div>
-      <div className="text-[9px] font-mono text-[var(--text-dim)] opacity-50">ticks/sec (max 20)</div>
+      <div className="text-[13px] font-mono text-[var(--text-dim)]">ticks/sec (max 20)</div>
     </div>
   )
 }
@@ -72,9 +72,9 @@ function TpsGauge({ tps }: { tps: number }) {
 function StatTile({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) {
   return (
     <div className="glass-card p-4 space-y-1">
-      <div className="text-[9px] font-mono tracking-widest text-[var(--text-dim)]">{label}</div>
+      <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">{label}</div>
       <div className="font-mono text-lg text-[var(--text)]">{value}</div>
-      {sub && <div className="text-[9px] font-mono text-[var(--text-dim)] opacity-50">{sub}</div>}
+      {sub && <div className="text-[13px] font-mono text-[var(--text-dim)]">{sub}</div>}
     </div>
   )
 }
@@ -453,7 +453,7 @@ export default function AdminSection({ players }: Props) {
     finally { setUserBusy(null) }
   }
 
-  const inputCls = 'w-full px-3 py-2 rounded-lg font-mono text-xs bg-[var(--panel)] border border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)] transition-colors'
+  const inputCls = 'w-full px-3 py-2 rounded-lg font-mono text-[13px] bg-[var(--panel)] border border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)] transition-colors'
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -466,56 +466,56 @@ export default function AdminSection({ players }: Props) {
       {/* ── SERVER INFO ── */}
       <div className="glass-card p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">SERVER INFO</div>
+          <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">SERVER INFO</div>
           <div className="flex items-center gap-3">
             {infoLastAt && (
-              <span className="text-[9px] font-mono text-[var(--text-dim)] opacity-40">
+              <span className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">
                 updated {infoLastAt.toLocaleTimeString()}
               </span>
             )}
             <button onClick={() => fetchInfo(true)} disabled={infoLoading}
-              className="text-[9px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity disabled:opacity-20">
+              className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity disabled:opacity-20">
               {infoLoading ? '…' : 'Refresh'}
             </button>
           </div>
         </div>
 
-        {infoError && <div className="text-xs font-mono text-red-400">{infoError}</div>}
+        {infoError && <div className="text-[13px] font-mono text-red-400">{infoError}</div>}
         {infoLoading && !info && (
-          <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40 tracking-widest">Connecting…</div>
+          <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60 tracking-widest">Connecting…</div>
         )}
         {info && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <StatTile label="PLAYERS ONLINE"
-                value={<span><span className="text-[var(--accent)]">{info.online}</span><span className="text-[var(--text-dim)] text-sm"> / {info.max}</span></span>}
+                value={<span><span className="text-[var(--accent)]">{info.online}</span><span className="text-[var(--text-dim)] text-[15px]"> / {info.max}</span></span>}
                 sub="currently connected" />
               <StatTile label="VERSION"
-                value={<span className="text-sm break-all">{info.version ?? <span className="opacity-40 text-xs">Unknown</span>}</span>}
+                value={<span className="text-[15px] break-all">{info.version ?? <span className="opacity-40 text-[13px]">Unknown</span>}</span>}
                 sub="server version" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <StatTile label="WEATHER"
-                value={<span className="flex items-center gap-1.5 text-sm">{info.weather !== null ? <><WeatherIcon w={info.weather} /><span className="capitalize">{info.weather}</span></> : <span className="opacity-40 text-xs">—</span>}</span>}
+                value={<span className="flex items-center gap-1.5 text-[15px]">{info.weather !== null ? <><WeatherIcon w={info.weather} /><span className="capitalize">{info.weather}</span></> : <span className="opacity-40 text-[13px]">—</span>}</span>}
                 sub="current conditions" />
               <StatTile label="TIME OF DAY"
-                value={<span className="flex items-center gap-1.5 text-sm">{info.timeOfDay !== null ? <><TimeIcon t={info.timeOfDay} />{info.timeOfDay}</> : <span className="opacity-40 text-xs">—</span>}</span>}
+                value={<span className="flex items-center gap-1.5 text-[15px]">{info.timeOfDay !== null ? <><TimeIcon t={info.timeOfDay} />{info.timeOfDay}</> : <span className="opacity-40 text-[13px]">—</span>}</span>}
                 sub="in-game time" />
             </div>
             <div className="glass-card p-4">
-              <div className="text-[9px] font-mono tracking-widest text-[var(--text-dim)] mb-3">TPS</div>
+              <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)] mb-3">TPS</div>
               {info.tps !== null ? <TpsGauge tps={info.tps} /> : (
-                <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Not available — vanilla servers do not expose TPS via RCON</div>
+                <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">Not available — vanilla servers do not expose TPS via RCON</div>
               )}
             </div>
-            <div className="text-[9px] font-mono text-[var(--text-dim)] opacity-30 text-right">Auto-refreshes every 30s</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-30 text-right">Auto-refreshes every 30s</div>
           </div>
         )}
       </div>
 
       {/* ── SERVER CONFIG ── */}
       <div className="glass-card p-4 space-y-4">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">SERVER CONFIG</div>
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">SERVER CONFIG</div>
 
         <div>
           <SectionLabel>DIFFICULTY</SectionLabel>
@@ -525,7 +525,7 @@ export default function AdminSection({ players }: Props) {
               const active = difficulty === d
               return (
                 <button key={d} onClick={() => setDifficultyCmd(d)} disabled={!!difficultyBusy}
-                  className="py-2 rounded-lg font-mono text-[9px] tracking-widest border transition-all disabled:opacity-40"
+                  className="py-2 rounded-lg font-mono text-[13px] tracking-widest border transition-all disabled:opacity-40"
                   style={active ? { borderColor: colors[d], background: colors[d] + '20', color: colors[d] }
                     : { borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
                   {difficultyBusy === d ? '…' : d.toUpperCase()}
@@ -539,12 +539,12 @@ export default function AdminSection({ players }: Props) {
           <div className="flex items-center justify-between mb-2">
             <SectionLabel>GAMERULES</SectionLabel>
             <button onClick={fetchGamerules} disabled={gamerulesLoading}
-              className="text-[9px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
+              className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
               {gamerulesLoading ? '…' : gamerules === null ? 'Load' : 'Refresh'}
             </button>
           </div>
           {gamerules === null ? (
-            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Click Load to fetch gamerules from the server</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">Click Load to fetch gamerules from the server</div>
           ) : (
             <div className="space-y-1.5">
               {(['keepInventory', 'mobGriefing', 'pvp', 'doDaylightCycle', 'doWeatherCycle', 'doFireTick', 'doMobSpawning', 'naturalRegeneration'] as const).map(rule => {
@@ -558,9 +558,9 @@ export default function AdminSection({ players }: Props) {
                 }
                 return (
                   <div key={rule} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
-                    <span className="text-[10px] font-mono text-[var(--text)]">{labels[rule] ?? rule}</span>
+                    <span className="text-[13px] font-mono text-[var(--text)]">{labels[rule] ?? rule}</span>
                     <button onClick={() => val !== undefined && toggleGamerule(rule, val)} disabled={busy || val === undefined}
-                      className={`text-[9px] font-mono px-3 py-1 rounded border transition-all disabled:opacity-40 ${
+                      className={`text-[13px] font-mono px-3 py-1 rounded border transition-all disabled:opacity-40 ${
                         isOn ? 'border-[var(--accent-mid)] text-[var(--accent)] bg-[var(--accent-dim)]' : 'border-[var(--border)] text-[var(--text-dim)]'
                       }`}>
                       {busy ? '…' : val === undefined ? '?' : isOn ? 'ON' : 'OFF'}
@@ -579,7 +579,7 @@ export default function AdminSection({ players }: Props) {
               const r = await fetch('/api/minecraft/server-ctrl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: 'save-all' }) })
               const d = await r.json()
               addToast(d.ok ? 'ok' : 'error', d.ok ? 'World saved' : (d.error || 'Save failed'))
-            }} className="py-2.5 rounded-lg font-mono text-xs tracking-widest border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] transition-all">
+            }} className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] transition-all">
               <span className="flex items-center justify-center gap-1.5"><Save size={13} strokeWidth={1.5} />Save World</span>
             </button>
             <button onClick={async () => {
@@ -587,7 +587,7 @@ export default function AdminSection({ players }: Props) {
               const r = await fetch('/api/minecraft/server-ctrl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: 'stop' }) })
               const d = await r.json()
               addToast(d.ok ? 'ok' : 'error', d.ok ? 'Server stopping…' : (d.error || 'Stop failed'))
-            }} className="py-2.5 rounded-lg font-mono text-xs tracking-widest border border-red-900 text-red-400 hover:border-red-700 transition-all">
+            }} className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest border border-red-900 text-red-400 hover:border-red-700 transition-all">
               <span className="flex items-center justify-center gap-1.5"><Square size={13} strokeWidth={1.5} />Stop Server</span>
             </button>
           </div>
@@ -596,7 +596,7 @@ export default function AdminSection({ players }: Props) {
 
       {/* ── MODERATION ── */}
       <div className="glass-card p-4 space-y-4">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">MODERATION</div>
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">MODERATION</div>
 
         <div>
           <SectionLabel>TARGET PLAYER</SectionLabel>
@@ -606,22 +606,22 @@ export default function AdminSection({ players }: Props) {
         <div>
           <SectionLabel>REASON (OPTIONAL)</SectionLabel>
           <input type="text" placeholder="e.g. Breaking rules" value={modReason} onChange={e => setModReason(e.target.value)}
-            className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+            className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
             style={{ fontSize: '16px' }} />
         </div>
 
         <div className="flex items-center gap-2">
           <input type="checkbox" id="mod-ban-ip" checked={modBanIp} onChange={e => setModBanIp(e.target.checked)} className="accent-[var(--accent)]" />
-          <label htmlFor="mod-ban-ip" className="text-xs font-mono text-[var(--text-dim)] cursor-pointer">Also ban IP address</label>
+          <label htmlFor="mod-ban-ip" className="text-[13px] font-mono text-[var(--text-dim)] cursor-pointer">Also ban IP address</label>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <button onClick={kickPlayer} disabled={!modTarget || !!modBusy}
-            className="py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-yellow-800 text-yellow-400 hover:border-yellow-600">
+            className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-yellow-800 text-yellow-400 hover:border-yellow-600">
             {modBusy === 'kick' ? 'Kicking…' : 'Kick'}
           </button>
           <button onClick={banPlayer} disabled={!modTarget || !!modBusy}
-            className="py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-red-900 text-red-400 hover:border-red-700">
+            className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-red-900 text-red-400 hover:border-red-700">
             {modBusy === 'ban' ? 'Banning…' : 'Ban'}
           </button>
         </div>
@@ -630,10 +630,10 @@ export default function AdminSection({ players }: Props) {
           <SectionLabel>PARDON (UNBAN)</SectionLabel>
           <div className="flex items-center gap-2">
             <input type="checkbox" id="mod-pardon-ip" checked={modPardonIp} onChange={e => setModPardonIp(e.target.checked)} className="accent-[var(--accent)]" />
-            <label htmlFor="mod-pardon-ip" className="text-xs font-mono text-[var(--text-dim)] cursor-pointer">Also pardon IP address</label>
+            <label htmlFor="mod-pardon-ip" className="text-[13px] font-mono text-[var(--text-dim)] cursor-pointer">Also pardon IP address</label>
           </div>
           <button onClick={pardonPlayer} disabled={!modTarget || !!modBusy}
-            className="w-full py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] hover:text-[var(--accent)]">
+            className="w-full py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] hover:text-[var(--accent)]">
             {modBusy === 'pardon' ? 'Pardoning…' : 'Pardon'}
           </button>
         </div>
@@ -642,21 +642,21 @@ export default function AdminSection({ players }: Props) {
           <div className="flex items-center justify-between">
             <SectionLabel>BAN LIST</SectionLabel>
             <button onClick={fetchBanList} disabled={banListLoading}
-              className="text-[9px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
+              className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
               {banListLoading ? '…' : banList === null ? 'Load' : 'Refresh'}
             </button>
           </div>
           {banList === null ? (
-            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Click Load to fetch the ban list</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">Click Load to fetch the ban list</div>
           ) : banList.length === 0 ? (
-            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">No players are banned — everyone behaved</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">No players are banned — everyone behaved</div>
           ) : (
             <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
               {banList.map(p => (
                 <div key={p} className="flex items-center gap-1 px-2 py-1 rounded border border-red-900/50 bg-red-950/20">
-                  <span className="text-[10px] font-mono text-red-300">{p}</span>
+                  <span className="text-[13px] font-mono text-red-300">{p}</span>
                   <button onClick={() => { setModTarget(p); setModPardonIp(false) }}
-                    className="text-[9px] font-mono text-[var(--text-dim)] hover:text-[var(--accent)] ml-1 transition-colors" title="Set as pardon target">↑</button>
+                    className="text-[13px] font-mono text-[var(--text-dim)] hover:text-[var(--accent)] ml-1 transition-colors" title="Set as pardon target">↑</button>
                 </div>
               ))}
             </div>
@@ -667,14 +667,14 @@ export default function AdminSection({ players }: Props) {
       {/* ── WHITELIST ── */}
       <div className="glass-card p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">WHITELIST</div>
+          <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">WHITELIST</div>
           <button onClick={fetchWhitelist} disabled={wlLoading}
-            className="text-[9px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
+            className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
             {wlLoading ? '…' : wlPlayers === null ? 'Load' : 'Refresh'}
           </button>
         </div>
         {wlPlayers === null ? (
-          <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Click Load to fetch the whitelist</div>
+          <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">Click Load to fetch the whitelist</div>
         ) : (
           <div className="space-y-3">
             <div>
@@ -682,14 +682,14 @@ export default function AdminSection({ players }: Props) {
                 <SectionLabel>CURRENT ENTRIES ({wlPlayers.length})</SectionLabel>
               </div>
               {wlPlayers.length === 0 ? (
-                <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Whitelist is empty — no one's on the list</div>
+                <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">Whitelist is empty — no one's on the list</div>
               ) : (
                 <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
                   {wlPlayers.map(p => (
                     <div key={p} className="flex items-center gap-1 px-2 py-1 rounded border border-[var(--border)] bg-[var(--panel)]">
-                      <span className="text-[10px] font-mono text-[var(--text)]">{p}</span>
+                      <span className="text-[13px] font-mono text-[var(--text)]">{p}</span>
                       <button onClick={() => wlAction(p, 'remove')} disabled={wlBusy === p + 'remove'}
-                        className="text-[9px] font-mono text-red-400 opacity-60 hover:opacity-100 ml-1 disabled:opacity-20" title="Remove from whitelist">✕</button>
+                        className="text-[13px] font-mono text-red-400 opacity-60 hover:opacity-100 ml-1 disabled:opacity-20" title="Remove from whitelist">✕</button>
                     </div>
                   ))}
                 </div>
@@ -700,7 +700,7 @@ export default function AdminSection({ players }: Props) {
               <PlayerPicker online={players} selected={wlTarget} onSelect={setWlTarget} placeholder="Or type player name…" />
               <button onClick={() => { const p = wlTarget.trim(); if (p) wlAction(p, 'add') }}
                 disabled={!wlTarget.trim() || !!wlBusy}
-                className="mt-2 w-full px-4 py-2 rounded-lg font-mono text-xs tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                className="mt-2 w-full px-4 py-2 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 {wlBusy?.endsWith('add') ? '…' : 'Add to Whitelist'}
               </button>
             </div>
@@ -710,18 +710,18 @@ export default function AdminSection({ players }: Props) {
 
       {/* ── OPERATOR ── */}
       <div className="glass-card p-4 space-y-4">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">OPERATOR</div>
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">OPERATOR</div>
         <div>
           <SectionLabel>SELECT PLAYER</SectionLabel>
           <PlayerPicker online={players} selected={opTarget} onSelect={setOpTarget} placeholder="Or type player name…" />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <button onClick={() => opAction('op')} disabled={!opTarget || !!opBusy}
-            className="py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]">
+            className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]">
             {opBusy === 'op' ? '…' : <span className="flex items-center justify-center gap-1.5"><Star size={13} strokeWidth={1.5} />Op</span>}
           </button>
           <button onClick={() => opAction('deop')} disabled={!opTarget || !!opBusy}
-            className="py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] hover:text-[var(--accent)]">
+            className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] hover:text-[var(--accent)]">
             {opBusy === 'deop' ? '…' : <span className="flex items-center justify-center gap-1.5"><X size={13} strokeWidth={1.5} />Deop</span>}
           </button>
         </div>
@@ -729,55 +729,55 @@ export default function AdminSection({ players }: Props) {
 
       {/* ── RCON CONSOLE ── */}
       <div className="glass-card p-4 space-y-3">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">RCON CONSOLE</div>
-        <div ref={rconOutputRef} className="bg-black/40 rounded-lg border border-[var(--border)] p-3 h-48 overflow-y-auto font-mono text-xs space-y-2">
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">RCON CONSOLE</div>
+        <div ref={rconOutputRef} className="bg-black/40 rounded-lg border border-[var(--border)] p-3 h-48 overflow-y-auto font-mono text-[13px] space-y-2">
           {rconEntries.length === 0 ? (
             <div className="text-[var(--text-dim)] opacity-30">Awaiting orders, operator…</div>
           ) : rconEntries.map((en, i) => (
             <div key={i} className="space-y-0.5">
               <div className="flex items-center gap-2">
-                <span className="text-[var(--text-dim)] opacity-40 text-[9px] shrink-0">{new Date(en.ts).toLocaleTimeString()}</span>
+                <span className="text-[var(--text-dim)] opacity-60 text-[13px] shrink-0">{new Date(en.ts).toLocaleTimeString()}</span>
                 <span className="text-[var(--accent)]">{'>'} {en.cmd}</span>
               </div>
-              <div className={`pl-4 text-[10px] ${en.ok ? 'text-[var(--text-dim)]' : 'text-red-400'}`}>{en.output}</div>
+              <div className={`pl-4 text-[13px] ${en.ok ? 'text-[var(--text-dim)]' : 'text-red-400'}`}>{en.output}</div>
             </div>
           ))}
         </div>
         <div className="flex gap-2">
           <input ref={rconInputRef} type="text" placeholder="Enter command…" value={rconInput}
             onChange={e => setRconInput(e.target.value)} onKeyDown={rconKeyDown}
-            className="flex-1 bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
+            className="flex-1 bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
             style={{ fontSize: '16px' }} />
           <button onClick={sendRcon} disabled={!rconInput.trim() || rconBusy}
-            className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            className="px-4 py-2 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
             {rconBusy ? '…' : 'Run'}
           </button>
         </div>
-        <div className="text-[9px] font-mono text-[var(--text-dim)] opacity-30">↑↓ to navigate history · Enter to send</div>
+        <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-30">↑↓ to navigate history · Enter to send</div>
       </div>
 
       {/* ── AUDIT LOG ── */}
       <div className="glass-card p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">AUDIT LOG</div>
+          <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">AUDIT LOG</div>
           <button onClick={fetchAuditLog} disabled={auditLoading}
-            className="text-[9px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
+            className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
             {auditLoading ? '…' : auditEntries === null ? 'Load' : 'Refresh'}
           </button>
         </div>
         {auditEntries === null ? (
-          <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Click Load to fetch the audit log</div>
+          <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">Click Load to fetch the audit log</div>
         ) : auditEntries.length === 0 ? (
-          <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">No actions logged yet — squeaky clean</div>
+          <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">No actions logged yet — squeaky clean</div>
         ) : (
           <div className="space-y-1 max-h-64 overflow-y-auto">
             {auditEntries.map((e: AuditEntry) => (
               <div key={e.id} className="flex items-start gap-2 px-2 py-1.5 rounded bg-[var(--panel)] border border-[var(--border)]">
-                <span className="text-[8px] font-mono text-[var(--text-dim)] shrink-0 mt-0.5 w-16">{new Date(e.ts * 1000).toLocaleTimeString()}</span>
-                <span className="text-[9px] font-mono text-[var(--accent)] shrink-0 w-20">{e.action}</span>
-                <span className="text-[9px] font-mono text-[var(--text-dim)] shrink-0 opacity-50 w-20 truncate" title={e.user_id}>{e.user_id}</span>
-                {e.target && <span className="text-[9px] font-mono text-[var(--text)] shrink-0">{e.target}</span>}
-                {e.detail && <span className="text-[9px] font-mono text-[var(--text-dim)] truncate opacity-60">{e.detail}</span>}
+                <span className="text-[13px] font-mono text-[var(--text-dim)] shrink-0 mt-0.5 w-16">{new Date(e.ts * 1000).toLocaleTimeString()}</span>
+                <span className="text-[13px] font-mono text-[var(--accent)] shrink-0 w-20">{e.action}</span>
+                <span className="text-[13px] font-mono text-[var(--text-dim)] shrink-0 w-20 truncate" title={e.user_id}>{e.user_id}</span>
+                {e.target && <span className="text-[13px] font-mono text-[var(--text)] shrink-0">{e.target}</span>}
+                {e.detail && <span className="text-[13px] font-mono text-[var(--text-dim)] truncate opacity-60">{e.detail}</span>}
               </div>
             ))}
           </div>
@@ -787,9 +787,9 @@ export default function AdminSection({ players }: Props) {
       {/* ── USER MANAGEMENT ── */}
       <div className="glass-card p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">USER MANAGEMENT</div>
+          <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">USER MANAGEMENT</div>
           <button onClick={fetchUsers} disabled={usersLoading}
-            className="text-[9px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
+            className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
             {usersLoading ? '…' : 'Refresh'}
           </button>
         </div>
@@ -799,12 +799,12 @@ export default function AdminSection({ players }: Props) {
             {users.map(u => (
               <div key={u.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-mono text-[var(--text)] truncate">{u.email}</div>
-                  <div className="text-[9px] font-mono text-[var(--text-dim)] opacity-60">
+                  <div className="text-[13px] font-mono text-[var(--text)] truncate">{u.email}</div>
+                  <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">
                     {new Date(u.created_at * 1000).toLocaleDateString()}
                   </div>
                 </div>
-                <span className={`text-[8px] font-mono px-2 py-0.5 rounded border shrink-0 ${
+                <span className={`text-[13px] font-mono px-2 py-0.5 rounded border shrink-0 ${
                   u.role === 'admin'
                     ? 'border-[var(--accent-mid)] text-[var(--accent)] bg-[var(--accent-dim)]'
                     : 'border-[var(--border)] text-[var(--text-dim)]'
@@ -812,14 +812,14 @@ export default function AdminSection({ players }: Props) {
                 <button
                   onClick={() => setRole(u.id, u.role === 'admin' ? 'user' : 'admin')}
                   disabled={userBusy === u.id + (u.role === 'admin' ? 'user' : 'admin')}
-                  className="text-[9px] font-mono px-2 py-1 rounded border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] hover:text-[var(--accent)] transition-all disabled:opacity-40 shrink-0"
+                  className="text-[13px] font-mono px-2 py-1 rounded border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] hover:text-[var(--accent)] transition-all disabled:opacity-40 shrink-0"
                   title={u.role === 'admin' ? 'Demote to user' : 'Promote to admin'}>
                   {u.role === 'admin' ? '↓' : '↑'}
                 </button>
                 <button
                   onClick={() => deleteUser(u.id, u.email)}
                   disabled={!!userBusy}
-                  className="text-[9px] font-mono px-2 py-1 rounded border border-red-900/50 text-red-400 hover:border-red-700 transition-all disabled:opacity-40 shrink-0">
+                  className="text-[13px] font-mono px-2 py-1 rounded border border-red-900/50 text-red-400 hover:border-red-700 transition-all disabled:opacity-40 shrink-0">
                   ✕
                 </button>
               </div>
@@ -835,11 +835,11 @@ export default function AdminSection({ players }: Props) {
             <input type="password" placeholder="Temporary password (min 8 chars)" value={newPassword} onChange={e => setNewPassword(e.target.value)}
               className={inputCls} required autoComplete="new-password" />
             <button type="submit" disabled={createBusy}
-              className="w-full py-2 rounded-lg font-mono text-xs tracking-widest border border-[var(--accent-mid)] text-[var(--accent)] bg-[var(--accent-dim)] hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              className="w-full py-2 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--accent-mid)] text-[var(--accent)] bg-[var(--accent-dim)] hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
               {createBusy ? 'Creating…' : 'Create User Account'}
             </button>
             {createStatus && (
-              <div className={`text-xs font-mono px-3 py-2 rounded-lg border ${
+              <div className={`text-[13px] font-mono px-3 py-2 rounded-lg border ${
                 createStatus.ok
                   ? 'border-[var(--accent-mid)] text-[var(--accent)] bg-[var(--accent-dim)]'
                   : 'border-red-800 text-red-400 bg-red-950/30'

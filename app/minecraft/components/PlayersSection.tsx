@@ -95,15 +95,15 @@ function pingColor(ms: number): string {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between py-1.5 border-b border-[var(--border)] last:border-0">
-      <span className="text-[9px] font-mono tracking-widest text-[var(--text-dim)] shrink-0 w-28">{label}</span>
-      <span className="text-xs font-mono text-[var(--text)] text-right">{children}</span>
+      <span className="text-[13px] font-mono tracking-widest text-[var(--text-dim)] shrink-0 w-28">{label}</span>
+      <span className="text-[13px] font-mono text-[var(--text)] text-right">{children}</span>
     </div>
   )
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[9px] font-mono tracking-widest text-[var(--text-dim)] pt-1">{children}</div>
+    <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)] pt-1">{children}</div>
   )
 }
 
@@ -114,9 +114,9 @@ function HeartBar({ value, max = 20 }: { value: number | null; max?: number }) {
   return (
     <div className="flex flex-wrap gap-0.5 items-center justify-end">
       {Array.from({ length: total }).map((_, i) => (
-        <span key={i} className="text-[11px] leading-none" style={{ color: i < filled ? '#ff4466' : 'var(--border)' }}>♥</span>
+        <span key={i} className="text-[13px] leading-none" style={{ color: i < filled ? '#ff4466' : 'var(--border)' }}>♥</span>
       ))}
-      <span className="text-[10px] font-mono text-[var(--text-dim)] ml-1">{value.toFixed(1)}/{max}</span>
+      <span className="text-[13px] font-mono text-[var(--text-dim)] ml-1">{value.toFixed(1)}/{max}</span>
     </div>
   )
 }
@@ -128,7 +128,7 @@ function HungerBar({ value, max = 20 }: { value: number | null; max?: number }) 
       {Array.from({ length: max / 2 }).map((_, i) => (
         <span key={i} className="inline-block w-2 h-2 rounded-sm" style={{ background: i < value / 2 ? '#f59e0b' : 'var(--border)' }} />
       ))}
-      <span className="text-[10px] font-mono text-[var(--text-dim)] ml-1">{value}/{max}</span>
+      <span className="text-[13px] font-mono text-[var(--text-dim)] ml-1">{value}/{max}</span>
     </div>
   )
 }
@@ -138,11 +138,11 @@ function XpRow({ level, progress }: { level: number | null; progress: number | n
   const pct = progress !== null ? Math.round(progress * 100) : 0
   return (
     <div className="flex items-center gap-2 justify-end">
-      <span className="text-xs font-mono text-[var(--accent)]">Lv.{level}</span>
+      <span className="text-[13px] font-mono text-[var(--accent)]">Lv.{level}</span>
       <div className="w-20 h-1.5 rounded-full bg-[var(--border)] overflow-hidden">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'var(--accent)' }} />
       </div>
-      <span className="text-[10px] font-mono text-[var(--text-dim)] w-7 text-right">{pct}%</span>
+      <span className="text-[13px] font-mono text-[var(--text-dim)] w-7 text-right">{pct}%</span>
     </div>
   )
 }
@@ -150,7 +150,7 @@ function XpRow({ level, progress }: { level: number | null; progress: number | n
 function Badge({ color, children }: { color: string; children: React.ReactNode }) {
   return (
     <span
-      className="text-[9px] font-mono tracking-widest px-2 py-0.5 rounded border"
+      className="text-[13px] font-mono tracking-widest px-2 py-0.5 rounded border"
       style={{ color, borderColor: color + '44', background: color + '11' }}
     >
       {children}
@@ -163,7 +163,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={() => navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) })}
-      className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] transition-colors"
+      className="text-[13px] font-mono px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] transition-colors"
     >
       {copied ? '✓' : 'copy'}
     </button>
@@ -176,14 +176,14 @@ function CoordBlock({ label, pos }: { label: string; pos: { x: number; y: number
   return (
     <div className="bg-[var(--panel)] rounded-lg p-3 border border-[var(--border)] space-y-1">
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-mono tracking-widest text-[var(--text-dim)]">{label}</span>
+        <span className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">{label}</span>
         <CopyButton text={str} />
       </div>
       <div className="grid grid-cols-3 gap-2 pt-1">
         {(['x', 'y', 'z'] as const).map(axis => (
           <div key={axis} className="text-center">
-            <div className="text-[8px] font-mono text-[var(--accent)] opacity-60">{axis.toUpperCase()}</div>
-            <div className="text-xs font-mono text-[var(--text)]">{Math.round(pos[axis])}</div>
+            <div className="text-[13px] font-mono text-[var(--accent)] opacity-60">{axis.toUpperCase()}</div>
+            <div className="text-[13px] font-mono text-[var(--text)]">{Math.round(pos[axis])}</div>
           </div>
         ))}
       </div>
@@ -206,13 +206,13 @@ function InvSlot({ item, onDelete, deleting }: {
         className="w-10 h-10 rounded border border-[var(--border)] bg-[var(--panel)] flex flex-col items-center justify-center cursor-default hover:border-[var(--accent-mid)] transition-colors"
       >
         {deleting ? (
-          <span className="text-[9px] font-mono text-[var(--text-dim)] animate-pulse">…</span>
+          <span className="text-[13px] font-mono text-[var(--text-dim)] animate-pulse">…</span>
         ) : (
           <>
-            <span className="text-[8px] font-mono text-[var(--accent)] leading-tight text-center px-0.5 w-full truncate text-center">
+            <span className="text-[13px] font-mono text-[var(--accent)] leading-tight text-center px-0.5 w-full truncate text-center">
               {item.label.slice(0, 6)}
             </span>
-            {item.count > 1 && <span className="text-[7px] font-mono text-[var(--text-dim)]">x{item.count}</span>}
+            {item.count > 1 && <span className="text-[13px] font-mono text-[var(--text-dim)]">x{item.count}</span>}
           </>
         )}
       </div>
@@ -225,7 +225,7 @@ function InvSlot({ item, onDelete, deleting }: {
               onDelete(item)
             }
           }}
-          className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-900 border border-red-700 text-red-300 text-[8px] font-mono leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-700"
+          className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-900 border border-red-700 text-red-300 text-[13px] font-mono leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-700"
           title={`Clear ${item.label}`}
         >
           ✕
@@ -233,11 +233,11 @@ function InvSlot({ item, onDelete, deleting }: {
       )}
       {/* Tooltip */}
       {hovered && !deleting && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-20 bg-[var(--bg)] border border-[var(--border)] rounded px-2 py-1.5 text-[9px] font-mono text-[var(--text)] whitespace-nowrap shadow-lg pointer-events-none">
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-20 bg-[var(--bg)] border border-[var(--border)] rounded px-2 py-1.5 text-[13px] font-mono text-[var(--text)] whitespace-nowrap shadow-lg pointer-events-none">
           <div className="font-medium">{item.label}</div>
           {item.count > 1 && <div className="text-[var(--text-dim)]">x{item.count}</div>}
           {item.enchants && <div className="text-[var(--accent)] opacity-80 mt-0.5">{item.enchants}</div>}
-          <div className="text-[var(--text-dim)] opacity-50 mt-0.5">{slotLabel(item.slot)}</div>
+          <div className="text-[var(--text-dim)] mt-0.5">{slotLabel(item.slot)}</div>
         </div>
       )}
     </div>
@@ -365,11 +365,11 @@ function PlayerPanel({
             <div className="w-8 h-8 rounded bg-[var(--panel)] border border-[var(--border)] shrink-0" />
           )}
           <div>
-            <div className="font-mono text-sm tracking-widest text-[var(--accent)]">
+            <div className="font-mono text-[15px] tracking-widest text-[var(--accent)]">
               {player}
             </div>
             {uuid && (
-              <div className="text-[8px] font-mono text-[var(--text-dim)] opacity-50 mt-0.5 leading-none">
+              <div className="text-[13px] font-mono text-[var(--text-dim)] mt-0.5 leading-none">
                 {uuid}
               </div>
             )}
@@ -379,13 +379,13 @@ function PlayerPanel({
           <button
             onClick={refresh}
             disabled={statsLoading || refreshing}
-            className="text-[10px] font-mono text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border)] px-2 py-0.5 rounded transition-colors disabled:opacity-40"
+            className="text-[13px] font-mono text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border)] px-2 py-0.5 rounded transition-colors disabled:opacity-40"
           >
             {refreshing ? '…' : 'Refresh'}
           </button>
           <button
             onClick={onClose}
-            className="text-[10px] font-mono text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border)] px-2 py-0.5 rounded transition-colors"
+            className="text-[13px] font-mono text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border)] px-2 py-0.5 rounded transition-colors"
           >
             x close
           </button>
@@ -394,11 +394,11 @@ function PlayerPanel({
 
       <div className="p-5 space-y-5">
         {statsLoading ? (
-          <div className="text-xs font-mono text-[var(--text-dim)] animate-pulse py-6 text-center">
+          <div className="text-[13px] font-mono text-[var(--text-dim)] animate-pulse py-6 text-center">
             Loading player data…
           </div>
         ) : statsError ? (
-          <div className="text-xs font-mono text-red-400 py-6 text-center">{statsError}</div>
+          <div className="text-[13px] font-mono text-red-400 py-6 text-center">{statsError}</div>
         ) : (
           <>
             {/* SESSION */}
@@ -471,24 +471,24 @@ function PlayerPanel({
             className="flex items-center gap-2 w-full text-left group"
           >
             <SectionTitle>INVENTORY</SectionTitle>
-            <span className="text-[8px] font-mono text-[var(--text-dim)] opacity-40 group-hover:opacity-70 transition-opacity ml-1">
+            <span className="text-[13px] font-mono text-[var(--text-dim)] opacity-60 group-hover:opacity-70 transition-opacity ml-1">
               {invOpen ? '▲' : '▼'}
             </span>
             {!invLoading && inventory.length > 0 && (
-              <span className="text-[8px] font-mono text-[var(--text-dim)] opacity-40 ml-auto">{inventory.length} items</span>
+              <span className="text-[13px] font-mono text-[var(--text-dim)] opacity-60 ml-auto">{inventory.length} items</span>
             )}
           </button>
           {invOpen && (invLoading ? (
-            <div className="text-xs font-mono text-[var(--text-dim)] animate-pulse">Loading inventory…</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)] animate-pulse">Loading inventory…</div>
           ) : (
             <div className="space-y-3">
               {deleteError && (
-                <div className="text-[10px] font-mono text-red-400 px-2 py-1 rounded border border-red-900/50 bg-red-950/30">
+                <div className="text-[13px] font-mono text-red-400 px-2 py-1 rounded border border-red-900/50 bg-red-950/30">
                   ✗ {deleteError}
                 </div>
               )}
               <div>
-                <div className="text-[8px] font-mono text-[var(--text-dim)] mb-1.5 opacity-50 tracking-widest">HOTBAR</div>
+                <div className="text-[13px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">HOTBAR</div>
                 <div className="flex flex-wrap gap-1">
                   {hotbar.map((item, i) => (
                     <InvSlot key={i} item={item}
@@ -499,7 +499,7 @@ function PlayerPanel({
                 </div>
               </div>
               <div>
-                <div className="text-[8px] font-mono text-[var(--text-dim)] mb-1.5 opacity-50 tracking-widest">ARMOR / OFFHAND</div>
+                <div className="text-[13px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">ARMOR / OFFHAND</div>
                 <div className="flex gap-1 flex-wrap items-center">
                   {armor.map((item, i) => (
                     <InvSlot key={i} item={item}
@@ -515,7 +515,7 @@ function PlayerPanel({
                 </div>
               </div>
               <div>
-                <div className="text-[8px] font-mono text-[var(--text-dim)] mb-1.5 opacity-50 tracking-widest">MAIN</div>
+                <div className="text-[13px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">MAIN</div>
                 <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(9, 2.5rem)' }}>
                   {main.map((item, i) => (
                     <InvSlot key={i} item={item}
@@ -526,7 +526,7 @@ function PlayerPanel({
                 </div>
               </div>
               {inventory.length === 0 && (
-                <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-50">Pockets empty — nothing to see here</div>
+                <div className="text-[13px] font-mono text-[var(--text-dim)]">Pockets empty — nothing to see here</div>
               )}
             </div>
           ))}
@@ -576,10 +576,10 @@ export default function PlayersSection({ onPlayersChange }: Props) {
 
       <div className="glass-card p-5">
         <div className="flex items-center justify-between mb-4">
-          <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">ONLINE NOW</div>
+          <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">ONLINE NOW</div>
           <button
             onClick={fetchPlayers}
-            className="text-[9px] font-mono text-[var(--accent)] hover:opacity-70 border border-[var(--border)] px-2 py-1 rounded transition-opacity"
+            className="text-[13px] font-mono text-[var(--accent)] hover:opacity-70 border border-[var(--border)] px-2 py-1 rounded transition-opacity"
           >
             Refresh
           </button>
@@ -589,13 +589,13 @@ export default function PlayersSection({ onPlayersChange }: Props) {
           <span className="text-5xl font-mono font-bold text-[var(--accent)] leading-none">
             {loading ? '—' : data.error ? '?' : data.count}
           </span>
-          <span className="text-[var(--text-dim)] text-sm mb-1">
+          <span className="text-[var(--text-dim)] text-[15px] mb-1">
             {data.count === 1 ? 'player online' : 'players online'}
           </span>
         </div>
 
         {data.error ? (
-          <div className="flex items-center gap-2 text-xs font-mono text-red-400">
+          <div className="flex items-center gap-2 text-[13px] font-mono text-red-400">
             <span>!</span><span>{data.error}</span>
           </div>
         ) : playerList.length > 0 ? (
@@ -606,7 +606,7 @@ export default function PlayersSection({ onPlayersChange }: Props) {
                 placeholder="Filter players…"
                 value={playerSearch}
                 onChange={e => setPlayerSearch(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg font-mono text-xs bg-[var(--panel)] border border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)] transition-colors"
+                className="w-full px-3 py-2 rounded-lg font-mono text-[13px] bg-[var(--panel)] border border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)] transition-colors"
               />
             )}
           <div className="flex flex-wrap gap-2">
@@ -629,13 +629,13 @@ export default function PlayersSection({ onPlayersChange }: Props) {
                   }}
                 >
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: 'var(--accent)' }} />
-                  <span className="text-xs font-mono">{p}</span>
+                  <span className="text-[13px] font-mono">{p}</span>
                   {joinedAt && (
-                    <span className="text-[8px] font-mono opacity-60 ml-0.5">
+                    <span className="text-[13px] font-mono opacity-60 ml-0.5">
                       <OnlineTimer joinedAtMs={joinedAt} />
                     </span>
                   )}
-                  <span className="text-[8px] font-mono ml-0.5 opacity-60">
+                  <span className="text-[13px] font-mono ml-0.5 opacity-60">
                     {selected ? 'v' : '>'}
                   </span>
                 </button>
@@ -643,12 +643,12 @@ export default function PlayersSection({ onPlayersChange }: Props) {
             })}
           </div>
           {playerSearch && playerList.filter(p => p.toLowerCase().includes(playerSearch.toLowerCase())).length === 0 && (
-            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-50">No players match &quot;{playerSearch}&quot;</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)]">No players match &quot;{playerSearch}&quot;</div>
           )}
           </div>
         ) : (
           !loading && (
-            <div className="text-xs font-mono text-[var(--text-dim)] opacity-50">The server is empty — not even a skeleton</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)]">The server is empty — not even a skeleton</div>
           )
         )}
       </div>
@@ -662,7 +662,7 @@ export default function PlayersSection({ onPlayersChange }: Props) {
       )}
 
       {data.ts && !data.error && (
-        <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40 text-right">
+        <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60 text-right">
           Updated {new Date(data.ts).toLocaleTimeString()}
         </div>
       )}

@@ -7,7 +7,7 @@ import { useTheme, ACCENTS } from '@/app/components/ThemeProvider'
 function StatusMsg({ ok, msg }: { ok: boolean; msg: string }) {
   return (
     <div
-      className="text-xs font-mono mt-2 px-3 py-2 rounded-lg border"
+      className="text-[13px] font-mono mt-2 px-3 py-2 rounded-lg border"
       style={{
         color: ok ? 'var(--accent)' : '#ff3355',
         borderColor: ok ? 'var(--accent-mid)' : '#ff335540',
@@ -150,8 +150,8 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
 
   // ── Shared input style ──────────────────────────────────────────────────────
 
-  const inputCls = 'w-full px-3 py-2 rounded-lg font-mono text-xs bg-[var(--panel)] border border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)] transition-colors'
-  const btnPrimary = 'px-4 py-2 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border'
+  const inputCls = 'w-full px-3 py-2 rounded-lg font-mono text-[13px] bg-[var(--panel)] border border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)] transition-colors'
+  const btnPrimary = 'px-4 py-2 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border'
 
   return (
     <div className="space-y-4">
@@ -159,16 +159,16 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
 
       {/* Appearance */}
       <div className="glass-card p-5 space-y-4">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">APPEARANCE</div>
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">APPEARANCE</div>
 
         <div>
-          <div className="text-[9px] font-mono text-[var(--text-dim)] tracking-widest mb-2">THEME</div>
+          <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-2">THEME</div>
           <div className="flex gap-2">
             {(['dark', 'light'] as const).map(t => (
               <button
                 key={t}
                 onClick={() => setTheme(t)}
-                className="flex-1 py-2 rounded-lg font-mono text-xs tracking-widest transition-all border"
+                className="flex-1 py-2 rounded-lg font-mono text-[13px] tracking-widest transition-all border"
                 style={theme === t ? {
                   borderColor: 'var(--accent)',
                   background: 'var(--accent-dim)',
@@ -185,7 +185,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
         </div>
 
         <div>
-          <div className="text-[9px] font-mono text-[var(--text-dim)] tracking-widest mb-2">ACCENT COLOR</div>
+          <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-2">ACCENT COLOR</div>
           <div className="flex flex-wrap gap-2.5">
             {ACCENTS.map(a => (
               <button
@@ -200,7 +200,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
                 }}
               >
                 {accent === a.id && (
-                  <span className="text-[10px] font-bold" style={{ color: '#000', mixBlendMode: 'multiply' }}>✓</span>
+                  <span className="text-[13px] font-bold" style={{ color: '#000', mixBlendMode: 'multiply' }}>✓</span>
                 )}
               </button>
             ))}
@@ -210,28 +210,28 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
 
       {/* Server connection info */}
       <div className="glass-card p-5 space-y-4">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">SERVER CONNECTION</div>
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">SERVER CONNECTION</div>
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-[var(--panel)] rounded-lg p-3 border border-[var(--border)]">
-            <div className="text-[9px] font-mono text-[var(--text-dim)] tracking-widest mb-1">HOST</div>
-            <div className="text-xs font-mono text-[var(--text)] truncate">{serverInfo?.host ?? '—'}</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">HOST</div>
+            <div className="text-[13px] font-mono text-[var(--text)] truncate">{serverInfo?.host ?? '—'}</div>
           </div>
           <div className="bg-[var(--panel)] rounded-lg p-3 border border-[var(--border)]">
-            <div className="text-[9px] font-mono text-[var(--text-dim)] tracking-widest mb-1">RCON PORT</div>
-            <div className="text-xs font-mono text-[var(--text)]">{serverInfo?.port ?? '—'}</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">RCON PORT</div>
+            <div className="text-[13px] font-mono text-[var(--text)]">{serverInfo?.port ?? '—'}</div>
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 pt-1">
           <a
             href="/connect?edit=1"
-            className="flex-1 py-2.5 rounded-lg font-mono text-xs tracking-widest text-center transition-all border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]"
+            className="flex-1 py-2.5 rounded-lg font-mono text-[13px] tracking-widest text-center transition-all border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]"
           >
             Edit Connection
           </a>
           <button
             onClick={disconnectServer}
             disabled={disconnecting}
-            className="flex-1 py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-red-900 text-red-400 hover:border-red-700"
+            className="flex-1 py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-red-900 text-red-400 hover:border-red-700"
           >
             {disconnecting ? 'Disconnecting...' : 'Disconnect Server'}
           </button>
@@ -240,7 +240,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
 
       {/* Account — Change Password */}
       <div className="glass-card p-5 space-y-4">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">ACCOUNT — CHANGE PASSWORD</div>
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">ACCOUNT — CHANGE PASSWORD</div>
         <form onSubmit={handleChangePassword} className="space-y-2">
           <input
             type="password"
@@ -283,7 +283,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
 
       {/* Account — Change Email */}
       <div className="glass-card p-5 space-y-4">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">ACCOUNT — CHANGE EMAIL</div>
+        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">ACCOUNT — CHANGE EMAIL</div>
         <form onSubmit={handleChangeEmail} className="space-y-2">
           <input
             type="email"
@@ -317,15 +317,15 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
 
       {/* Account — Danger Zone */}
       <div className="glass-card p-5 space-y-3" style={{ borderColor: '#ff335530' }}>
-        <div className="text-[10px] font-mono tracking-widest text-red-500">DANGER ZONE</div>
+        <div className="text-[13px] font-mono tracking-widest text-red-500">DANGER ZONE</div>
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-mono text-[var(--text)]">Delete Account</div>
-            <div className="text-[10px] font-mono text-[var(--text-dim)] mt-0.5">Permanently removes your account and all data. This cannot be undone.</div>
+            <div className="text-[15px] font-mono text-[var(--text)]">Delete Account</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)] mt-0.5">Permanently removes your account and all data. This cannot be undone.</div>
           </div>
           <button
             onClick={() => { setShowDeleteModal(true); setDeleteStatus(null); setDeletePw('') }}
-            className="px-3 py-1.5 rounded-lg font-mono text-xs border border-red-900 text-red-400 hover:border-red-700 transition-colors flex-shrink-0 ml-4"
+            className="px-3 py-1.5 rounded-lg font-mono text-[13px] border border-red-900 text-red-400 hover:border-red-700 transition-colors flex-shrink-0 ml-4"
           >
             Delete
           </button>
@@ -336,8 +336,8 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
           <div className="glass-card p-6 w-full max-w-sm space-y-4" style={{ borderColor: '#ff335540' }}>
-            <div className="text-sm font-mono text-red-400 tracking-widest">DELETE ACCOUNT</div>
-            <p className="text-xs font-mono text-[var(--text-dim)]">
+            <div className="text-[15px] font-mono text-red-400 tracking-widest">DELETE ACCOUNT</div>
+            <p className="text-[13px] font-mono text-[var(--text-dim)]">
               This is permanent. All your data, server connections, and settings will be erased. Enter your password to confirm.
             </p>
             <form onSubmit={handleDeleteAccount} className="space-y-3">
@@ -356,14 +356,14 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
                 <button
                   type="button"
                   onClick={() => setShowDeleteModal(false)}
-                  className="flex-1 py-2 rounded-lg font-mono text-xs border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] transition-colors"
+                  className="flex-1 py-2 rounded-lg font-mono text-[13px] border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={deleteLoading}
-                  className="flex-1 py-2 rounded-lg font-mono text-xs border border-red-800 text-red-400 hover:border-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="flex-1 py-2 rounded-lg font-mono text-[13px] border border-red-800 text-red-400 hover:border-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   {deleteLoading ? 'Deleting...' : 'Confirm Delete'}
                 </button>
