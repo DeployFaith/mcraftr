@@ -12,6 +12,16 @@ import SettingsSection from './components/SettingsSection'
 
 export type TabId = 'players' | 'actions' | 'admin' | 'chat' | 'settings'
 
+type FeatureFlags = {
+  enable_chat: boolean
+  enable_chat_read: boolean
+  enable_chat_write: boolean
+  enable_teleport: boolean
+  enable_inventory: boolean
+  enable_rcon: boolean
+  enable_admin: boolean
+}
+
 const ALL_TABS: {
   id: TabId
   label: string
@@ -33,7 +43,7 @@ function normalizeTab(raw: string | null | undefined): TabId {
 }
 
 export default function MinecraftClientPage({ initialTab, initialRole }: { initialTab: TabId; initialRole?: string }) {
-  const { data: session, update: updateSession } = useSession()
+  const { data: session } = useSession()
   const role = session?.role ?? initialRole
   const router = useRouter()
   const pathname = usePathname()
@@ -41,11 +51,24 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
 
   const [activeTab, setActiveTab] = useState<TabId>(initialTab)
   const [players, setPlayers] = useState<string[]>([])
-  const [hydrated, setHydrated] = useState(false)
+  const [features, setFeatures] = useState<FeatureFlags | null>(null)
+
+  const loadFeatures = useCallback(async () => {
+    try {
+      const r = await fetch('/api/account/preferences')
+      const d = await r.json()
+      if (d.ok && d.features) setFeatures(d.features)
+    } catch {
+      setFeatures(null)
+    }
+  }, [])
 
   useEffect(() => {
-    setHydrated(true)
-  }, [])
+    loadFeatures()
+    const onFeatures = () => { void loadFeatures() }
+    window.addEventListener('mcraftr:features-updated', onFeatures)
+    return () => window.removeEventListener('mcraftr:features-updated', onFeatures)
+  }, [loadFeatures])
 
   useEffect(() => {
     const urlTab = normalizeTab(searchParams.get('tab'))
@@ -64,7 +87,14 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
     setPlayers(list)
   }, [])
 
-  const tabs = ALL_TABS.filter(t => !t.adminOnly || role === 'admin')
+  const tabs = ALL_TABS.filter(t => {
+    if (t.id === 'chat' && features && !features.enable_chat) return false
+    if (t.id === 'admin') {
+      if (role !== 'admin') return false
+      if (features && !features.enable_admin) return false
+    }
+    return !t.adminOnly || role === 'admin'
+  })
   const visibleTab = tabs.find(t => t.id === activeTab) ? activeTab : 'players'
 
   return (

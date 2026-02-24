@@ -72,9 +72,11 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
       })
       const d = await res.json()
       if (d.ok) {
+        if (d.features) setFeatures(d.features)
         setFeaturesStatus({ ok: true, msg: 'Preferences saved' })
+        window.dispatchEvent(new Event('mcraftr:features-updated'))
       } else {
-        setFeatures(d.features ? newFeatures : features)
+        setFeatures(features)
         setFeaturesStatus({ ok: false, msg: d.error || 'Failed to save' })
       }
     } catch {

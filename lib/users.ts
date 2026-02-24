@@ -422,32 +422,46 @@ export function getUserFeatures(id: string): UserFeatures {
 
 export function updateUserFeatures(id: string, features: Partial<UserFeatures>): void {
   const db = initDb()
-  const existing = db.prepare('SELECT user_id FROM user_features WHERE user_id = ?').get(id)
-  const setClauses: string[] = []
-  const values: (string | number)[] = []
-  if (features.enable_chat !== undefined) { setClauses.push('enable_chat = ?'); values.push(features.enable_chat ? 1 : 0) }
-  if (features.enable_chat_read !== undefined) { setClauses.push('enable_chat_read = ?'); values.push(features.enable_chat_read ? 1 : 0) }
-  if (features.enable_chat_write !== undefined) { setClauses.push('enable_chat_write = ?'); values.push(features.enable_chat_write ? 1 : 0) }
-  if (features.enable_teleport !== undefined) { setClauses.push('enable_teleport = ?'); values.push(features.enable_teleport ? 1 : 0) }
-  if (features.enable_inventory !== undefined) { setClauses.push('enable_inventory = ?'); values.push(features.enable_inventory ? 1 : 0) }
-  if (features.enable_rcon !== undefined) { setClauses.push('enable_rcon = ?'); values.push(features.enable_rcon ? 1 : 0) }
-  if (features.enable_admin !== undefined) { setClauses.push('enable_admin = ?'); values.push(features.enable_admin ? 1 : 0) }
-  if (setClauses.length === 0) return
-  setClauses.push('updated_at = unixepoch()')
-  values.push(id)
-  if (existing) {
-    db.prepare(`UPDATE user_features SET ${setClauses.join(', ')} WHERE user_id = ?`).run(...values)
-  } else {
-    const cols = ['user_id']
-    const qmarks = ['?']
-    if (features.enable_chat !== undefined) { cols.push('enable_chat'); qmarks.push('?') }
-    if (features.enable_chat_read !== undefined) { cols.push('enable_chat_read'); qmarks.push('?') }
-    if (features.enable_chat_write !== undefined) { cols.push('enable_chat_write'); qmarks.push('?') }
-    if (features.enable_teleport !== undefined) { cols.push('enable_teleport'); qmarks.push('?') }
-    if (features.enable_inventory !== undefined) { cols.push('enable_inventory'); qmarks.push('?') }
-    if (features.enable_rcon !== undefined) { cols.push('enable_rcon'); qmarks.push('?') }
-    if (features.enable_admin !== undefined) { cols.push('enable_admin'); qmarks.push('?') }
-    const insertVals = values.slice(0, -1)
-    db.prepare(`INSERT INTO user_features (${cols.join(', ')}) VALUES (${qmarks.join(', ')})`).run(...insertVals)
+  const current = getUserFeatures(id)
+  const next: UserFeatures = {
+    enable_chat: features.enable_chat ?? current.enable_chat,
+    enable_chat_read: features.enable_chat_read ?? current.enable_chat_read,
+    enable_chat_write: features.enable_chat_write ?? current.enable_chat_write,
+    enable_teleport: features.enable_teleport ?? current.enable_teleport,
+    enable_inventory: features.enable_inventory ?? current.enable_inventory,
+    enable_rcon: features.enable_rcon ?? current.enable_rcon,
+    enable_admin: features.enable_admin ?? current.enable_admin,
   }
+
+  db.prepare(`
+    INSERT INTO user_features (
+      user_id,
+      enable_chat,
+      enable_chat_read,
+      enable_chat_write,
+      enable_teleport,
+      enable_inventory,
+      enable_rcon,
+      enable_admin,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, unixepoch())
+    ON CONFLICT(user_id) DO UPDATE SET
+      enable_chat = excluded.enable_chat,
+      enable_chat_read = excluded.enable_chat_read,
+      enable_chat_write = excluded.enable_chat_write,
+      enable_teleport = excluded.enable_teleport,
+      enable_inventory = excluded.enable_inventory,
+      enable_rcon = excluded.enable_rcon,
+      enable_admin = excluded.enable_admin,
+      updated_at = unixepoch()
+  `).run(
+    id,
+    next.enable_chat ? 1 : 0,
+    next.enable_chat_read ? 1 : 0,
+    next.enable_chat_write ? 1 : 0,
+    next.enable_teleport ? 1 : 0,
+    next.enable_inventory ? 1 : 0,
+    next.enable_rcon ? 1 : 0,
+    next.enable_admin ? 1 : 0,
+  )
 }
