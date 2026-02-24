@@ -83,11 +83,20 @@ body::before {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Teleport "to" player — pulsing glow border */
+/* Teleport chip animations */
 @keyframes tp-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
-  50%       { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent); }
+  0%, 100% { box-shadow: 0 0 0 0   color-mix(in srgb, var(--accent) 0%,  transparent);
+             background:           color-mix(in srgb, var(--accent) 18%, transparent); }
+  50%       { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent);
+             background:           color-mix(in srgb, var(--accent) 30%, transparent); }
 }
+/* "to" chip alone — fill + pulse */
 .tp-target {
   animation: tp-pulse 1.4s ease-in-out infinite;
+}
+/* "from" chip when both are selected — outline only, pulse offset by half period */
+.tp-source {
+  animation: tp-pulse 1.4s ease-in-out infinite;
+  animation-delay: -0.7s;
+  background: transparent !important;
 }

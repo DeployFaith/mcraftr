@@ -52,14 +52,23 @@ const CAT_PAGE_SIZE = 24
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function PlayerChip({ name, selected, variant = 'default', onClick }: {
-  name: string; selected: boolean; variant?: 'default' | 'from' | 'to'; onClick: () => void
+function PlayerChip({ name, selected, variant = 'default', bothSelected = false, onClick }: {
+  name: string; selected: boolean; variant?: 'default' | 'from' | 'to'; bothSelected?: boolean; onClick: () => void
 }) {
   const base = 'px-3 py-1.5 rounded-lg text-[13px] font-mono border transition-all cursor-pointer select-none'
-  if (variant === 'from')
-    return <button onClick={onClick} className={`${base} ${selected ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] hover:text-[var(--text)]'}`}>{name}</button>
-  if (variant === 'to')
-    return <button onClick={onClick} className={`${base} ${selected ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)] tp-target' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]'}`}>{name}</button>
+  if (variant === 'from') {
+    if (!selected)
+      return <button onClick={onClick} className={`${base} border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] hover:text-[var(--text)]`}>{name}</button>
+    // selected alone: outline only, no fill
+    // selected + bothSelected: same outline, pulse with offset (tp-source handles bg override)
+    return <button onClick={onClick} className={`${base} border-[var(--accent)] text-[var(--accent)] ${bothSelected ? 'tp-source' : ''}`}>{name}</button>
+  }
+  if (variant === 'to') {
+    if (!selected)
+      return <button onClick={onClick} className={`${base} border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]`}>{name}</button>
+    // selected: outline + fill + pulse (always, once "to" is chosen)
+    return <button onClick={onClick} className={`${base} border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)] tp-target`}>{name}</button>
+  }
   return (
     <button onClick={onClick} className={`${base} ${selected ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]'}`}>
       {name}
@@ -561,7 +570,7 @@ export default function ActionsSection({ players }: Props) {
               <div className="flex flex-wrap gap-2">
                 {players.map(p => {
                   const role = tpRole(p)
-                  return <PlayerChip key={p} name={p} selected={!!role} variant={role ?? 'default'} onClick={() => handleTpClick(p)} />
+                  return <PlayerChip key={p} name={p} selected={!!role} variant={role ?? 'default'} bothSelected={!!(tpFrom && tpTo)} onClick={() => handleTpClick(p)} />
                 })}
               </div>
               <div className="flex items-center gap-3 py-2 px-3 rounded-lg bg-[var(--panel)] border border-[var(--border)] font-mono text-[13px] min-h-[38px]">
