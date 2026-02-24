@@ -217,6 +217,10 @@ function PlayerPanel({
   const [features, setFeatures]         = useState<FeatureFlags | null>(null)
   const [featuresLoaded, setFeaturesLoaded] = useState(false)
 
+  const canSession = features ? features.enable_player_session : true
+  const canVitals = features ? features.enable_player_vitals : true
+  const canLocation = features ? features.enable_player_location : true
+  const canEffects = features ? features.enable_player_effects : true
   const canInventory = features ? features.enable_inventory : true
 
   const loadFeatures = useCallback(async () => {
@@ -243,13 +247,22 @@ function PlayerPanel({
     setStatsLoading(true); setInvLoading(true); setStatsError(null)
     setRefreshing(true)
 
-    Promise.all([
-      fetch(`/api/minecraft/player?player=${encodeURIComponent(player)}`).then(r => r.json()),
-      fetch(`/api/minecraft/effects?player=${encodeURIComponent(player)}`).then(r => r.json()),
-    ]).then(([statsData, effectsData]) => {
-      if (statsData.ok) setStats(statsData)
-      else setStatsError(statsData.error ?? 'Failed to load player data')
-      if (effectsData.ok) setEffects(effectsData.active ?? [])
+    const needsStats = canSession || canVitals || canLocation
+    const needsEffects = canEffects
+
+    const statsReq = needsStats
+      ? fetch(`/api/minecraft/player?player=${encodeURIComponent(player)}`).then(r => r.json())
+      : Promise.resolve({ ok: true })
+    const effectsReq = needsEffects
+      ? fetch(`/api/minecraft/effects?player=${encodeURIComponent(player)}`).then(r => r.json())
+      : Promise.resolve({ ok: true, active: [] as string[] })
+
+    Promise.all([statsReq, effectsReq]).then(([statsData, effectsData]) => {
+      if (needsStats) {
+        if (statsData.ok) setStats(statsData)
+        else setStatsError(statsData.error ?? 'Failed to load player data')
+      }
+      if (needsEffects && effectsData.ok) setEffects(effectsData.active ?? [])
     }).catch(() => setStatsError('Could not reach server'))
       .finally(() => { setStatsLoading(false); setRefreshing(false) })
 
@@ -264,7 +277,7 @@ function PlayerPanel({
       .then(d => { if (d.ok) setInventory(d.items ?? []) })
       .catch(() => {})
       .finally(() => setInvLoading(false))
-  }, [player, canInventory])
+  }, [player, canInventory, canEffects, canLocation, canSession, canVitals])
 
   useEffect(() => {
     if (!featuresLoaded) return
@@ -404,6 +417,7 @@ function PlayerPanel({
         ) : (
           <>
             {/* SESSION */}
+            {canSession && (
             <div className="space-y-1.5">
               <SectionTitle>SESSION</SectionTitle>
               <div className="bg-[var(--panel)] rounded-lg border border-[var(--border)] px-3 divide-y divide-[var(--border)]">
@@ -430,8 +444,10 @@ function PlayerPanel({
                 </Row>
               </div>
             </div>
+            )}
 
             {/* VITALS */}
+            {canVitals && (
             <div className="space-y-1.5">
               <SectionTitle>VITALS</SectionTitle>
               <div className="bg-[var(--panel)] rounded-lg border border-[var(--border)] px-3 divide-y divide-[var(--border)]">
@@ -440,9 +456,10 @@ function PlayerPanel({
                 <Row label="EXPERIENCE"><XpRow level={stats?.xpLevel ?? null} progress={stats?.xpP ?? null} /></Row>
               </div>
             </div>
+            )}
 
             {/* ACTIVE EFFECTS — only shown if any */}
-            {effects.length > 0 && (
+            {canEffects && effects.length > 0 && (
               <div className="space-y-1.5">
                 <SectionTitle>ACTIVE EFFECTS</SectionTitle>
                 <div className="flex flex-wrap gap-1.5">
@@ -454,6 +471,7 @@ function PlayerPanel({
             )}
 
             {/* LOCATION */}
+            {canLocation && (
             <div className="space-y-1.5">
               <SectionTitle>LOCATION</SectionTitle>
               <div className="space-y-2">
@@ -463,6 +481,11 @@ function PlayerPanel({
                 )}
               </div>
             </div>
+            )}
+
+            {!canSession && !canVitals && !canEffects && !canLocation && !canInventory && (
+              <div className="text-[13px] font-mono text-[var(--text-dim)]">All player detail features are disabled for this account.</div>
+            )}
           </>
         )}
 

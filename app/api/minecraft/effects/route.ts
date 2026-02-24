@@ -21,7 +21,8 @@ export async function GET(req: NextRequest) {
   if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 
   const features = await getUserFeatureFlags(req)
-  if (!checkFeatureAccess(features, 'enable_player_commands')) {
+  const canEffects = checkFeatureAccess(features, 'enable_player_effects') || checkFeatureAccess(features, 'enable_player_commands')
+  if (!canEffects) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
 

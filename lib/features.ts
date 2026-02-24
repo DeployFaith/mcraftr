@@ -10,6 +10,10 @@ export const FEATURE_DEFS = [
   { key: 'enable_player_commands', label: 'Player Commands', desc: 'Allow gamemode and ability actions', category: 'actions' },
   { key: 'enable_kits', label: 'Kit Assignment', desc: 'Allow giving predefined kits', category: 'actions' },
   { key: 'enable_item_catalog', label: 'Item Catalog', desc: 'Allow item give catalog', category: 'actions' },
+  { key: 'enable_player_session', label: 'Player Session', desc: 'Show online time, ping, dimension and gamemode', category: 'players' },
+  { key: 'enable_player_vitals', label: 'Player Vitals', desc: 'Show health, hunger and experience', category: 'players' },
+  { key: 'enable_player_location', label: 'Player Location', desc: 'Show current and spawn coordinates', category: 'players' },
+  { key: 'enable_player_effects', label: 'Player Effects', desc: 'Show active effects in player panel', category: 'players' },
 ] as const
 
 export type FeatureKey = typeof FEATURE_DEFS[number]['key']
