@@ -32,23 +32,23 @@ export default function ConfirmModal({
       onClick={onCancel}
     >
       <div
-        className="glass-card p-6 w-full max-w-sm space-y-4"
+        className="glass-card p-4 w-full max-w-[280px] space-y-3"
         onClick={e => e.stopPropagation()}
       >
-        <div className="space-y-1.5">
-          <div className="font-mono text-[15px] text-[var(--text)] tracking-wide">{title}</div>
-          <div className="font-mono text-[13px] text-[var(--text-dim)]">{body}</div>
+        <div className="space-y-1">
+          <div className="font-mono text-[13px] text-[var(--text)] tracking-wide">{title}</div>
+          {body && <div className="font-mono text-[11px] text-[var(--text-dim)]">{body}</div>}
         </div>
-        <div className="flex gap-3 pt-1">
+        <div className="flex gap-2">
           <button
             onClick={onCancel}
-            className="flex-1 py-2 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] hover:text-[var(--text)] transition-all"
+            className="flex-1 py-1.5 rounded font-mono text-[11px] tracking-widest border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] hover:text-[var(--text)] transition-all"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 py-2 rounded-lg font-mono text-[13px] tracking-widest transition-all"
+            className="flex-1 py-1.5 rounded font-mono text-[11px] tracking-widest transition-all"
             style={destructive
               ? { background: 'rgba(127,29,29,0.4)', border: '1px solid #7f1d1d', color: '#fca5a5' }
               : { background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }

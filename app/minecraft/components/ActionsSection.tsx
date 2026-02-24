@@ -412,18 +412,12 @@ export default function ActionsSection({ players }: Props) {
     }
   }
 
-  const handleInvSlotClick = (player: string, clickedItem: InvItem | undefined, clickedSlot: number) => {
-    if (selectedInvSlot) {
-      if (clickedItem && clickedItem.slot === selectedInvSlot.slot) {
+  const handleInvSlotClick = (player: string, clickedItem: InvItem | undefined, clickedSlot: number, currentSelected: InvItem | null) => {
+    if (currentSelected) {
+      if (clickedItem && clickedItem.slot === currentSelected.slot) {
         setSelectedInvSlot(null)
       } else {
-        setConfirmModal({
-          title: 'Move item?',
-          body: 'Confirm move',
-          confirmLabel: 'Move',
-          destructive: false,
-          onConfirm: () => { setConfirmModal(null); moveInvItem(player, selectedInvSlot.slot, clickedItem?.slot ?? clickedSlot) },
-        })
+        moveInvItem(player, currentSelected.slot, clickedItem?.slot ?? clickedSlot)
       }
     } else if (clickedItem) {
       setSelectedInvSlot(clickedItem)
@@ -565,7 +559,7 @@ export default function ActionsSection({ players }: Props) {
           ) : (
             <div className="space-y-3">
               <div className="text-[13px] font-mono text-[var(--text-dim)]">
-                Tap <span className="text-[var(--text-dim)]">FROM</span> then <span className="text-[var(--accent)]">TO</span>
+                Tap <span className="text-[var(--accent)]">FROM</span> then <span className="text-[var(--accent)]">TO</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {players.map(p => {
@@ -855,7 +849,7 @@ export default function ActionsSection({ players }: Props) {
                       selected={!!item && selectedInvSlot?.slot === item.slot}
                       moveTarget={!!selectedInvSlot && !item}
                       onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
-                      onSlotClick={() => handleInvSlotClick(invPlayer, item, item?.slot ?? i)}
+                      onSlotClick={() => handleInvSlotClick(invPlayer, item, item?.slot ?? i, selectedInvSlot)}
                       deleting={item ? invDeleting === `${item.slot}` : false}
                     />
                   ))}
@@ -872,7 +866,7 @@ export default function ActionsSection({ players }: Props) {
                         selected={!!item && selectedInvSlot?.slot === item.slot}
                         moveTarget={!!selectedInvSlot && !item}
                         onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
-                        onSlotClick={() => handleInvSlotClick(invPlayer, item, item?.slot ?? s)}
+                        onSlotClick={() => handleInvSlotClick(invPlayer, item, item?.slot ?? s, selectedInvSlot)}
                         deleting={item ? invDeleting === `${item.slot}` : false}
                       />
                     )
@@ -882,7 +876,7 @@ export default function ActionsSection({ players }: Props) {
                     selected={!!offhand && selectedInvSlot?.slot === 150}
                     moveTarget={!!selectedInvSlot && !offhand}
                     onDelete={offhand ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
-                    onSlotClick={() => handleInvSlotClick(invPlayer, offhand, offhand?.slot ?? 150)}
+                    onSlotClick={() => handleInvSlotClick(invPlayer, offhand, offhand?.slot ?? 150, selectedInvSlot)}
                     deleting={offhand ? invDeleting === `${offhand.slot}` : false}
                   />
                 </div>
@@ -895,7 +889,7 @@ export default function ActionsSection({ players }: Props) {
                       selected={!!item && selectedInvSlot?.slot === item.slot}
                       moveTarget={!!selectedInvSlot && !item}
                       onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
-                      onSlotClick={() => handleInvSlotClick(invPlayer, item, item?.slot ?? (i + 9))}
+                      onSlotClick={() => handleInvSlotClick(invPlayer, item, item?.slot ?? (i + 9), selectedInvSlot)}
                       deleting={item ? invDeleting === `${item.slot}` : false}
                     />
                   ))}

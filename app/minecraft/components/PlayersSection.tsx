@@ -284,31 +284,16 @@ function PlayerPanel({
     }
   }
 
-  // Slot click handler — manages select/deselect and move-target logic
-  const handleSlotClick = (clickedItem: InvItem | undefined, clickedSlotIndex: number | undefined) => {
+  // Slot click handler — click to select, click another slot to move immediately (no modal)
+  const handleSlotClick = (clickedItem: InvItem | undefined, clickedSlotIndex: number | undefined, currentSelected: InvItem | null) => {
     if (clickedSlotIndex === undefined) return
-    if (selectedSlot) {
-      if (clickedItem && clickedItem.slot === selectedSlot.slot) {
-        // Deselect
+    if (currentSelected) {
+      if (clickedItem && clickedItem.slot === currentSelected.slot) {
+        // Same slot — deselect
         setSelectedSlot(null)
-      } else if (!clickedItem) {
-        // Empty slot while something selected — open move confirm
-        setConfirmModal({
-          title: 'Move item?',
-          body: 'Confirm move',
-          confirmLabel: 'Move',
-          destructive: false,
-          onConfirm: () => { setConfirmModal(null); moveItem(selectedSlot.slot, clickedSlotIndex) },
-        })
       } else {
-        // Swap to a different filled slot
-        setConfirmModal({
-          title: 'Move item?',
-          body: 'Confirm move',
-          confirmLabel: 'Move',
-          destructive: false,
-          onConfirm: () => { setConfirmModal(null); moveItem(selectedSlot.slot, clickedItem.slot) },
-        })
+        // Different slot (empty or filled) — move immediately
+        moveItem(currentSelected.slot, clickedItem?.slot ?? clickedSlotIndex)
       }
     } else if (clickedItem) {
       setSelectedSlot(clickedItem)
@@ -485,9 +470,9 @@ function PlayerPanel({
                       selected={!!item && selectedSlot?.slot === item.slot}
                       moveTarget={!!selectedSlot && !item}
                       onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
-                      onSlotClick={() => handleSlotClick(item, item?.slot ?? i)}
+                      onSlotClick={() => handleSlotClick(item, item?.slot ?? i, selectedSlot)}
                       deleting={item ? deletingSlot === item.slot : false}
-                    />
+                     />
                   ))}
                 </div>
               </div>
@@ -502,7 +487,7 @@ function PlayerPanel({
                         selected={!!item && selectedSlot?.slot === item.slot}
                         moveTarget={!!selectedSlot && !item}
                         onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
-                        onSlotClick={() => handleSlotClick(item, item?.slot ?? s)}
+                        onSlotClick={() => handleSlotClick(item, item?.slot ?? s, selectedSlot)}
                         deleting={item ? deletingSlot === item.slot : false}
                       />
                     )
@@ -512,7 +497,7 @@ function PlayerPanel({
                     selected={!!offhand && selectedSlot?.slot === 150}
                     moveTarget={!!selectedSlot && !offhand}
                     onDelete={offhand ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
-                    onSlotClick={() => handleSlotClick(offhand, offhand?.slot ?? 150)}
+                    onSlotClick={() => handleSlotClick(offhand, offhand?.slot ?? 150, selectedSlot)}
                     deleting={offhand ? deletingSlot === 150 : false}
                   />
                 </div>
@@ -525,7 +510,7 @@ function PlayerPanel({
                       selected={!!item && selectedSlot?.slot === item.slot}
                       moveTarget={!!selectedSlot && !item}
                       onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
-                      onSlotClick={() => handleSlotClick(item, item?.slot ?? (i + 9))}
+                      onSlotClick={() => handleSlotClick(item, item?.slot ?? (i + 9), selectedSlot)}
                       deleting={item ? deletingSlot === item.slot : false}
                     />
                   ))}

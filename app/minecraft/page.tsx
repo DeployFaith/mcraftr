@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { Users, Zap, Shield, MessageSquare, Settings } from 'lucide-react'
 import PlayersSection  from './components/PlayersSection'
@@ -31,8 +31,28 @@ export default function MinecraftPage() {
   const { data: session } = useSession()
   const role = session?.role
 
-  const [activeTab, setActiveTab] = useState<TabId>('players')
+  const VALID_TABS: TabId[] = ['players', 'actions', 'admin', 'chat', 'settings']
+
+  function readHashTab(): TabId {
+    if (typeof window === 'undefined') return 'players'
+    const h = window.location.hash.replace('#', '') as TabId
+    return VALID_TABS.includes(h) ? h : 'players'
+  }
+
+  const [activeTab, setActiveTab] = useState<TabId>(readHashTab)
   const [players,   setPlayers]   = useState<string[]>([])
+
+  // Sync hash → tab on popstate (browser back/forward)
+  useEffect(() => {
+    const onPop = () => setActiveTab(readHashTab())
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  const handleTabChange = useCallback((id: TabId) => {
+    setActiveTab(id)
+    window.location.hash = id
+  }, [])
 
   const handlePlayersChange = useCallback((list: string[]) => {
     setPlayers(list)
@@ -55,7 +75,7 @@ export default function MinecraftPage() {
             return (
               <button
                 key={id}
-                onClick={() => setActiveTab(id)}
+                onClick={() => handleTabChange(id)}
                 className={`flex items-center gap-2 px-5 py-3 text-[13px] font-mono tracking-widest transition-all border-b-2 ${
                   active
                     ? 'border-[var(--accent)] text-[var(--accent)]'
@@ -88,7 +108,7 @@ export default function MinecraftPage() {
             return (
               <button
                 key={id}
-                onClick={() => setActiveTab(id)}
+                onClick={() => handleTabChange(id)}
                 className="relative flex-1 flex flex-col items-center gap-1 py-3 transition-all"
               >
                 <Icon size={20} color={active ? 'var(--accent)' : 'var(--text-dim)'} strokeWidth={1.75} />
