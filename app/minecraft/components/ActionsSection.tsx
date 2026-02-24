@@ -4,7 +4,6 @@ import {
   Sun, Moon, CloudSun, CloudLightning,
   Hammer, Shield, Map,
   Wind, Heart, Eye, Zap, EyeOff, ArrowUp, Swords, Pickaxe, Sparkles,
-  Trash2,
   type LucideProps,
 } from 'lucide-react'
 import { KITS } from '@/lib/kits'
@@ -12,6 +11,7 @@ import { CATALOG, type CatalogItem } from '../items'
 import type { InvItem } from '../../api/minecraft/inventory/route'
 import { useToast } from './useToast'
 import Toasts from './Toasts'
+import InvSlot, { buildInventoryLayout } from './InvSlot'
 
 type LucideIcon = React.ComponentType<LucideProps>
 
@@ -358,10 +358,6 @@ export default function ActionsSection({ players }: Props) {
       addToast('error', e instanceof Error ? e.message : 'Network error')
     } finally { setInvDeleting(null) }
   }
-
-  const slotLabel = (slot: number) =>
-    slot === 150 ? 'Offhand' : slot === 103 ? 'Helmet' : slot === 102 ? 'Chestplate' :
-    slot === 101 ? 'Leggings' : slot === 100 ? 'Boots' : slot < 9 ? `Hotbar ${slot + 1}` : `Slot ${slot}`
 
   const clearAllInventory = async (player: string) => {
     if (!confirm(`Clear ALL items from ${player}'s inventory? This cannot be undone.`)) return
@@ -782,45 +778,60 @@ export default function ActionsSection({ players }: Props) {
           {invLoading ? 'Loading…' : 'Load Inventory'}
         </button>
 
-        {invItems.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="text-[13px] font-mono text-[var(--text-dim)]">{invItems.length} item{invItems.length !== 1 ? 's' : ''}</div>
-              <button
-                onClick={() => clearAllInventory(invPlayer)}
-                disabled={!!invDeleting}
-                className="text-[13px] font-mono px-2 py-1 rounded border border-red-900/50 text-red-400 hover:border-red-700 transition-all disabled:opacity-30">
-                Clear All
-              </button>
+        {invItems.length > 0 && (() => {
+          const { hotbar, main, armor, offhand } = buildInventoryLayout(invItems)
+          return (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-[13px] font-mono text-[var(--text-dim)]">{invItems.length} item{invItems.length !== 1 ? 's' : ''}</div>
+                <button
+                  onClick={() => clearAllInventory(invPlayer)}
+                  disabled={!!invDeleting}
+                  className="text-[13px] font-mono px-2 py-1 rounded border border-red-900/50 text-red-400 hover:border-red-700 transition-all disabled:opacity-30">
+                  Clear All
+                </button>
+              </div>
+              <div>
+                <div className="text-[11px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">HOTBAR</div>
+                <div className="flex flex-wrap gap-1">
+                  {hotbar.map((item, i) => (
+                    <InvSlot key={i} item={item}
+                      onDelete={item ? (it) => deleteItem(invPlayer, it) : undefined}
+                      deleting={item ? invDeleting === `${item.slot}` : false}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">ARMOR / OFFHAND</div>
+                <div className="flex gap-1 flex-wrap items-center">
+                  {armor.map((item, i) => (
+                    <InvSlot key={i} item={item}
+                      onDelete={item ? (it) => deleteItem(invPlayer, it) : undefined}
+                      deleting={item ? invDeleting === `${item.slot}` : false}
+                    />
+                  ))}
+                  <div className="w-px h-8 bg-[var(--border)] mx-1.5" />
+                  <InvSlot item={offhand}
+                    onDelete={offhand ? (it) => deleteItem(invPlayer, it) : undefined}
+                    deleting={offhand ? invDeleting === `${offhand.slot}` : false}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">MAIN</div>
+                <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(9, 2.5rem)' }}>
+                  {main.map((item, i) => (
+                    <InvSlot key={i} item={item}
+                      onDelete={item ? (it) => deleteItem(invPlayer, it) : undefined}
+                      deleting={item ? invDeleting === `${item.slot}` : false}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {invItems.map(item => {
-                const key = `${item.slot}`
-                return (
-                  <div key={key} className="flex items-start justify-between gap-2 px-3 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--panel)]">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-[13px] font-mono text-[var(--text-dim)] shrink-0">{slotLabel(item.slot)}</span>
-                        <span className="text-[13px] font-mono text-[var(--text)] truncate">{item.label}</span>
-                        {item.count > 1 && <span className="text-[13px] font-mono text-[var(--accent)] shrink-0">×{item.count}</span>}
-                      </div>
-                      {item.enchants && (
-                        <div className="text-[13px] font-mono text-purple-400 opacity-80 mt-0.5 leading-relaxed">{item.enchants}</div>
-                      )}
-                    </div>
-                    <button onClick={() => deleteItem(invPlayer, item)} disabled={!!invDeleting}
-                      className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-dim)] hover:border-red-700 disabled:opacity-30 transition-all group"
-                      title={`Clear ${item.label}`}>
-                      {invDeleting === key
-                        ? <span className="text-[13px] font-mono">…</span>
-                        : <Trash2 size={13} className="group-hover:text-red-400 transition-colors" strokeWidth={1.5} />}
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
+          )
+        })()}
 
         {!invLoading && invPlayer && invItems.length === 0 && (
           <div className="text-[13px] font-mono text-[var(--text-dim)] text-center py-4">

@@ -1,5 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import InvSlot, { slotLabel, buildInventoryLayout } from './InvSlot'
+import type { InvItem } from '../../api/minecraft/inventory/route'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -23,14 +25,6 @@ type PlayerStats = {
   gamemode: string | null
   pos: { x: number; y: number; z: number } | null
   spawnPos: { x: number; y: number; z: number } | null
-}
-
-type InvItem = {
-  slot: number
-  id: string
-  label: string
-  count: number
-  enchants?: string
 }
 
 type Props = {
@@ -63,17 +57,6 @@ const DIMENSION_COLORS: Record<string, string> = {
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
-
-function slotLabel(slot: number): string {
-  if (slot >= 0  && slot <= 8)  return `Hotbar ${slot + 1}`
-  if (slot >= 9  && slot <= 35) return `Slot ${slot - 8}`
-  if (slot === 100) return 'Boots'
-  if (slot === 101) return 'Leggings'
-  if (slot === 102) return 'Chestplate'
-  if (slot === 103) return 'Helmet'
-  if (slot === 150) return 'Offhand'
-  return `Slot ${slot}`
-}
 
 function formatOnlineTime(joinedAtMs: number): string {
   const elapsed = Math.floor((Date.now() - joinedAtMs) / 1000)
@@ -191,59 +174,6 @@ function CoordBlock({ label, pos }: { label: string; pos: { x: number; y: number
   )
 }
 
-function InvSlot({ item, onDelete, deleting }: {
-  item: InvItem | undefined
-  onDelete?: (item: InvItem) => void
-  deleting?: boolean
-}) {
-  const [hovered, setHovered] = useState(false)
-  if (!item) {
-    return <div className="w-10 h-10 rounded border border-[var(--border)] bg-[var(--panel)] opacity-20" />
-  }
-  return (
-    <div className="relative group" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <div
-        className="w-10 h-10 rounded border border-[var(--border)] bg-[var(--panel)] flex flex-col items-center justify-center cursor-default hover:border-[var(--accent-mid)] transition-colors"
-      >
-        {deleting ? (
-          <span className="text-[13px] font-mono text-[var(--text-dim)] animate-pulse">…</span>
-        ) : (
-          <>
-            <span className="text-[13px] font-mono text-[var(--accent)] leading-tight text-center px-0.5 w-full truncate text-center">
-              {item.label.slice(0, 6)}
-            </span>
-            {item.count > 1 && <span className="text-[13px] font-mono text-[var(--text-dim)]">x{item.count}</span>}
-          </>
-        )}
-      </div>
-      {/* Delete button — appears on hover when onDelete is provided */}
-      {onDelete && !deleting && (
-        <button
-          onClick={e => {
-            e.stopPropagation()
-            if (confirm(`Clear ${item.label} from inventory? This cannot be undone.`)) {
-              onDelete(item)
-            }
-          }}
-          className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-900 border border-red-700 text-red-300 text-[13px] font-mono leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-700"
-          title={`Clear ${item.label}`}
-        >
-          ✕
-        </button>
-      )}
-      {/* Tooltip */}
-      {hovered && !deleting && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-20 bg-[var(--bg)] border border-[var(--border)] rounded px-2 py-1.5 text-[13px] font-mono text-[var(--text)] whitespace-nowrap shadow-lg pointer-events-none">
-          <div className="font-medium">{item.label}</div>
-          {item.count > 1 && <div className="text-[var(--text-dim)]">x{item.count}</div>}
-          {item.enchants && <div className="text-[var(--accent)] opacity-80 mt-0.5">{item.enchants}</div>}
-          <div className="text-[var(--text-dim)] mt-0.5">{slotLabel(item.slot)}</div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Online time ticker ────────────────────────────────────────────────────────
 
 function OnlineTimer({ joinedAtMs }: { joinedAtMs: number | null }) {
@@ -326,11 +256,7 @@ function PlayerPanel({
     } finally { setDeletingSlot(null) }
   }
 
-  const bySlot  = new Map(inventory.map(i => [i.slot, i]))
-  const hotbar  = Array.from({ length: 9 },  (_, i) => bySlot.get(i))
-  const main    = Array.from({ length: 27 }, (_, i) => bySlot.get(i + 9))
-  const armor   = [103, 102, 101, 100].map(s => bySlot.get(s))
-  const offhand = bySlot.get(150)
+  const { hotbar, main, armor, offhand } = buildInventoryLayout(inventory)
 
   const uuid = stats?.uuid ?? null
   // Bedrock players (Geyser) have offline UUIDs that don't resolve on Craftatar.
