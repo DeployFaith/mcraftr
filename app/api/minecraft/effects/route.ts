@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { rconForRequest, getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,7 +17,14 @@ const EFFECT_IDS: Record<string, string> = {
 const PLAYER_RE = /^\.?[a-zA-Z0-9_]{1,16}$/
 
 export async function GET(req: NextRequest) {
-  if (!await getSessionUserId(req)) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const userId = await getSessionUserId(req)
+  if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_player_commands')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
+
   const player = req.nextUrl.searchParams.get('player')
   if (!player) return Response.json({ ok: false, error: 'Missing player' }, { status: 400 })
   if (!PLAYER_RE.test(player)) return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getUserFeatures, updateUserFeatures, getUserById, listUsers } from '@/lib/users'
 import { getToken } from 'next-auth/jwt'
+import { FEATURE_KEYS, type FeatureKey } from '@/lib/features'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -58,13 +59,8 @@ export async function PUT(req: NextRequest) {
     return Response.json({ ok: false, error: 'User not found' }, { status: 404 })
   }
 
-  const allowedFields = [
-    'enable_chat', 'enable_chat_read', 'enable_chat_write',
-    'enable_teleport', 'enable_inventory', 'enable_rcon', 'enable_admin'
-  ] as const
-
-  const updates: Partial<Record<typeof allowedFields[number], boolean>> = {}
-  for (const field of allowedFields) {
+  const updates: Partial<Record<FeatureKey, boolean>> = {}
+  for (const field of FEATURE_KEYS) {
     if (features[field] !== undefined) {
       updates[field] = !!features[field]
     }

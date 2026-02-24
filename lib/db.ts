@@ -69,6 +69,14 @@ export function getDb(): Database.Database {
       enable_admin      INTEGER NOT NULL DEFAULT 1,
       updated_at        INTEGER NOT NULL DEFAULT (unixepoch())
     );
+
+    CREATE TABLE IF NOT EXISTS user_feature_flags (
+      user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      feature_key  TEXT NOT NULL,
+      enabled      INTEGER NOT NULL,
+      updated_at   INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (user_id, feature_key)
+    );
   `)
 
   return _db

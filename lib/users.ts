@@ -4,6 +4,7 @@ import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 import Database from 'better-sqlite3'
 import { getDb } from './db'
+import { DEFAULT_FEATURES, FEATURE_KEYS, type FeatureKey } from './features'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -377,91 +378,72 @@ export function createUserByAdmin(email: string, password: string): User {
   return { id, email, passwordHash: '', role: 'user', server: null }
 }
 
-export type UserFeatures = {
-  enable_chat: boolean
-  enable_chat_read: boolean
-  enable_chat_write: boolean
-  enable_teleport: boolean
-  enable_inventory: boolean
-  enable_rcon: boolean
-  enable_admin: boolean
-}
+export type UserFeatures = Record<FeatureKey, boolean>
+
+const LEGACY_KEYS: FeatureKey[] = [
+  'enable_chat',
+  'enable_chat_read',
+  'enable_chat_write',
+  'enable_teleport',
+  'enable_inventory',
+  'enable_rcon',
+  'enable_admin',
+]
 
 export function getUserFeatures(id: string): UserFeatures {
   const db = initDb()
-  const row = db.prepare('SELECT * FROM user_features WHERE user_id = ?').get(id) as {
-    enable_chat: number
-    enable_chat_read: number
-    enable_chat_write: number
-    enable_teleport: number
-    enable_inventory: number
-    enable_rcon: number
-    enable_admin: number
-  } | undefined
-  if (!row) {
-    return {
-      enable_chat: true,
-      enable_chat_read: true,
-      enable_chat_write: true,
-      enable_teleport: true,
-      enable_inventory: true,
-      enable_rcon: true,
-      enable_admin: true,
+  const features: UserFeatures = { ...DEFAULT_FEATURES }
+
+  const legacy = db.prepare('SELECT * FROM user_features WHERE user_id = ?').get(id) as Record<string, number> | undefined
+  if (legacy) {
+    for (const k of LEGACY_KEYS) {
+      if (legacy[k] !== undefined) features[k] = !!legacy[k]
     }
   }
-  return {
-    enable_chat: !!row.enable_chat,
-    enable_chat_read: !!row.enable_chat_read,
-    enable_chat_write: !!row.enable_chat_write,
-    enable_teleport: !!row.enable_teleport,
-    enable_inventory: !!row.enable_inventory,
-    enable_rcon: !!row.enable_rcon,
-    enable_admin: !!row.enable_admin,
+
+  const rows = db.prepare('SELECT feature_key, enabled FROM user_feature_flags WHERE user_id = ?').all(id) as { feature_key: string; enabled: number }[]
+  for (const row of rows) {
+    if (FEATURE_KEYS.includes(row.feature_key as FeatureKey)) {
+      features[row.feature_key as FeatureKey] = !!row.enabled
+    }
   }
+
+  return features
 }
 
-export function updateUserFeatures(id: string, features: Partial<UserFeatures>): void {
+export function updateUserFeatures(id: string, updates: Partial<UserFeatures>): void {
   const db = initDb()
-  const current = getUserFeatures(id)
-  const next: UserFeatures = {
-    enable_chat: features.enable_chat ?? current.enable_chat,
-    enable_chat_read: features.enable_chat_read ?? current.enable_chat_read,
-    enable_chat_write: features.enable_chat_write ?? current.enable_chat_write,
-    enable_teleport: features.enable_teleport ?? current.enable_teleport,
-    enable_inventory: features.enable_inventory ?? current.enable_inventory,
-    enable_rcon: features.enable_rcon ?? current.enable_rcon,
-    enable_admin: features.enable_admin ?? current.enable_admin,
-  }
+  const keys = Object.keys(updates).filter((k): k is FeatureKey => FEATURE_KEYS.includes(k as FeatureKey))
+  if (keys.length === 0) return
 
-  db.prepare(`
-    INSERT INTO user_features (
-      user_id,
-      enable_chat,
-      enable_chat_read,
-      enable_chat_write,
-      enable_teleport,
-      enable_inventory,
-      enable_rcon,
-      enable_admin,
-      updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, unixepoch())
-    ON CONFLICT(user_id) DO UPDATE SET
-      enable_chat = excluded.enable_chat,
-      enable_chat_read = excluded.enable_chat_read,
-      enable_chat_write = excluded.enable_chat_write,
-      enable_teleport = excluded.enable_teleport,
-      enable_inventory = excluded.enable_inventory,
-      enable_rcon = excluded.enable_rcon,
-      enable_admin = excluded.enable_admin,
+  const upsert = db.prepare(`
+    INSERT INTO user_feature_flags (user_id, feature_key, enabled, updated_at)
+    VALUES (?, ?, ?, unixepoch())
+    ON CONFLICT(user_id, feature_key) DO UPDATE SET
+      enabled = excluded.enabled,
       updated_at = unixepoch()
-  `).run(
-    id,
-    next.enable_chat ? 1 : 0,
-    next.enable_chat_read ? 1 : 0,
-    next.enable_chat_write ? 1 : 0,
-    next.enable_teleport ? 1 : 0,
-    next.enable_inventory ? 1 : 0,
-    next.enable_rcon ? 1 : 0,
-    next.enable_admin ? 1 : 0,
-  )
+  `)
+
+  const upsertLegacy = db.prepare(`
+    INSERT INTO user_features (user_id, updated_at)
+    VALUES (?, unixepoch())
+    ON CONFLICT(user_id) DO UPDATE SET
+      updated_at = unixepoch()
+  `)
+
+  const tx = db.transaction(() => {
+    for (const key of keys) {
+      upsert.run(id, key, updates[key] ? 1 : 0)
+    }
+
+    const legacyUpdates = keys.filter(k => LEGACY_KEYS.includes(k))
+    if (legacyUpdates.length > 0) {
+      upsertLegacy.run(id)
+      for (const key of legacyUpdates) {
+        db.prepare(`UPDATE user_features SET ${key} = ?, updated_at = unixepoch() WHERE user_id = ?`).run(updates[key] ? 1 : 0, id)
+      }
+    }
+  })
+
+  tx()
 }

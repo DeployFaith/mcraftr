@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getUserFeatures, updateUserFeatures, getUserById } from '@/lib/users'
 import { getSessionUserId } from '@/lib/rcon'
+import { FEATURE_KEYS, type FeatureKey } from '@/lib/features'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,13 +28,9 @@ export async function PUT(req: NextRequest) {
   }
 
   const body = await req.json()
-  const allowedFields = [
-    'enable_chat', 'enable_chat_read', 'enable_chat_write',
-    'enable_teleport', 'enable_inventory', 'enable_rcon', 'enable_admin'
-  ] as const
 
-  const updates: Partial<Record<typeof allowedFields[number], boolean>> = {}
-  for (const field of allowedFields) {
+  const updates: Partial<Record<FeatureKey, boolean>> = {}
+  for (const field of FEATURE_KEYS) {
     if (body[field] !== undefined) {
       updates[field] = !!body[field]
     }

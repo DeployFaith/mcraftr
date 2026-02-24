@@ -9,18 +9,11 @@ import ActionsSection from './components/ActionsSection'
 import ChatSection from './components/ChatSection'
 import AdminSection from './components/AdminSection'
 import SettingsSection from './components/SettingsSection'
+import type { FeatureKey } from '@/lib/features'
 
 export type TabId = 'players' | 'actions' | 'admin' | 'chat' | 'settings'
 
-type FeatureFlags = {
-  enable_chat: boolean
-  enable_chat_read: boolean
-  enable_chat_write: boolean
-  enable_teleport: boolean
-  enable_inventory: boolean
-  enable_rcon: boolean
-  enable_admin: boolean
-}
+type FeatureFlags = Record<FeatureKey, boolean>
 
 const ALL_TABS: {
   id: TabId
@@ -89,6 +82,10 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
 
   const tabs = ALL_TABS.filter(t => {
     if (t.id === 'chat' && features && !features.enable_chat) return false
+    if (t.id === 'actions' && features) {
+      const hasAnyAction = features.enable_world || features.enable_player_commands || features.enable_chat_write || features.enable_teleport || features.enable_kits || features.enable_item_catalog || features.enable_inventory
+      if (!hasAnyAction) return false
+    }
     if (t.id === 'admin') {
       if (role !== 'admin') return false
       if (features && !features.enable_admin) return false

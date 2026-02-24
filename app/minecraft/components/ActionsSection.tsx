@@ -14,12 +14,15 @@ import Toasts from './Toasts'
 import InvSlot, { buildInventoryLayout } from './InvSlot'
 import ConfirmModal from './ConfirmModal'
 import type { ConfirmModalProps } from './ConfirmModal'
+import type { FeatureKey } from '@/lib/features'
 
 type LucideIcon = React.ComponentType<LucideProps>
 
 type Props = {
   players: string[]
 }
+
+type FeatureFlags = Record<FeatureKey, boolean>
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -88,6 +91,14 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export default function ActionsSection({ players }: Props) {
   const { toasts, addToast } = useToast()
+  const [features, setFeatures] = useState<FeatureFlags | null>(null)
+
+  useEffect(() => {
+    fetch('/api/account/preferences')
+      .then(r => r.json())
+      .then(d => { if (d.ok && d.features) setFeatures(d.features as FeatureFlags) })
+      .catch(() => {})
+  }, [])
 
   const [busyCmd,   setBusyCmd]   = useState<string | null>(null)
   const [cmdPlayer, setCmdPlayer] = useState('')
@@ -425,6 +436,14 @@ export default function ActionsSection({ players }: Props) {
   }
 
   const noPlayers = players.length === 0
+  const canWorld = features ? features.enable_world : true
+  const canPlayerCmd = features ? features.enable_player_commands : true
+  const canChatWrite = features ? (features.enable_chat && features.enable_chat_write) : true
+  const canTeleport = features ? features.enable_teleport : true
+  const canKits = features ? features.enable_kits : true
+  const canCatalog = features ? features.enable_item_catalog : true
+  const canInventory = features ? features.enable_inventory : true
+  const allSectionsDisabled = !canWorld && !canPlayerCmd && !canChatWrite && !canTeleport && !canKits && !canCatalog && !canInventory
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -432,7 +451,14 @@ export default function ActionsSection({ players }: Props) {
     <div className="space-y-4 pb-6">
       <h2 className="font-mono text-base tracking-widest text-[var(--accent)]">ACTIONS</h2>
 
+      {allSectionsDisabled && (
+        <div className="glass-card p-4 text-[13px] font-mono text-[var(--text-dim)]">
+          All Actions features are disabled for this account.
+        </div>
+      )}
+
       {/* ── WORLD COMMANDS ── */}
+      {canWorld && (
       <div className="glass-card p-4 space-y-4">
         <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">WORLD</div>
         <div>
@@ -442,8 +468,10 @@ export default function ActionsSection({ players }: Props) {
           </div>
         </div>
       </div>
+      )}
 
       {/* ── PLAYER COMMANDS ── */}
+      {canPlayerCmd && (
       <div className="glass-card p-4 space-y-4">
         <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">PLAYER COMMANDS</div>
 
@@ -497,8 +525,10 @@ export default function ActionsSection({ players }: Props) {
           ) : <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">Select a player above</div>}
         </div>
       </div>
+      )}
 
       {/* ── BROADCAST ── */}
+      {canChatWrite && (
       <div className="glass-card p-4 space-y-4">
         <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">BROADCAST</div>
         <div>
@@ -547,8 +577,10 @@ export default function ActionsSection({ players }: Props) {
           </div>
         </div>
       </div>
+      )}
 
       {/* ── TELEPORT ── */}
+      {canTeleport && (
       <div className="glass-card p-4 space-y-4">
         <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">TELEPORT</div>
 
@@ -613,8 +645,10 @@ export default function ActionsSection({ players }: Props) {
           </div>
         </div>
       </div>
+      )}
 
       {/* ── KIT ASSIGNMENT ── */}
+      {canKits && (
       <div className="glass-card p-4 space-y-4">
         <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">KIT ASSIGNMENT</div>
 
@@ -690,8 +724,10 @@ export default function ActionsSection({ players }: Props) {
           </>
         )}
       </div>
+      )}
 
       {/* ── ITEM CATALOG ── */}
+      {canCatalog && (
       <div className="glass-card p-4 space-y-4">
         <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">ITEM CATALOG</div>
 
@@ -788,8 +824,10 @@ export default function ActionsSection({ players }: Props) {
           </>
         )}
       </div>
+      )}
 
       {/* ── INVENTORY VIEWER ── */}
+      {canInventory && (
       <div className="glass-card p-4 space-y-4">
         <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">INVENTORY VIEWER</div>
 
@@ -905,6 +943,7 @@ export default function ActionsSection({ players }: Props) {
           </div>
         )}
       </div>
+      )}
 
       <Toasts toasts={toasts} />
       {confirmModal && (

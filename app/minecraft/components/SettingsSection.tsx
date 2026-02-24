@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { signOut } from 'next-auth/react'
 import { useTheme, ACCENTS } from '@/app/components/ThemeProvider'
+import { FEATURE_DEFS, type FeatureKey } from '@/lib/features'
 // ── Small helpers ─────────────────────────────────────────────────────────────
 
 function StatusMsg({ ok, msg }: { ok: boolean; msg: string }) {
@@ -19,25 +20,7 @@ function StatusMsg({ ok, msg }: { ok: boolean; msg: string }) {
   )
 }
 
-type FeatureFlags = {
-  enable_chat: boolean
-  enable_chat_read: boolean
-  enable_chat_write: boolean
-  enable_teleport: boolean
-  enable_inventory: boolean
-  enable_rcon: boolean
-  enable_admin: boolean
-}
-
-const FEATURE_LIST: { key: keyof FeatureFlags; label: string; desc: string }[] = [
-  { key: 'enable_chat', label: 'Chat Tab', desc: 'Show/hide the Chat tab in the navigation' },
-  { key: 'enable_chat_read', label: 'View Chat Logs', desc: 'Allow viewing player chat history' },
-  { key: 'enable_chat_write', label: 'Send Messages', desc: 'Allow sending messages to players' },
-  { key: 'enable_teleport', label: 'Teleport', desc: 'Use teleport commands (tp, tploc)' },
-  { key: 'enable_inventory', label: 'Inventory', desc: 'View and manage player inventories' },
-  { key: 'enable_rcon', label: 'RCON Console', desc: 'Use the raw RCON console' },
-  { key: 'enable_admin', label: 'Admin Panel', desc: 'Access the Admin tab and user management' },
-]
+type FeatureFlags = Record<FeatureKey, boolean>
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -58,7 +41,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
     }).catch(() => {}).finally(() => setFeaturesLoading(false))
   }, [])
 
-  const toggleFeature = async (key: keyof FeatureFlags) => {
+  const toggleFeature = async (key: FeatureKey) => {
     if (!features || featuresSaving) return
     const newFeatures = { ...features, [key]: !features[key] }
     setFeatures(newFeatures)
@@ -277,7 +260,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
           <div className="text-[13px] font-mono text-[var(--text-dim)] animate-pulse">Loading...</div>
         ) : (
           <div className="space-y-2">
-            {FEATURE_LIST.map(f => (
+            {FEATURE_DEFS.map(f => (
               <div key={f.key} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
                 <div className="min-w-0">
                   <div className="text-[13px] font-mono text-[var(--text)]">{f.label}</div>

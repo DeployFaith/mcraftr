@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { rconForRequest, getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -24,7 +24,8 @@ const COMMANDS: Record<string, { cmds: string[]; label: string; requiresPlayer: 
 }
 
 export async function POST(req: NextRequest) {
-  if (!await getSessionUserId(req)) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const userId = await getSessionUserId(req)
+  if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   try {
     const { command, player } = await req.json()
 
@@ -32,6 +33,16 @@ export async function POST(req: NextRequest) {
 
     const def = COMMANDS[command]
     if (!def) return Response.json({ ok: false, error: `Unknown command: ${command}` }, { status: 400 })
+
+    const features = await getUserFeatureFlags(req)
+    if (def.requiresPlayer) {
+      if (!checkFeatureAccess(features, 'enable_player_commands')) {
+        return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+      }
+    } else if (!checkFeatureAccess(features, 'enable_world')) {
+      return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+    }
+
     if (def.requiresPlayer && !player) return Response.json({ ok: false, error: 'This command requires a player' }, { status: 400 })
     if (player && !PLAYER_RE.test(player)) return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
 
