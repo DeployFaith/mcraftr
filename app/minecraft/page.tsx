@@ -1,4 +1,4 @@
-import { auth } from '@/auth'
+import { nodeAuth } from '@/auth.node'
 import MinecraftClientPage, { type TabId } from './MinecraftClientPage'
 
 const VALID_TABS: TabId[] = ['players', 'actions', 'admin', 'chat', 'settings']
@@ -16,7 +16,7 @@ export default async function MinecraftPage({
 }: {
   searchParams: Promise<{ tab?: string | string[] }>
 }) {
-  const session = await auth()
+  const session = await nodeAuth()
   const isAdmin = session?.role === 'admin'
 
   const params = await searchParams
