@@ -54,14 +54,14 @@ export default function ChatSection() {
         <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)] mb-3">OUTBOUND MESSAGES</div>
 
         {loading ? (
-          <div className="flex-1 flex items-center justify-center text-[10px] font-mono text-[var(--text-dim)] opacity-40 tracking-widest">
+          <div className="flex-1 flex items-center justify-center text-[10px] font-mono text-[var(--text-dim)] opacity-40 tracking-widest animate-pulse">
             Loading…
           </div>
         ) : entries.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center">
-            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40 tracking-widest">No messages yet</div>
+            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40 tracking-widest">The chat is quieter than a creeper in water</div>
             <div className="text-[9px] font-mono text-[var(--text-dim)] opacity-30">
-              Use Broadcast or Private Message in Actions to send messages — they'll appear here.
+              Use Broadcast or Private Message in Actions — messages will appear here.
             </div>
           </div>
         ) : (

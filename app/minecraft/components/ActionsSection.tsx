@@ -10,12 +10,10 @@ import {
 import { KITS } from '@/lib/kits'
 import { CATALOG, type CatalogItem } from '../items'
 import type { InvItem } from '../../api/minecraft/inventory/route'
+import { useToast } from './useToast'
+import Toasts from './Toasts'
 
 type LucideIcon = React.ComponentType<LucideProps>
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type Toast = { id: number; variant: 'ok' | 'error' | 'deactivated'; message: string }
 
 type Props = {
   players: string[]
@@ -78,13 +76,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function ActionsSection({ players }: Props) {
-  const addToast = (variant: Toast['variant'], message: string) => {
-    const id = Date.now()
-    setToasts(prev => [...prev, { id, variant, message }])
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
-  }
+  const { toasts, addToast } = useToast()
 
-  const [toasts,    setToasts]    = useState<Toast[]>([])
   const [busyCmd,   setBusyCmd]   = useState<string | null>(null)
   const [cmdPlayer, setCmdPlayer] = useState('')
 
@@ -370,6 +363,26 @@ export default function ActionsSection({ players }: Props) {
     slot === 150 ? 'Offhand' : slot === 103 ? 'Helmet' : slot === 102 ? 'Chestplate' :
     slot === 101 ? 'Leggings' : slot === 100 ? 'Boots' : slot < 9 ? `Hotbar ${slot + 1}` : `Slot ${slot}`
 
+  const clearAllInventory = async (player: string) => {
+    if (!confirm(`Clear ALL items from ${player}'s inventory? This cannot be undone.`)) return
+    setInvDeleting('all')
+    let cleared = 0; let failed = 0
+    for (const item of invItems) {
+      try {
+        const r = await fetch('/api/minecraft/inventory', {
+          method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ player, item: item.id, count: item.count }),
+        })
+        const d = await r.json()
+        if (d.ok) cleared++; else failed++
+      } catch { failed++ }
+    }
+    setInvItems([])
+    setInvDeleting(null)
+    if (failed === 0) addToast('ok', `Cleared ${cleared} item${cleared !== 1 ? 's' : ''} from ${player}`)
+    else addToast('error', `Cleared ${cleared}, failed ${failed}`)
+  }
+
   const noPlayers = players.length === 0
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -396,7 +409,7 @@ export default function ActionsSection({ players }: Props) {
         <div>
           <SectionLabel>SELECT PLAYER</SectionLabel>
           {noPlayers ? (
-            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-50">No players online</div>
+            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-50">No players online — the world is your oyster</div>
           ) : (
             <div className="flex flex-wrap gap-2">
               {players.map(p => (
@@ -766,12 +779,20 @@ export default function ActionsSection({ players }: Props) {
 
         <button onClick={loadInventory} disabled={invLoading || !invPlayer}
           className="w-full py-2.5 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]">
-          {invLoading ? 'Loading...' : 'Load Inventory'}
+          {invLoading ? 'Loading…' : 'Load Inventory'}
         </button>
 
         {invItems.length > 0 && (
           <div className="space-y-2">
-            <div className="text-[9px] font-mono text-[var(--text-dim)]">{invItems.length} item{invItems.length !== 1 ? 's' : ''}</div>
+            <div className="flex items-center justify-between">
+              <div className="text-[9px] font-mono text-[var(--text-dim)]">{invItems.length} item{invItems.length !== 1 ? 's' : ''}</div>
+              <button
+                onClick={() => clearAllInventory(invPlayer)}
+                disabled={!!invDeleting}
+                className="text-[9px] font-mono px-2 py-1 rounded border border-red-900/50 text-red-400 hover:border-red-700 transition-all disabled:opacity-30">
+                Clear All
+              </button>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {invItems.map(item => {
                 const key = `${item.slot}`
@@ -803,28 +824,12 @@ export default function ActionsSection({ players }: Props) {
 
         {!invLoading && invPlayer && invItems.length === 0 && (
           <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-50 text-center py-4">
-            No items found — player may not be online or inventory is empty
+            Pockets empty — player may be offline or carrying nothing
           </div>
         )}
       </div>
 
-      {/* Toasts */}
-      <div className="fixed bottom-20 right-4 flex flex-col gap-2 z-50 pointer-events-none md:bottom-6 md:right-6">
-        {toasts.map(toast => {
-          const styles =
-            toast.variant === 'ok'
-              ? { background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }
-              : toast.variant === 'deactivated'
-              ? { background: '#2a1500', border: '1px solid #92400e', color: '#fb923c' }
-              : { background: '#2a0f0f', border: '1px solid #7f1d1d', color: '#fca5a5' }
-          const prefix = toast.variant === 'ok' ? '✓ ' : toast.variant === 'deactivated' ? '○ ' : '✗ '
-          return (
-            <div key={toast.id} className="px-4 py-3 rounded-lg font-mono text-xs shadow-lg pointer-events-auto max-w-xs" style={styles}>
-              {prefix}{toast.message}
-            </div>
-          )
-        })}
-      </div>
+      <Toasts toasts={toasts} />
     </div>
   )
 }

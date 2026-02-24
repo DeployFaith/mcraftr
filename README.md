@@ -6,7 +6,7 @@
 
 **A beautiful, modern Minecraft server admin panel**
 
-[Features](#features) • [Tech Stack](#tech-stack) • [Screenshots](#screenshots) • [Self-Hosting](#self-hosting) • [Environment Variables](#environment-variables) • [Getting Started](#getting-started) • [API](#api)
+**[Live Demo](https://mcraftr.deployfaith.xyz)** &nbsp;•&nbsp; [Features](#features) • [Tech Stack](#tech-stack) • [Screenshots](#screenshots) • [Self-Hosting](#self-hosting) • [Environment Variables](#environment-variables) • [Getting Started](#getting-started) • [API](#api)
 
 </div>
 
@@ -136,15 +136,15 @@ Ensure the port is accessible from the Mcraftr container/host.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `NEXTAUTH_SECRET` | Yes | Secret key for NextAuth JWT signing (use `openssl rand -base64 32`) |
-| `NEXTAUTH_URL` | Yes | Public URL (e.g., `https://mcraftr.example.com`) |
-| `MCRAFTR_ADMIN_USER` | Yes | First admin email (created on first run) |
-| `MCRAFTR_ADMIN_PASS` | Yes | First admin password |
-| `MCRAFTR_ENC_KEY` | Yes | AES-256 encryption key for RCON passwords at rest (`openssl rand -base64 32`) |
-| `REDIS_PASSWORD` | Yes | Redis authentication password |
-| `REDIS_URL` | Yes | Redis connection string (`redis://:PASSWORD@host:port`) |
-| `DATA_DIR` | No | SQLite database directory (default: `/app/data`) |
-| `ALLOW_REGISTRATION` | No | Set to `true` to allow public user registration (default: `false`) |
+| **`NEXTAUTH_SECRET`** | **Required** | Secret key for NextAuth JWT signing (use `openssl rand -base64 32`) |
+| **`NEXTAUTH_URL`** | **Required** | Public URL (e.g., `https://mcraftr.example.com`) |
+| **`MCRAFTR_ADMIN_USER`** | **Required** | First admin email (created on first run) |
+| **`MCRAFTR_ADMIN_PASS`** | **Required** | First admin password |
+| **`MCRAFTR_ENC_KEY`** | **Required** | AES-256 encryption key for RCON passwords at rest (`openssl rand -base64 32`) |
+| **`REDIS_PASSWORD`** | **Required** | Redis authentication password |
+| **`REDIS_URL`** | **Required** | Redis connection string (`redis://:PASSWORD@host:port`) |
+| `DATA_DIR` | Optional | SQLite database directory (default: `/app/data`) |
+| `ALLOW_REGISTRATION` | Optional | Set to `true` to allow public user registration (default: `false`) |
 
 ### Example `.env`
 
@@ -279,4 +279,4 @@ Mcraftr exposes REST endpoints under `/api/`. All endpoints require authenticati
 
 ## License
 
-<!-- Add license information here -->
+MIT — see [LICENSE](./LICENSE)

@@ -7,10 +7,8 @@ import {
 import PlayerPicker from './PlayerPicker'
 import type { AuditEntry } from '@/lib/audit'
 import type { UserSummary } from '@/lib/users'
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type Toast = { id: number; variant: 'ok' | 'error'; message: string }
+import { useToast } from './useToast'
+import Toasts from './Toasts'
 
 const RCON_HISTORY_KEY = 'mcraftr:rcon:history'
 const RCON_HISTORY_MAX = 20
@@ -84,13 +82,8 @@ function StatTile({ label, value, sub }: { label: string; value: React.ReactNode
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function AdminSection({ players }: Props) {
-  const addToast = (variant: Toast['variant'], message: string) => {
-    const id = Date.now()
-    setToasts(prev => [...prev, { id, variant, message }])
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
-  }
+  const { toasts, addToast } = useToast()
 
-  const [toasts, setToasts] = useState<Toast[]>([])
 
   // ── Server Info ───────────────────────────────────────────────────────────────
 
@@ -468,18 +461,7 @@ export default function AdminSection({ players }: Props) {
     <div className="space-y-4 pb-6">
       <h2 className="font-mono text-base tracking-widest text-[var(--accent)]">ADMIN</h2>
 
-      {/* Toast notifications */}
-      {toasts.length > 0 && (
-        <div className="fixed top-16 right-4 z-50 flex flex-col gap-2 pointer-events-none">
-          {toasts.map(t => (
-            <div key={t.id} className={`px-4 py-2 rounded-lg font-mono text-xs border backdrop-blur-sm ${
-              t.variant === 'ok'
-                ? 'bg-[var(--accent-dim)] border-[var(--accent-mid)] text-[var(--accent)]'
-                : 'bg-red-950/80 border-red-800 text-red-300'
-            }`}>{t.message}</div>
-          ))}
-        </div>
-      )}
+      <Toasts toasts={toasts} />
 
       {/* ── SERVER INFO ── */}
       <div className="glass-card p-4 space-y-4">
@@ -562,7 +544,7 @@ export default function AdminSection({ players }: Props) {
             </button>
           </div>
           {gamerules === null ? (
-            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Click Load to fetch gamerules</div>
+            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Click Load to fetch gamerules from the server</div>
           ) : (
             <div className="space-y-1.5">
               {(['keepInventory', 'mobGriefing', 'pvp', 'doDaylightCycle', 'doWeatherCycle', 'doFireTick', 'doMobSpawning', 'naturalRegeneration'] as const).map(rule => {
@@ -665,9 +647,9 @@ export default function AdminSection({ players }: Props) {
             </button>
           </div>
           {banList === null ? (
-            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Click Load to fetch ban list</div>
+            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Click Load to fetch the ban list</div>
           ) : banList.length === 0 ? (
-            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">No players are banned</div>
+            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">No players are banned — everyone behaved</div>
           ) : (
             <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
               {banList.map(p => (
@@ -684,24 +666,23 @@ export default function AdminSection({ players }: Props) {
 
       {/* ── WHITELIST ── */}
       <div className="glass-card p-4 space-y-4">
-        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">WHITELIST</div>
-        {wlPlayers === null ? (
+        <div className="flex items-center justify-between">
+          <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">WHITELIST</div>
           <button onClick={fetchWhitelist} disabled={wlLoading}
-            className="w-full py-2.5 rounded-lg font-mono text-xs tracking-widest border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40">
-            {wlLoading ? 'Loading…' : 'Load Whitelist'}
+            className="text-[9px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
+            {wlLoading ? '…' : wlPlayers === null ? 'Load' : 'Refresh'}
           </button>
+        </div>
+        {wlPlayers === null ? (
+          <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Click Load to fetch the whitelist</div>
         ) : (
           <div className="space-y-3">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <SectionLabel>CURRENT ENTRIES ({wlPlayers.length})</SectionLabel>
-                <button onClick={fetchWhitelist} disabled={wlLoading}
-                  className="text-[9px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
-                  {wlLoading ? '…' : 'Refresh'}
-                </button>
               </div>
               {wlPlayers.length === 0 ? (
-                <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Whitelist is empty</div>
+                <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Whitelist is empty — no one's on the list</div>
               ) : (
                 <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
                   {wlPlayers.map(p => (
@@ -751,7 +732,7 @@ export default function AdminSection({ players }: Props) {
         <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">RCON CONSOLE</div>
         <div ref={rconOutputRef} className="bg-black/40 rounded-lg border border-[var(--border)] p-3 h-48 overflow-y-auto font-mono text-xs space-y-2">
           {rconEntries.length === 0 ? (
-            <div className="text-[var(--text-dim)] opacity-30">No commands yet</div>
+            <div className="text-[var(--text-dim)] opacity-30">Awaiting orders, operator…</div>
           ) : rconEntries.map((en, i) => (
             <div key={i} className="space-y-0.5">
               <div className="flex items-center gap-2">
@@ -785,15 +766,16 @@ export default function AdminSection({ players }: Props) {
           </button>
         </div>
         {auditEntries === null ? (
-          <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Click Load to fetch audit log</div>
+          <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">Click Load to fetch the audit log</div>
         ) : auditEntries.length === 0 ? (
-          <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">No audit entries yet</div>
+          <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-40">No actions logged yet — squeaky clean</div>
         ) : (
           <div className="space-y-1 max-h-64 overflow-y-auto">
             {auditEntries.map((e: AuditEntry) => (
               <div key={e.id} className="flex items-start gap-2 px-2 py-1.5 rounded bg-[var(--panel)] border border-[var(--border)]">
                 <span className="text-[8px] font-mono text-[var(--text-dim)] shrink-0 mt-0.5 w-16">{new Date(e.ts * 1000).toLocaleTimeString()}</span>
                 <span className="text-[9px] font-mono text-[var(--accent)] shrink-0 w-20">{e.action}</span>
+                <span className="text-[9px] font-mono text-[var(--text-dim)] shrink-0 opacity-50 w-20 truncate" title={e.user_id}>{e.user_id}</span>
                 {e.target && <span className="text-[9px] font-mono text-[var(--text)] shrink-0">{e.target}</span>}
                 {e.detail && <span className="text-[9px] font-mono text-[var(--text-dim)] truncate opacity-60">{e.detail}</span>}
               </div>

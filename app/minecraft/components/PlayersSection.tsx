@@ -277,6 +277,7 @@ function PlayerPanel({
   const [deletingSlot, setDeletingSlot] = useState<number | null>(null)
   const [deleteError, setDeleteError]   = useState<string | null>(null)
   const [refreshing, setRefreshing]     = useState(false)
+  const [invOpen, setInvOpen]           = useState(true)
 
   const refresh = useCallback(() => {
     setStats(null); setEffects([]); setInventory([])
@@ -394,7 +395,7 @@ function PlayerPanel({
       <div className="p-5 space-y-5">
         {statsLoading ? (
           <div className="text-xs font-mono text-[var(--text-dim)] animate-pulse py-6 text-center">
-            Loading player data...
+            Loading player data…
           </div>
         ) : statsError ? (
           <div className="text-xs font-mono text-red-400 py-6 text-center">{statsError}</div>
@@ -463,11 +464,22 @@ function PlayerPanel({
           </>
         )}
 
-        {/* INVENTORY — loads independently */}
+        {/* INVENTORY — loads independently, collapsible */}
         <div className="space-y-1.5">
-          <SectionTitle>INVENTORY</SectionTitle>
-          {invLoading ? (
-            <div className="text-xs font-mono text-[var(--text-dim)] animate-pulse">Loading inventory...</div>
+          <button
+            onClick={() => setInvOpen(o => !o)}
+            className="flex items-center gap-2 w-full text-left group"
+          >
+            <SectionTitle>INVENTORY</SectionTitle>
+            <span className="text-[8px] font-mono text-[var(--text-dim)] opacity-40 group-hover:opacity-70 transition-opacity ml-1">
+              {invOpen ? '▲' : '▼'}
+            </span>
+            {!invLoading && inventory.length > 0 && (
+              <span className="text-[8px] font-mono text-[var(--text-dim)] opacity-40 ml-auto">{inventory.length} items</span>
+            )}
+          </button>
+          {invOpen && (invLoading ? (
+            <div className="text-xs font-mono text-[var(--text-dim)] animate-pulse">Loading inventory…</div>
           ) : (
             <div className="space-y-3">
               {deleteError && (
@@ -514,10 +526,10 @@ function PlayerPanel({
                 </div>
               </div>
               {inventory.length === 0 && (
-                <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-50">Inventory empty</div>
+                <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-50">Pockets empty — nothing to see here</div>
               )}
             </div>
-          )}
+          ))}
         </div>
       </div>
     </div>
@@ -530,6 +542,7 @@ export default function PlayersSection({ onPlayersChange }: Props) {
   const [data, setData]               = useState<PlayerListData>({ count: 0, players: '' })
   const [loading, setLoading]         = useState(true)
   const [selectedPlayer, setSelected] = useState<string | null>(null)
+  const [playerSearch, setPlayerSearch] = useState('')
 
   const fetchPlayers = useCallback(async () => {
     try {
@@ -586,8 +599,18 @@ export default function PlayersSection({ onPlayersChange }: Props) {
             <span>!</span><span>{data.error}</span>
           </div>
         ) : playerList.length > 0 ? (
+          <div className="space-y-3">
+            {playerList.length > 5 && (
+              <input
+                type="text"
+                placeholder="Filter players…"
+                value={playerSearch}
+                onChange={e => setPlayerSearch(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg font-mono text-xs bg-[var(--panel)] border border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)] transition-colors"
+              />
+            )}
           <div className="flex flex-wrap gap-2">
-            {playerList.map(p => {
+            {playerList.filter(p => p.toLowerCase().includes(playerSearch.toLowerCase())).map(p => {
               const selected  = selectedPlayer === p
               const joinedAt  = data.sessionStarts?.[p] ?? null
               return (
@@ -619,9 +642,13 @@ export default function PlayersSection({ onPlayersChange }: Props) {
               )
             })}
           </div>
+          {playerSearch && playerList.filter(p => p.toLowerCase().includes(playerSearch.toLowerCase())).length === 0 && (
+            <div className="text-[10px] font-mono text-[var(--text-dim)] opacity-50">No players match &quot;{playerSearch}&quot;</div>
+          )}
+          </div>
         ) : (
           !loading && (
-            <div className="text-xs font-mono text-[var(--text-dim)] opacity-50">No players online</div>
+            <div className="text-xs font-mono text-[var(--text-dim)] opacity-50">The server is empty — not even a skeleton</div>
           )
         )}
       </div>
