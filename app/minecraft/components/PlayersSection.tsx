@@ -4,6 +4,7 @@ import InvSlot, { slotLabel, buildInventoryLayout } from './InvSlot'
 import type { InvItem } from '../../api/minecraft/inventory/route'
 import ConfirmModal from './ConfirmModal'
 import type { ConfirmModalProps } from './ConfirmModal'
+import type { FeatureKey } from '@/lib/features'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -200,6 +201,7 @@ function PlayerPanel({
   joinedAtMs: number | null
   onClose: () => void
 }) {
+  type FeatureFlags = Record<FeatureKey, boolean>
   const [stats, setStats]         = useState<PlayerStats | null>(null)
   const [effects, setEffects]     = useState<string[]>([])
   const [inventory, setInventory] = useState<InvItem[]>([])
@@ -212,6 +214,29 @@ function PlayerPanel({
   const [invOpen, setInvOpen]           = useState(true)
   const [selectedSlot, setSelectedSlot] = useState<InvItem | null>(null)
   const [confirmModal, setConfirmModal] = useState<Omit<ConfirmModalProps, 'onCancel'> | null>(null)
+  const [features, setFeatures]         = useState<FeatureFlags | null>(null)
+  const [featuresLoaded, setFeaturesLoaded] = useState(false)
+
+  const canInventory = features ? features.enable_inventory : true
+
+  const loadFeatures = useCallback(async () => {
+    try {
+      const r = await fetch('/api/account/preferences')
+      const d = await r.json()
+      if (d.ok && d.features) setFeatures(d.features as FeatureFlags)
+    } catch {
+      setFeatures(null)
+    } finally {
+      setFeaturesLoaded(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadFeatures()
+    const onFeatures = () => { void loadFeatures() }
+    window.addEventListener('mcraftr:features-updated', onFeatures)
+    return () => window.removeEventListener('mcraftr:features-updated', onFeatures)
+  }, [loadFeatures])
 
   const refresh = useCallback(() => {
     setStats(null); setEffects([]); setInventory([])
@@ -228,16 +253,23 @@ function PlayerPanel({
     }).catch(() => setStatsError('Could not reach server'))
       .finally(() => { setStatsLoading(false); setRefreshing(false) })
 
+    if (!canInventory) {
+      setInventory([])
+      setInvLoading(false)
+      return
+    }
+
     fetch(`/api/minecraft/inventory?player=${encodeURIComponent(player)}`)
       .then(r => r.json())
       .then(d => { if (d.ok) setInventory(d.items ?? []) })
       .catch(() => {})
       .finally(() => setInvLoading(false))
-  }, [player])
+  }, [player, canInventory])
 
   useEffect(() => {
+    if (!featuresLoaded) return
     refresh()
-  }, [refresh])
+  }, [refresh, featuresLoaded])
 
   const deleteItem = async (item: InvItem) => {
     setDeletingSlot(item.slot)
@@ -435,6 +467,7 @@ function PlayerPanel({
         )}
 
         {/* INVENTORY — loads independently, collapsible */}
+        {canInventory && (
         <div className="space-y-1.5">
           <button
             onClick={() => setInvOpen(o => !o)}
@@ -522,6 +555,7 @@ function PlayerPanel({
             </div>
           ))}
         </div>
+        )}
       </div>
       {confirmModal && (
         <ConfirmModal
