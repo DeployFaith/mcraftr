@@ -1,6 +1,5 @@
 'use client'
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import BrandLockup from '@/app/components/BrandLockup'
@@ -41,18 +40,7 @@ export default function RegisterPage() {
         return
       }
 
-      // Auto sign-in after registration
-      const signInRes = await signIn('credentials', {
-        username: email,
-        password,
-        redirect: false,
-      })
-
-      if (signInRes?.ok) {
-        router.push('/connect')
-      } else {
-        router.push('/login')
-      }
+      router.push('/login')
     } catch {
       setError('Something went wrong. Please try again.')
       setLoading(false)

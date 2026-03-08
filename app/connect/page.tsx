@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState, Suspense } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import BrandLockup from '@/app/components/BrandLockup'
 
@@ -25,9 +25,10 @@ type SavedServer = {
 }
 
 function ConnectForm() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const wantsEdit = searchParams.get('edit') === '1'
-  const { update: updateSession } = useSession()
+  const { status, update: updateSession } = useSession()
 
   const [label, setLabel] = useState('')
   const [host, setHost] = useState('')
@@ -99,8 +100,19 @@ function ConnectForm() {
   }, [editingServerId, wantsEdit])
 
   useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.replace('/login')
+    }
+  }, [router, status])
+
+  useEffect(() => {
+    if (status !== 'authenticated') return
     void loadServers()
-  }, [loadServers])
+  }, [loadServers, status])
+
+  if (status !== 'authenticated') {
+    return null
+  }
 
   const startEditing = (server: SavedServer) => {
     setEditingServerId(server.id)
