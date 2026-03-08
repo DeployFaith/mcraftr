@@ -1,9 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getSessionUserId, rconForRequest, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
-import { VALID_ITEM_IDS } from '@/lib/items'
 import { Rcon } from 'rcon-client'
 import { getActiveServer } from '@/lib/users'
-import { getToken } from 'next-auth/jwt'
 import { checkRateLimit } from '@/lib/ratelimit'
 
 export const runtime = 'nodejs'
@@ -25,10 +23,19 @@ function itemLabel(id: string): string {
 const STANDARD_SLOTS = Array.from({ length: 36 }, (_, i) => i)  // 0–35
 const SPECIAL_SLOTS  = [100, 101, 102, 103, 150]
 
+function nbtSlotByte(slot: number): number | null {
+  if (slot >= 0 && slot <= 35) return slot
+  if (slot >= 100 && slot <= 103) return slot
+  if (slot === 150) return -106
+  return null
+}
+
 function slotQuery(slot: number, player: string, field: 'id' | 'count' | 'ench'): string {
-  const base = slot < 36
-    ? `data get entity ${player} Inventory[${slot}]`
-    : `data get entity ${player} Inventory[{Slot:${slot}b}]`
+  const slotByte = nbtSlotByte(slot)
+  if (slotByte == null) {
+    throw new Error(`Unsupported slot ${slot}`)
+  }
+  const base = `minecraft:data get entity ${player} Inventory[{Slot:${slotByte}b}]`
   if (field === 'id')    return `${base}.id`
   if (field === 'count') return `${base}.count`
   return `${base}.components."minecraft:enchantments".levels`
@@ -62,12 +69,7 @@ function parseEnchants(stdout: string): string | undefined {
 // ── RCON helper scoped to inventory (uses 'inventory' rate-limit bucket) ──────
 
 async function rconInventory(req: NextRequest, cmds: string[]): Promise<{ ok: boolean; results: string[]; error?: string }> {
-  const token = await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-    cookieName: 'authjs.session-token',
-  })
-  const userId = token?.id as string | undefined
+  const userId = await getSessionUserId(req)
   if (!userId) return { ok: false, results: [], error: 'Not authenticated' }
 
   const rl = await checkRateLimit(req, 'inventory', userId)
@@ -190,7 +192,7 @@ export async function POST(req: NextRequest) {
     if (!src || !dest) {
       return Response.json({ ok: false, error: 'Invalid slot number' }, { status: 400 })
     }
-    const cmd = `item entity @a[name=${player},limit=1] ${dest} from entity @a[name=${player},limit=1] ${src}`
+    const cmd = `minecraft:item replace entity @a[name=${player},limit=1] ${dest} from entity @a[name=${player},limit=1] ${src}`
     const result = await rconForRequest(req, cmd)
     if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
     return Response.json({ ok: true })
@@ -215,7 +217,7 @@ export async function DELETE(req: NextRequest) {
       return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
     }
     if (!item) {
-      const result = await rconForRequest(req, `clear ${player}`)
+      const result = await rconForRequest(req, `minecraft:clear ${player}`)
       if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
       return Response.json({ ok: true, message: `Cleared inventory for ${player}` })
     }
@@ -226,7 +228,7 @@ export async function DELETE(req: NextRequest) {
       }
       const result = await rconForRequest(
         req,
-        `item replace entity @a[name=${player},limit=1] ${commandSlot} with minecraft:air`
+        `minecraft:item replace entity @a[name=${player},limit=1] ${commandSlot} with minecraft:air`
       )
       if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
       return Response.json({ ok: true, message: `Cleared slot ${slot} for ${player}` })
@@ -243,7 +245,9 @@ export async function DELETE(req: NextRequest) {
       return Response.json({ ok: false, error: 'Count must be an integer between 1 and 64' }, { status: 400 })
     }
 
-    const cmd = clearCount !== undefined ? `clear ${player} ${bareItem} ${clearCount}` : `clear ${player} ${bareItem}`
+    const cmd = clearCount !== undefined
+      ? `minecraft:clear ${player} ${bareItem} ${clearCount}`
+      : `minecraft:clear ${player} ${bareItem}`
     const result = await rconForRequest(req, cmd)
 
     if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
