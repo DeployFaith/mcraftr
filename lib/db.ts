@@ -180,6 +180,13 @@ export function getDb(): Database.Database {
       host         TEXT NOT NULL,
       port         INTEGER NOT NULL DEFAULT 25575,
       password_enc TEXT NOT NULL,
+      sidecar_enabled INTEGER NOT NULL DEFAULT 0,
+      sidecar_url TEXT,
+      sidecar_token_enc TEXT,
+      sidecar_last_seen INTEGER,
+      sidecar_capabilities_json TEXT,
+      sidecar_structure_roots_json TEXT,
+      sidecar_entity_roots_json TEXT,
       created_at   INTEGER NOT NULL DEFAULT (unixepoch()),
       updated_at   INTEGER NOT NULL DEFAULT (unixepoch())
     );
@@ -216,11 +223,46 @@ export function getDb(): Database.Database {
       detail    TEXT,
       ts        INTEGER NOT NULL DEFAULT (unixepoch())
     );
+
+    CREATE TABLE IF NOT EXISTS world_structure_placements (
+      id            TEXT PRIMARY KEY,
+      user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      server_id     TEXT NOT NULL,
+      world         TEXT NOT NULL,
+      structure_id  TEXT NOT NULL,
+      structure_label TEXT NOT NULL,
+      source_kind   TEXT NOT NULL,
+      bridge_ref    TEXT NOT NULL,
+      origin_x      REAL NOT NULL,
+      origin_y      REAL NOT NULL,
+      origin_z      REAL NOT NULL,
+      rotation      INTEGER NOT NULL DEFAULT 0,
+      include_air   INTEGER NOT NULL DEFAULT 0,
+      min_x         INTEGER NOT NULL,
+      min_y         INTEGER NOT NULL,
+      min_z         INTEGER NOT NULL,
+      max_x         INTEGER NOT NULL,
+      max_y         INTEGER NOT NULL,
+      max_z         INTEGER NOT NULL,
+      metadata_json TEXT,
+      created_at    INTEGER NOT NULL DEFAULT (unixepoch()),
+      removed_at    INTEGER
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_world_structure_placements_server
+      ON world_structure_placements(server_id, world, removed_at, created_at DESC);
   `)
 
   ensureColumn(_db, 'users', 'active_server_id', 'active_server_id TEXT')
   ensureColumn(_db, 'users', 'avatar_type', 'avatar_type TEXT')
   ensureColumn(_db, 'users', 'avatar_value', 'avatar_value TEXT')
+  ensureColumn(_db, 'saved_servers', 'sidecar_enabled', 'sidecar_enabled INTEGER NOT NULL DEFAULT 0')
+  ensureColumn(_db, 'saved_servers', 'sidecar_url', 'sidecar_url TEXT')
+  ensureColumn(_db, 'saved_servers', 'sidecar_token_enc', 'sidecar_token_enc TEXT')
+  ensureColumn(_db, 'saved_servers', 'sidecar_last_seen', 'sidecar_last_seen INTEGER')
+  ensureColumn(_db, 'saved_servers', 'sidecar_capabilities_json', 'sidecar_capabilities_json TEXT')
+  ensureColumn(_db, 'saved_servers', 'sidecar_structure_roots_json', 'sidecar_structure_roots_json TEXT')
+  ensureColumn(_db, 'saved_servers', 'sidecar_entity_roots_json', 'sidecar_entity_roots_json TEXT')
   ensureColumn(_db, 'chat_log', 'server_id', 'server_id TEXT')
   ensureColumn(_db, 'audit_log', 'server_id', 'server_id TEXT')
   migratePlayerTables(_db)
