@@ -11,6 +11,32 @@ function parsePort(raw: unknown, fallback = 25575): number {
   return n
 }
 
+function parseFlag(raw: unknown): boolean {
+  if (typeof raw === 'boolean') return raw
+  if (typeof raw === 'number') return raw !== 0
+  if (typeof raw === 'string') {
+    const normalized = raw.trim().toLowerCase()
+    return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on'
+  }
+  return false
+}
+
+function parseStringArray(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return Array.from(new Set(raw
+      .filter((entry): entry is string => typeof entry === 'string')
+      .map(entry => entry.trim())
+      .filter(Boolean)))
+  }
+  if (typeof raw === 'string') {
+    return Array.from(new Set(raw
+      .split('\n')
+      .map(entry => entry.trim())
+      .filter(Boolean)))
+  }
+  return []
+}
+
 export async function GET(req: NextRequest) {
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Not authenticated' }, { status: 401 })
@@ -24,6 +50,14 @@ export async function GET(req: NextRequest) {
       label: server.label,
       host: server.host,
       port: server.port,
+      sidecar: {
+        enabled: server.sidecar.enabled,
+        url: server.sidecar.url,
+        lastSeen: server.sidecar.lastSeen,
+        capabilities: server.sidecar.capabilities,
+        structureRoots: server.sidecar.structureRoots,
+        entityPresetRoots: server.sidecar.entityPresetRoots,
+      },
       createdAt: server.createdAt,
       updatedAt: server.updatedAt,
     })),
@@ -34,7 +68,17 @@ export async function POST(req: NextRequest) {
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Not authenticated' }, { status: 401 })
   try {
-    const { label, host, port, password } = await req.json()
+    const {
+      label,
+      host,
+      port,
+      password,
+      sidecarEnabled,
+      sidecarUrl,
+      sidecarToken,
+      sidecarStructureRoots,
+      sidecarEntityPresetRoots,
+    } = await req.json()
     if (!host || typeof host !== 'string' || !password || typeof password !== 'string') {
       return Response.json({ ok: false, error: 'Host and password are required' }, { status: 400 })
     }
@@ -43,6 +87,13 @@ export async function POST(req: NextRequest) {
       host: host.trim(),
       port: parsePort(port),
       password,
+      sidecar: {
+        enabled: parseFlag(sidecarEnabled),
+        url: typeof sidecarUrl === 'string' ? sidecarUrl.trim() : null,
+        token: typeof sidecarToken === 'string' ? sidecarToken : null,
+        structureRoots: parseStringArray(sidecarStructureRoots),
+        entityPresetRoots: parseStringArray(sidecarEntityPresetRoots),
+      },
     })
     return Response.json({
       ok: true,
@@ -51,6 +102,14 @@ export async function POST(req: NextRequest) {
         label: server.label,
         host: server.host,
         port: server.port,
+        sidecar: {
+          enabled: server.sidecar.enabled,
+          url: server.sidecar.url,
+          lastSeen: server.sidecar.lastSeen,
+          capabilities: server.sidecar.capabilities,
+          structureRoots: server.sidecar.structureRoots,
+          entityPresetRoots: server.sidecar.entityPresetRoots,
+        },
         createdAt: server.createdAt,
         updatedAt: server.updatedAt,
       },

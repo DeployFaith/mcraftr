@@ -12,6 +12,14 @@ type SavedServer = {
   label: string | null
   host: string
   port: number
+  sidecar?: {
+    enabled: boolean
+    url: string | null
+    lastSeen: number | null
+    capabilities: string[]
+    structureRoots: string[]
+    entityPresetRoots: string[]
+  }
   createdAt: number
   updatedAt: number
 }
@@ -25,6 +33,11 @@ function ConnectForm() {
   const [host, setHost] = useState('')
   const [port, setPort] = useState('25575')
   const [password, setPassword] = useState('')
+  const [sidecarEnabled, setSidecarEnabled] = useState(false)
+  const [sidecarUrl, setSidecarUrl] = useState('')
+  const [sidecarToken, setSidecarToken] = useState('')
+  const [sidecarStructureRoots, setSidecarStructureRoots] = useState('')
+  const [sidecarEntityPresetRoots, setSidecarEntityPresetRoots] = useState('')
   const [showHelp, setShowHelp] = useState(false)
   const [testState, setTestState] = useState<TestState>('idle')
   const [testMsg, setTestMsg] = useState('')
@@ -42,6 +55,11 @@ function ConnectForm() {
     setHost('')
     setPort('25575')
     setPassword('')
+    setSidecarEnabled(false)
+    setSidecarUrl('')
+    setSidecarToken('')
+    setSidecarStructureRoots('')
+    setSidecarEntityPresetRoots('')
     setTestState('idle')
     setTestMsg('')
     setError('')
@@ -66,6 +84,11 @@ function ConnectForm() {
           setHost(active.host)
           setPort(String(active.port ?? 25575))
           setPassword('')
+          setSidecarEnabled(!!active.sidecar?.enabled)
+          setSidecarUrl(active.sidecar?.url ?? '')
+          setSidecarToken('')
+          setSidecarStructureRoots((active.sidecar?.structureRoots ?? []).join('\n'))
+          setSidecarEntityPresetRoots((active.sidecar?.entityPresetRoots ?? []).join('\n'))
         }
       }
     } catch (e) {
@@ -85,6 +108,11 @@ function ConnectForm() {
     setHost(server.host)
     setPort(String(server.port ?? 25575))
     setPassword('')
+    setSidecarEnabled(!!server.sidecar?.enabled)
+    setSidecarUrl(server.sidecar?.url ?? '')
+    setSidecarToken('')
+    setSidecarStructureRoots((server.sidecar?.structureRoots ?? []).join('\n'))
+    setSidecarEntityPresetRoots((server.sidecar?.entityPresetRoots ?? []).join('\n'))
     setTestState('idle')
     setTestMsg('')
     setError('')
@@ -133,6 +161,11 @@ function ConnectForm() {
         host,
         port: parseInt(port) || 25575,
         password,
+        sidecarEnabled,
+        sidecarUrl: sidecarUrl.trim() || null,
+        sidecarToken: sidecarToken.trim() || null,
+        sidecarStructureRoots,
+        sidecarEntityPresetRoots,
       }
       const res = await fetch(editingServerId ? `/api/servers/${editingServerId}` : '/api/servers', {
         method: editingServerId ? 'PUT' : 'POST',
@@ -302,6 +335,83 @@ function ConnectForm() {
               )}
             </div>
 
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-mono tracking-widest" style={{ color: 'var(--text-dim)' }}>PLUGIN SIDECAR</div>
+                  <div className="text-[12px] font-mono mt-1" style={{ color: 'var(--text-dim)' }}>
+                    Optional private helper for plugin inventory, map links, schematics, and world folder discovery.
+                  </div>
+                </div>
+                <label className="inline-flex items-center gap-2 text-[12px] font-mono" style={{ color: 'var(--text)' }}>
+                  <input type="checkbox" checked={sidecarEnabled} onChange={e => setSidecarEnabled(e.target.checked)} />
+                  ENABLED
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                  SIDECAR URL
+                </label>
+                <input
+                  type="text"
+                  value={sidecarUrl}
+                  onChange={e => setSidecarUrl(e.target.value)}
+                  placeholder="https://sidecar.internal:9419/"
+                  className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                  style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                  SIDECAR TOKEN <span style={{ color: 'var(--text-dim)', fontWeight: 'normal' }}>(optional on edit)</span>
+                </label>
+                <input
+                  type="password"
+                  value={sidecarToken}
+                  onChange={e => setSidecarToken(e.target.value)}
+                  placeholder={editingServerId ? 'Leave blank to keep current token' : 'Bearer token'}
+                  className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                  style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                  STRUCTURE DIRECTORIES <span style={{ color: 'var(--text-dim)', fontWeight: 'normal' }}>(one relative path per line)</span>
+                </label>
+                <textarea
+                  value={sidecarStructureRoots}
+                  onChange={e => setSidecarStructureRoots(e.target.value)}
+                  rows={3}
+                  placeholder={'plugins/WorldEdit/schematics/custom\nmcraftr/structures'}
+                  className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                  style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
+                />
+                <div className="mt-1 text-[10px] font-mono" style={{ color: 'var(--text-dim)' }}>
+                  Paths are relative to the server data folder at <code>/data</code>.
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                  ENTITY PRESET DIRECTORIES <span style={{ color: 'var(--text-dim)', fontWeight: 'normal' }}>(one relative path per line)</span>
+                </label>
+                <textarea
+                  value={sidecarEntityPresetRoots}
+                  onChange={e => setSidecarEntityPresetRoots(e.target.value)}
+                  rows={3}
+                  placeholder={'mcraftr/entity-presets\nplugins/FancyNpcs/presets'}
+                  className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                  style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
+                />
+                <div className="mt-1 text-[10px] font-mono" style={{ color: 'var(--text-dim)' }}>
+                  These folders are scanned for custom JSON entity presets.
+                </div>
+              </div>
+            </div>
+
             {testState !== 'idle' && (
               <div
                 className="text-xs font-mono px-3 py-2 rounded-lg"
@@ -386,6 +496,18 @@ function ConnectForm() {
                         <div className="min-w-0">
                           <div className="text-[13px] font-mono text-[var(--text)] truncate">{labelText}</div>
                           <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1 break-all">{server.host}:{server.port}</div>
+                          {server.sidecar?.enabled && (
+                            <div className="text-[10px] font-mono text-[var(--text-dim)] mt-1 break-all">
+                              sidecar · {server.sidecar.url || 'configured'}{server.sidecar.lastSeen ? ` · seen ${new Date(server.sidecar.lastSeen * 1000).toLocaleString()}` : ''}
+                            </div>
+                          )}
+                          {((server.sidecar?.structureRoots?.length ?? 0) > 0 || (server.sidecar?.entityPresetRoots?.length ?? 0) > 0) && (
+                            <div className="text-[10px] font-mono text-[var(--text-dim)] mt-1">
+                              {(server.sidecar?.structureRoots?.length ?? 0) > 0 ? `${server.sidecar?.structureRoots.length} structure dir(s)` : '0 structure dirs'}
+                              {' · '}
+                              {(server.sidecar?.entityPresetRoots?.length ?? 0) > 0 ? `${server.sidecar?.entityPresetRoots.length} entity dir(s)` : '0 entity dirs'}
+                            </div>
+                          )}
                         </div>
                         <span
                           className="shrink-0 rounded border px-2 py-1 text-[10px] font-mono tracking-widest"

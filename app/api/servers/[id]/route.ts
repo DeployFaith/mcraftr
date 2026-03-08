@@ -11,6 +11,32 @@ function parsePort(raw: unknown, fallback = 25575): number {
   return n
 }
 
+function parseFlag(raw: unknown): boolean {
+  if (typeof raw === 'boolean') return raw
+  if (typeof raw === 'number') return raw !== 0
+  if (typeof raw === 'string') {
+    const normalized = raw.trim().toLowerCase()
+    return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on'
+  }
+  return false
+}
+
+function parseStringArray(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return Array.from(new Set(raw
+      .filter((entry): entry is string => typeof entry === 'string')
+      .map(entry => entry.trim())
+      .filter(Boolean)))
+  }
+  if (typeof raw === 'string') {
+    return Array.from(new Set(raw
+      .split('\n')
+      .map(entry => entry.trim())
+      .filter(Boolean)))
+  }
+  return []
+}
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -19,7 +45,17 @@ export async function PUT(
   if (!userId) return Response.json({ ok: false, error: 'Not authenticated' }, { status: 401 })
   try {
     const { id } = await params
-    const { label, host, port, password } = await req.json()
+    const {
+      label,
+      host,
+      port,
+      password,
+      sidecarEnabled,
+      sidecarUrl,
+      sidecarToken,
+      sidecarStructureRoots,
+      sidecarEntityPresetRoots,
+    } = await req.json()
     if (!host || typeof host !== 'string' || !password || typeof password !== 'string') {
       return Response.json({ ok: false, error: 'Host and password are required' }, { status: 400 })
     }
@@ -29,6 +65,13 @@ export async function PUT(
       host: host.trim(),
       port: parsePort(port),
       password,
+      sidecar: {
+        enabled: parseFlag(sidecarEnabled),
+        url: typeof sidecarUrl === 'string' ? sidecarUrl.trim() : null,
+        token: typeof sidecarToken === 'string' ? sidecarToken : null,
+        structureRoots: parseStringArray(sidecarStructureRoots),
+        entityPresetRoots: parseStringArray(sidecarEntityPresetRoots),
+      },
     })
     const server = user.servers.find(entry => entry.id === id)
     return Response.json({ ok: true, server })

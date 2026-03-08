@@ -14,10 +14,21 @@ export type ServerConfig = {
   password: string  // decrypted in-memory; always encrypted at rest
 }
 
+export type SidecarConfig = {
+  enabled: boolean
+  url: string | null
+  token: string | null
+  lastSeen: number | null
+  capabilities: string[]
+  structureRoots: string[]
+  entityPresetRoots: string[]
+}
+
 export type SavedServer = ServerConfig & {
   id: string
   userId: string
   label: string | null
+  sidecar: SidecarConfig
   createdAt: number
   updatedAt: number
 }
@@ -68,6 +79,8 @@ export function encryptPassword(plain: string): string {
   return `${iv.toString('hex')}:${tag.toString('hex')}:${enc.toString('hex')}`
 }
 
+export const encryptSecret = encryptPassword
+
 // Legacy key derivation (SHA-256, no KDF) — used only during re-encryption migration.
 function getLegacyEncKey(): Buffer {
   const secret = process.env.NEXTAUTH_SECRET
@@ -106,6 +119,8 @@ export function decryptPassword(stored: string): string {
   if (legacy !== null) return legacy
   throw new Error('Failed to decrypt RCON password — key may have changed without re-encryption')
 }
+
+export const decryptSecret = decryptPassword
 
 // ── Database setup ────────────────────────────────────────────────────────────
 
@@ -315,8 +330,39 @@ type SavedServerRow = {
   host: string
   port: number
   password_enc: string
+  sidecar_enabled?: number
+  sidecar_url?: string | null
+  sidecar_token_enc?: string | null
+  sidecar_last_seen?: number | null
+  sidecar_capabilities_json?: string | null
+  sidecar_structure_roots_json?: string | null
+  sidecar_entity_roots_json?: string | null
   created_at: number
   updated_at: number
+}
+
+function parseSidecarCapabilities(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function parseStringArray(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return Array.from(new Set(parsed
+      .filter((entry): entry is string => typeof entry === 'string')
+      .map(entry => entry.trim())
+      .filter(Boolean)))
+  } catch {
+    return []
+  }
 }
 
 function rowToSavedServer(row: SavedServerRow): SavedServer {
@@ -327,6 +373,15 @@ function rowToSavedServer(row: SavedServerRow): SavedServer {
     host: row.host,
     port: row.port,
     password: decryptPassword(row.password_enc),
+    sidecar: {
+      enabled: !!row.sidecar_enabled,
+      url: row.sidecar_url ?? null,
+      token: row.sidecar_token_enc ? decryptSecret(row.sidecar_token_enc) : null,
+      lastSeen: row.sidecar_last_seen ?? null,
+      capabilities: parseSidecarCapabilities(row.sidecar_capabilities_json),
+      structureRoots: parseStringArray(row.sidecar_structure_roots_json),
+      entityPresetRoots: parseStringArray(row.sidecar_entity_roots_json),
+    },
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -391,7 +446,10 @@ export function getActiveServer(id: string): SavedServer | null {
 
 export function createUserServer(
   userId: string,
-  server: ServerConfig & { label?: string | null },
+  server: ServerConfig & {
+    label?: string | null
+    sidecar?: Partial<Pick<SidecarConfig, 'enabled' | 'url' | 'token' | 'lastSeen' | 'capabilities' | 'structureRoots' | 'entityPresetRoots'>>
+  },
 ): SavedServer {
   const db = initDb()
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow | undefined
@@ -399,10 +457,36 @@ export function createUserServer(
 
   const serverId = crypto.randomUUID()
   const passwordEnc = encryptPassword(server.password)
+  const sidecarEnabled = server.sidecar?.enabled ? 1 : 0
+  const sidecarUrl = server.sidecar?.url?.trim() || null
+  const sidecarTokenEnc = server.sidecar?.token?.trim() ? encryptSecret(server.sidecar.token.trim()) : null
+  const sidecarLastSeen = server.sidecar?.lastSeen ?? null
+  const sidecarCapabilitiesJson = server.sidecar?.capabilities?.length ? JSON.stringify(server.sidecar.capabilities) : null
+  const sidecarStructureRootsJson = server.sidecar?.structureRoots?.length ? JSON.stringify(Array.from(new Set(server.sidecar.structureRoots.map(entry => entry.trim()).filter(Boolean)))) : null
+  const sidecarEntityRootsJson = server.sidecar?.entityPresetRoots?.length ? JSON.stringify(Array.from(new Set(server.sidecar.entityPresetRoots.map(entry => entry.trim()).filter(Boolean)))) : null
   db.prepare(`
-    INSERT INTO saved_servers (id, user_id, label, host, port, password_enc, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, unixepoch(), unixepoch())
-  `).run(serverId, userId, server.label?.trim() || null, server.host, server.port, passwordEnc)
+    INSERT INTO saved_servers (
+      id, user_id, label, host, port, password_enc,
+      sidecar_enabled, sidecar_url, sidecar_token_enc, sidecar_last_seen, sidecar_capabilities_json,
+      sidecar_structure_roots_json, sidecar_entity_roots_json,
+      created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), unixepoch())
+  `).run(
+    serverId,
+    userId,
+    server.label?.trim() || null,
+    server.host,
+    server.port,
+    passwordEnc,
+    sidecarEnabled,
+    sidecarUrl,
+    sidecarTokenEnc,
+    sidecarLastSeen,
+    sidecarCapabilitiesJson,
+    sidecarStructureRootsJson,
+    sidecarEntityRootsJson,
+  )
 
   if (!user.active_server_id) {
     db.prepare('UPDATE users SET active_server_id = ? WHERE id = ?').run(serverId, userId)
@@ -414,7 +498,11 @@ export function createUserServer(
 
 export function updateUserServer(
   userId: string,
-  server: ServerConfig & { label?: string | null; serverId?: string | null },
+  server: ServerConfig & {
+    label?: string | null
+    serverId?: string | null
+    sidecar?: Partial<Pick<SidecarConfig, 'enabled' | 'url' | 'token' | 'lastSeen' | 'capabilities' | 'structureRoots' | 'entityPresetRoots'>>
+  },
 ): User {
   const db = initDb()
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow | undefined
@@ -422,11 +510,48 @@ export function updateUserServer(
 
   const passwordEnc = encryptPassword(server.password)
   if (server.serverId) {
+    const existing = db.prepare('SELECT * FROM saved_servers WHERE id = ? AND user_id = ?').get(server.serverId, userId) as SavedServerRow | undefined
+    if (!existing) throw new Error('Server not found')
+    const nextSidecarTokenEnc = server.sidecar?.token?.trim()
+      ? encryptSecret(server.sidecar.token.trim())
+      : existing.sidecar_token_enc ?? null
+    const nextStructureRootsJson = server.sidecar?.structureRoots
+      ? JSON.stringify(Array.from(new Set(server.sidecar.structureRoots.map(entry => entry.trim()).filter(Boolean))))
+      : existing.sidecar_structure_roots_json ?? null
+    const nextEntityRootsJson = server.sidecar?.entityPresetRoots
+      ? JSON.stringify(Array.from(new Set(server.sidecar.entityPresetRoots.map(entry => entry.trim()).filter(Boolean))))
+      : existing.sidecar_entity_roots_json ?? null
     const result = db.prepare(`
       UPDATE saved_servers
-      SET label = ?, host = ?, port = ?, password_enc = ?, updated_at = unixepoch()
+      SET
+        label = ?,
+        host = ?,
+        port = ?,
+        password_enc = ?,
+        sidecar_enabled = ?,
+        sidecar_url = ?,
+        sidecar_token_enc = ?,
+        sidecar_last_seen = ?,
+        sidecar_capabilities_json = ?,
+        sidecar_structure_roots_json = ?,
+        sidecar_entity_roots_json = ?,
+        updated_at = unixepoch()
       WHERE id = ? AND user_id = ?
-    `).run(server.label?.trim() || null, server.host, server.port, passwordEnc, server.serverId, userId)
+    `).run(
+      server.label?.trim() || null,
+      server.host,
+      server.port,
+      passwordEnc,
+      server.sidecar?.enabled ? 1 : 0,
+      server.sidecar?.url?.trim() || null,
+      nextSidecarTokenEnc,
+      server.sidecar?.lastSeen ?? existing.sidecar_last_seen ?? null,
+      server.sidecar?.capabilities?.length ? JSON.stringify(server.sidecar.capabilities) : existing.sidecar_capabilities_json ?? null,
+      nextStructureRootsJson,
+      nextEntityRootsJson,
+      server.serverId,
+      userId,
+    )
     if (result.changes === 0) throw new Error('Server not found')
   } else {
     const created = createUserServer(userId, server)
@@ -476,6 +601,24 @@ export function clearUserServer(id: string): User {
   const active = getUserById(id)?.activeServerId
   if (!active) return getUserById(id)!
   return deleteUserServer(id, active)
+}
+
+export function updateServerSidecarHealth(
+  userId: string,
+  serverId: string,
+  next: { lastSeen?: number | null; capabilities?: string[] | null },
+): void {
+  const db = initDb()
+  db.prepare(`
+    UPDATE saved_servers
+    SET sidecar_last_seen = ?, sidecar_capabilities_json = ?, updated_at = updated_at
+    WHERE id = ? AND user_id = ?
+  `).run(
+    next.lastSeen ?? null,
+    next.capabilities ? JSON.stringify(next.capabilities) : null,
+    serverId,
+    userId,
+  )
 }
 
 export function createUser(email: string, password: string): User {
