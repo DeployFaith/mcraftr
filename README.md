@@ -1,126 +1,159 @@
-<!-- SCREENSHOT: logo -->
-
-<div align="center">
-
 # Mcraftr
 
-**A beautiful, modern Minecraft server admin panel**
+Mcraftr is a self-hosted Minecraft admin panel built for fast, opinionated server management over RCON. It gives you a polished web UI for moderation, player tools, server actions, chat, schedules, theming, and account management without turning into a full host-control panel.
 
-**[Live Demo](https://mcraftr.deployfaith.xyz)** &nbsp;•&nbsp; [Features](#features) • [Tech Stack](#tech-stack) • [Screenshots](#screenshots) • [Self-Hosting](#self-hosting) • [Environment Variables](#environment-variables) • [Getting Started](#getting-started) • [API](#api)
+It is designed around a simple model:
 
-</div>
+- Mcraftr talks to Minecraft through RCON.
+- Accounts live in Mcraftr.
+- One Mcraftr account can manage multiple saved servers.
+- One browser can keep multiple Mcraftr accounts available for quick switching.
 
----
+## What Mcraftr Does Well
 
-Mcraftr is a self-hosted web panel for managing Minecraft servers via RCON. It provides a sleek, tab-based interface for player management, server actions, real-time chat monitoring, and administrative controls.
+### Dashboard
 
-> **Note:** Mcraftr connects to your Minecraft server's RCON port. The server must have RCON enabled and accessible from the Mcraftr host.
+- Default landing tab with current server status
+- Online player count and quick recent activity
+- TPS, version, weather, and time snapshot
+- Fast deep-links into the rest of the app
 
----
+### Players
 
-## Features
+- Live player list
+- Session, vitals, location, and effects panels
+- Inventory inspection and item deletion
+- Admin player directory and recent player context
 
-### Players Tab
-- **Real-time player list** — See who's online with ping, dimension, and session duration
-- **Player details panel** — Health, hunger, XP level, coordinates, gamemode
-- **Inventory browser** — View and manage player inventory; clear individual items
-- **Effect tracker** — See active potion effects and status indicators
+### Actions
 
-### Actions Tab
-- **Weather control** — Toggle day/night, clear sky, or storm
-- **Gamemode switching** — Creative, Survival, Adventure
-- **Ability toggles** — Fly, Heal, Night Vision, Speed, Invisibility, Super Jump, Strength, Haste
-- **Item giver** — Browse full Minecraft item catalog (blocks, items, tools, armor)
-- **Kit system** — Pre-built kits: Starter, Builder, Explorer, Combat, Admin
+- Day/night and weather controls
+- Gamemode, abilities, and teleport tools
+- Item catalog with quantity and stack-aware give controls
+- Built-in kit assignment
+- Custom kit builder with saved reusable kits
 
-### Admin Tab (Admin-only)
-- **Server status dashboard** — Online players, TPS, version, weather, time of day
-- **RCON console** — Execute arbitrary commands with history
-- **World management** — Set time, weather, difficulty, gamerules, save/stop
-- **User management** — Create users, change roles (admin/user), delete users
-- **Audit log** — Full history of admin actions (bans, kicks, item giveaways, etc.)
+### Chat
 
-### Chat Tab
-- **Broadcast history** — View all messages sent via the panel
-- **Private message log** — Track in-game whispers
+- Chat history panel
+- Broadcast as `[Admin]`
+- Direct messages as `[Admin -> You]`
+- Chat send flow from the panel itself
 
-### Settings Tab
-- **Theme toggle** — Dark/Light mode
-- **Accent colors** — 8 color options (cyan, blue, purple, pink, orange, yellow, red, white)
-- **Account settings** — Change password, change email, delete account
-- **Server info** — View configured RCON host/port, disconnect option
+### Admin
 
----
+- Moderation tools: kick, ban, pardon, whitelist, op
+- Raw RCON console
+- Rules, difficulty, and curated gamerules
+- Scheduled recurring actions
+- Audit history
+- User management and feature-policy controls
 
-## Tech Stack
+### Settings / Personalization
 
-| Layer | Technology |
-|-------|------------|
-| Framework | Next.js 15 (App Router) |
-| Language | TypeScript |
-| Auth | NextAuth.js (credentials provider) |
-| Database | SQLite (better-sqlite3) |
-| Rate Limiting | Redis |
-| Minecraft Protocol | RCON (rcon-client) |
-| Styling | Tailwind CSS |
-| Icons | Lucide React |
+- Dark/light mode
+- Accent presets plus custom accent picker
+- Theme pack import/export
+- Font family and font size controls
+- Built-in and custom sound effects
+- Built-in and custom background music
+- Built-in or uploaded profile pictures
 
----
+## Current Product Shape
 
-## Screenshots
+Mcraftr is intentionally not a generic hosting controller.
 
-<!-- SCREENSHOT: login page -->
-<!-- SCREENSHOT: players tab -->
-<!-- SCREENSHOT: actions tab -->
-<!-- SCREENSHOT: admin tab -->
-<!-- SCREENSHOT: settings tab - accent colors -->
+It does **not** currently try to be:
 
----
+- a file manager
+- a plugin installer
+- a host/Docker manager
+- a generic backup orchestrator
+- a world-creation/provisioning suite
 
-## Self-Hosting
+It is best when used as a focused Minecraft operations panel sitting in front of one or more existing servers.
 
-### Prerequisites
+## Highlights
 
-- Node.js 22+ (for local development)
-- Docker & Docker Compose (for production deployment)
-- Redis (included via docker-compose)
-- A Minecraft server with RCON enabled
+- Built with `Next.js 15`, `React 19`, `TypeScript`, `SQLite`, `Redis`, and `rcon-client`
+- Multiple saved Minecraft servers per Mcraftr account
+- Multiple saved Mcraftr accounts per browser/device
+- Per-user feature flags, including subfeatures like `Custom Kit Builder`
+- Local theme packs and audio customization without touching server code
+- Docker-first deployment with Redis and persistent SQLite data
 
-### Quick Start with Docker Compose
+## Screens at a Glance
+
+- `Dashboard`
+- `Players`
+- `Actions`
+- `Admin`
+- `Chat`
+- `Settings`
+
+Most major sections are collapsible so long pages stay manageable.
+
+## Multi-Account and Multi-Server Model
+
+### Accounts
+
+Mcraftr accounts are application users, not Minecraft players.
+
+- Each account signs into Mcraftr with email + password.
+- The browser can keep several Mcraftr accounts saved for quick switching.
+- Saved device accounts are stored in cookies with an encrypted secure store.
+- You can forget a saved account from the profile menu at any time.
+
+### Servers
+
+Each Mcraftr account can save multiple Minecraft servers.
+
+- One account can manage multiple RCON targets.
+- One active server is selected at a time.
+- The header profile menu lets you switch active server quickly.
+- Operational data such as audit history, player sessions, chat logs, and schedules are scoped to the active saved server.
+
+## Deployment
+
+### Requirements
+
+- Docker
+- Docker Compose
+- A reachable Minecraft RCON endpoint
+- Redis
+
+### Included Stack
+
+The repo ships with:
+
+- `mcraftr` app container
+- `mcraftr-redis` Redis container
+- SQLite data persisted under `./data`
+
+### Docker Compose
+
+`docker-compose.yml` publishes Mcraftr on `127.0.0.1:3054` and expects an external Docker network named `code_default`.
+
+Bring it up with:
 
 ```bash
-# 1. Clone or download Mcraftr
-cd mcraftr
-
-# 2. Configure environment variables
-cp .env.example .env
-# Edit .env with your settings (see Environment Variables below)
-
-# 3. Create the external minecraft network (if not exists)
-docker network create minecraft 2>/dev/null || true
-
-# 4. Start the stack
-docker-compose up -d
-
-# 5. Open browser
-open http://localhost:3054
+docker compose up -d --build
 ```
 
-### Manual Setup (Development)
+### Development
 
 ```bash
-# Install dependencies
 npm install
-
-# Run development server
 npm run dev
 ```
 
-The app runs on `http://localhost:3000` in development mode.
+Local dev runs through Next.js.
 
-### Enable RCON on Your Minecraft Server
+## Minecraft Server Requirements
 
-Add or edit these in your `server.properties`:
+Mcraftr requires RCON.
+
+In `server.properties`:
 
 ```properties
 enable-rcon=true
@@ -128,155 +161,330 @@ rcon.port=25575
 rcon.password=your-secure-password
 ```
 
-Ensure the port is accessible from the Mcraftr container/host.
-
----
+Mcraftr only manages what the Minecraft server and installed plugins actually support. If you want specialized behavior, implement it server-side and expose it via command/API paths Mcraftr can call.
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| **`NEXTAUTH_SECRET`** | **Required** | Secret key for NextAuth JWT signing (use `openssl rand -base64 32`) |
-| **`NEXTAUTH_URL`** | **Required** | Public URL (e.g., `https://mcraftr.example.com`) |
-| **`MCRAFTR_ADMIN_USER`** | **Required** | First admin email (created on first run) |
-| **`MCRAFTR_ADMIN_PASS`** | **Required** | First admin password |
-| **`MCRAFTR_ENC_KEY`** | **Required** | AES-256 encryption key for RCON passwords at rest (`openssl rand -base64 32`) |
-| **`REDIS_PASSWORD`** | **Required** | Redis authentication password |
-| **`REDIS_URL`** | **Required** | Redis connection string (`redis://:PASSWORD@host:port`) |
-| `DATA_DIR` | Optional | SQLite database directory (default: `/app/data`) |
-| `ALLOW_REGISTRATION` | Optional | Set to `true` to allow public user registration (default: `false`) |
+These are the important runtime variables used by the app today.
 
-### Example `.env`
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `NEXTAUTH_SECRET` | Yes | Session/JWT signing and device-account encryption key derivation |
+| `MCRAFTR_ADMIN_USER` | Yes | Bootstrap admin email |
+| `MCRAFTR_ADMIN_PASS` | Yes | Bootstrap admin password |
+| `MCRAFTR_ENC_KEY` | Yes | Encrypt stored RCON passwords at rest |
+| `REDIS_URL` | Yes | Redis connection string |
+| `DATA_DIR` | No | Directory for SQLite data, defaults to app-local storage |
+| `ALLOW_REGISTRATION` | No | Set `true` to allow public registration |
+
+Example:
 
 ```bash
-# Auth
-NEXTAUTH_SECRET=your-secret-here
-NEXTAUTH_URL=https://mcraftr.example.com
-
-# Admin
+NEXTAUTH_SECRET=replace-me
 MCRAFTR_ADMIN_USER=admin@example.com
-MCRAFTR_ADMIN_PASS=secure-password-here
-
-# Encryption
-MCRAFTR_ENC_KEY=your-32-byte-key
-
-# Redis
-REDIS_PASSWORD=redis-password
-REDIS_URL=redis://:redis-password@mcraftr-redis:6379
-
+MCRAFTR_ADMIN_PASS=replace-me
+MCRAFTR_ENC_KEY=replace-me
+REDIS_URL=redis://:replace-me@mcraftr-redis:6379
 DATA_DIR=/app/data
 ALLOW_REGISTRATION=false
 ```
 
----
+## Build and Runtime Notes
 
-## Getting Started
+- `npm run build` performs a production Next.js build.
+- The Docker image uses a multi-stage build and runs as a non-root user.
+- `better-sqlite3` is compiled in Alpine-compatible build stages for the final image.
+- The schedule runner is in-process inside the Mcraftr app.
 
-### First-Run (Admin Setup)
+## Features by Area
 
-1. Start Mcraftr with `docker-compose up -d`
-2. Visit the login page
-3. The first user is created automatically from `MCRAFTR_ADMIN_USER` / `MCRAFTR_ADMIN_PASS`
-4. After login, you'll be redirected to `/connect` to configure your RCON server
+### Dashboard
 
-### Connecting a Server
+- Fast aggregate API for the active server
+- Current server state without switching tabs
+- Recent operational context
 
-1. Enter your Minecraft server hostname (e.g., `mc.example.com`)
-2. Enter the RCON port (default: `25575`)
-3. Enter the RCON password
-4. Click **Test & Save**
+### Players
 
-### Creating Additional Users
+- Online player list
+- Session stats
+- Health / hunger / XP
+- Coordinates and spawn context
+- Effect viewer
 
-- **If `ALLOW_REGISTRATION=true`:** Users can self-register at `/register`
-- **If disabled (default):** Admins create users via the Admin tab → User Management
+### Actions
 
-### Role System
+- World controls
+- Player controls
+- Teleport
+- Item catalog
+- Built-in kit assignment
+- Custom kit builder
+- Inventory tools
 
-| Role | Permissions |
-|------|-------------|
-| `user` | Players, Actions, Chat, Settings tabs |
-| `admin` | All tabs + Admin tab (server controls, user management, audit logs) |
+### Chat
 
----
-
-## API
-
-Mcraftr exposes REST endpoints under `/api/`. All endpoints require authentication unless noted.
-
-### Authentication
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/auth/[...nextauth]` | * | NextAuth handlers (login/logout) |
-| `/api/auth/register` | POST | Register new user (if enabled) |
-
-### Account
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/account/password` | PUT | Change password |
-| `/api/account/email` | PUT | Change email |
-| `/api/account/delete` | DELETE | Delete account |
-
-### Server
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/server` | GET | Get stored server config |
-| `/api/server` | POST | Save server config |
-| `/api/server` | DELETE | Disconnect server |
-
-### Minecraft Commands
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/minecraft/players` | GET | List online players |
-| `/api/minecraft/player` | GET | Get player stats |
-| `/api/minecraft/cmd` | POST | Execute named command |
-| `/api/minecraft/rcon` | POST | Execute raw RCON command |
-| `/api/minecraft/broadcast` | POST | Send broadcast |
-| `/api/minecraft/msg` | POST | Send private message |
-| `/api/minecraft/kit` | POST | Give kit to player |
-| `/api/minecraft/give` | POST | Give item to player |
-| `/api/minecraft/inventory` | GET/DELETE | View/clear player inventory |
-| `/api/minecraft/effects` | GET | Get player effects |
-| `/api/minecraft/tp` | POST | Teleport player |
-| `/api/minecraft/tploc` | POST | Teleport to coordinates |
-| `/api/minecraft/ban` | POST | Ban player |
-| `/api/minecraft/banlist` | GET | List bans |
-| `/api/minecraft/pardon` | POST | Unban player |
-| `/api/minecraft/kick` | POST | Kick player |
-| `/api/minecraft/op` | POST | Grant operator |
-| `/api/minecraft/pardon` | POST | Remove operator |
-| `/api/minecraft/whitelist` | POST/DELETE | Add/remove whitelist |
-| `/api/minecraft/difficulty` | GET/SET | Get/set difficulty |
-| `/api/minecraft/gamerule` | GET/SET | Get/set gamerules |
-| `/api/minecraft/server-info` | GET | Server status (TPS, version, weather, time) |
-| `/api/minecraft/server-ctrl` | POST | Save/stop server |
-| `/api/minecraft/chat-log` | GET | Chat message history |
+- Read chat history
+- Broadcast
+- DM player from the panel
+- Delete saved outbound messages from history
 
 ### Admin
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/admin/users` | GET | List all users |
-| `/api/admin/users/[id]` | GET/PUT/DELETE | Manage user (admin only) |
-| `/api/admin/players` | GET | View all known players |
-| `/api/admin/audit` | GET | Get audit log |
+- Server info
+- Rules and difficulty
+- Server controls
+- Moderation
+- Whitelist
+- Operator management
+- Schedules
+- RCON console
+- Audit log
+- User management
+- Feature policies
 
----
+### Settings
+
+- Appearance
+- Theme packs
+- Font family
+- Font size
+- Audio
+- Profile avatar
+- Account update
+- Server management
+
+## Feature Policies
+
+Mcraftr supports per-user feature gating.
+
+Current policy categories:
+
+- `Navigation Tabs`
+- `Actions`
+- `Players`
+- `Chat`
+- `Admin`
+
+Important subfeatures can be controlled independently. For example, `Custom Kit Builder` can be disabled without disabling all kit assignment.
+
+## Schedules
+
+Schedules are server-scoped and admin-facing.
+
+Current schedule model is intentionally curated rather than arbitrary:
+
+- broadcast
+- save-all
+- time/day-night
+- weather
+- difficulty
+- selected gamerules
+
+Cadences supported:
+
+- daily
+- weekly
+- monthly
+
+Missed jobs are not replayed in a backlog after downtime.
+
+## Custom Theme Packs
+
+Mcraftr supports import/export of simple JSON theme packs from the Settings page.
+
+Theme packs are:
+
+- client-side preferences
+- stored in browser local storage
+- safe and intentionally constrained
+
+They are **not** arbitrary CSS bundles.
+
+### What a Theme Pack Can Change
+
+Valid theme variable keys:
+
+- `--bg`
+- `--bg2`
+- `--panel`
+- `--border`
+- `--text`
+- `--text-dim`
+- `--red`
+
+Optional top-level field:
+
+- `accent`
+
+Optional metadata:
+
+- `name`
+
+### Validation Rules
+
+Mcraftr currently expects:
+
+- JSON object
+- `vars` object containing one or more valid keys
+- optional `accent`
+- all colors must be full 6-digit hex values like `#1a2b3c`
+- invalid keys are ignored
+- invalid colors are ignored
+- if the pack has no valid variables and no valid accent, import is rejected
+
+### Theme Pack Format
+
+```json
+{
+  "name": "Basalt Terminal",
+  "accent": "#7df9ff",
+  "vars": {
+    "--bg": "#0d1117",
+    "--bg2": "#161b22",
+    "--panel": "#11161d",
+    "--border": "#273344",
+    "--text": "#f0f6fc",
+    "--text-dim": "#9fb0c3",
+    "--red": "#ff5f56"
+  }
+}
+```
+
+### How to Build a Good Theme Pack
+
+Use this approach:
+
+1. Start from a screenshot of the current UI and decide the mood first.
+2. Pick `--bg` and `--bg2` as the page foundation.
+3. Set `--panel` so cards still stand out against the page background.
+4. Keep `--border` visible enough to preserve structure.
+5. Make `--text` high-contrast.
+6. Make `--text-dim` clearly secondary but still readable.
+7. Set `accent` to the interactive highlight color you want.
+
+Recommended rule:
+
+- keep contrast high
+- avoid muddy `--panel` / `--bg` combinations
+- test both the header and dense cards before sharing a theme
+
+### What Theme Packs Cannot Do
+
+Theme packs currently cannot:
+
+- inject custom CSS
+- replace component layouts
+- change typography beyond the separate font controls
+- override motion behavior
+- change icons
+- bundle scripts
+
+### Import / Export Flow
+
+In the app:
+
+1. Open `Settings`
+2. Go to the appearance/theme area
+3. Import a `.json` file, or export your current theme as `mcraftr-theme.json`
+
+## Fonts
+
+Built-in font modes:
+
+- `System`
+- `Operator`
+- `Minecraft UI`
+- `Pixel`
+- `Terminal`
+
+Built-in font sizes:
+
+- `Small`
+- `Normal`
+- `Large`
+- `Extra Large`
+
+## Audio
+
+### Built-in Sound Effects
+
+- `UI Click`
+- `Success Orb`
+- `Notify Pling`
+- `Villager No`
+
+### Built-in Music
+
+- `Dry Hands`
+- `Living Mice`
+- `Mice on Venus`
+
+Users can also:
+
+- upload audio files
+- point sound slots at direct web audio URLs
+- build their own music track list
+- turn all sound off
+- disable individual sound effects
+- disable music separately
+
+Audio and music settings are browser-local preferences.
+
+## Profile Avatars
+
+Users can:
+
+- use the default letter avatar
+- choose a built-in Minecraft-themed avatar
+- upload a custom avatar
+- unset later and return to the letter avatar
+
+Built-in avatar set currently includes:
+
+- Creeper
+- Grass Block
+- Diamond Pickaxe
+- Redstone
+- Slime
+- Nether Star
 
 ## Security Notes
 
-- RCON passwords are encrypted at rest using AES-256-GCM
-- Session tokens are HTTP-only, secure cookies
-- Rate limiting on RCON commands (30/60s per user)
-- Middleware enforces authentication and server connection requirement
-- Admin-only routes validated server-side
+- RCON passwords are encrypted at rest
+- Mcraftr authentication is session-based
+- Saved device accounts use encrypted secure cookies
+- Admin-only routes are enforced server-side
+- Rate limiting is applied around sensitive command paths
 
----
+## Main API Areas
+
+This is not a full endpoint dump, but these are the major areas:
+
+- `/api/auth/*`
+- `/api/account/*`
+- `/api/server`
+- `/api/servers/*`
+- `/api/players`
+- `/api/minecraft/*`
+- `/api/admin/*`
+
+The codebase is the source of truth for the exact route surface.
+
+## Tech Stack
+
+| Layer | Technology |
+| --- | --- |
+| Framework | Next.js 15 |
+| UI | React 19 |
+| Language | TypeScript |
+| Auth | NextAuth |
+| Database | SQLite via `better-sqlite3` |
+| Cache / rate limiting | Redis |
+| Minecraft transport | RCON via `rcon-client` |
+| Styling | Tailwind CSS |
+| Icons | Lucide React |
 
 ## License
 
-MIT — see [LICENSE](./LICENSE)
+MIT. See [LICENSE](./LICENSE).
