@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 import { getUserById } from '@/lib/users'
+import { logAudit } from '@/lib/audit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -29,7 +30,10 @@ export async function POST(req: NextRequest) {
     if (!command || typeof command !== 'string') {
       return Response.json({ ok: false, error: 'Command is required' }, { status: 400 })
     }
-    const cmd = command.trim()
+    const cmd = command
+      .replace(/\r?\n+/g, ' ')
+      .trim()
+      .replace(/^\/+/, '')
     if (!cmd) {
       return Response.json({ ok: false, error: 'Command cannot be empty' }, { status: 400 })
     }
@@ -38,10 +42,15 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await rconForRequest(req, cmd)
-    if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
+    if (!result.ok) {
+      console.error('[mcraftr:rcon] command failed', { userId, cmd, error: result.error || 'RCON error' })
+      return Response.json({ ok: false, error: result.error || 'RCON error' })
+    }
 
+    logAudit(userId, 'cmd', undefined, cmd)
     return Response.json({ ok: true, output: result.stdout || '(no output)' })
   } catch (e: unknown) {
+    console.error('[mcraftr:rcon] route error', e)
     return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Server error' }, { status: 500 })
   }
 }

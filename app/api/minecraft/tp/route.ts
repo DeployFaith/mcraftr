@@ -4,7 +4,7 @@ import { rconForRequest, getSessionUserId, getUserFeatureFlags, checkFeatureAcce
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const PLAYER_RE = /^[a-zA-Z0-9_]{1,16}$/
+const PLAYER_RE = /^\.?[a-zA-Z0-9_]{1,16}$/
 
 export async function POST(req: NextRequest) {
   const userId = await getSessionUserId(req)

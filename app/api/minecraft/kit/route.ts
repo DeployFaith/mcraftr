@@ -2,6 +2,9 @@ import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 import { getUserById } from '@/lib/users'
 import { KITS_BY_ID } from '@/lib/kits'
+import { getDb } from '@/lib/db'
+import { giveItemViaRcon } from '@/lib/minecraft-give'
+import type { CustomKitItem } from '@/lib/custom-kits'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,28 +30,51 @@ export async function POST(req: NextRequest) {
     }
 
     const kit = KITS_BY_ID[kitId]
-    if (!kit) {
+    if (!kit && !checkFeatureAccess(features, 'enable_custom_kits')) {
+      return Response.json({ ok: false, error: 'Custom kits are disabled by admin' }, { status: 403 })
+    }
+    const customKit = !kit
+      ? getDb().prepare(`
+          SELECT id, label, items_json
+          FROM custom_kits
+          WHERE id = ? AND user_id = ?
+        `).get(kitId, userId) as { id: string; label: string; items_json: string } | undefined
+      : undefined
+
+    if (!kit && !customKit) {
       return Response.json({ ok: false, error: `Unknown kit: ${kitId}` }, { status: 400 })
     }
 
     // Admin kit requires admin role — reuse the userId already verified above
-    if (kit.adminOnly) {
+    if (kit?.adminOnly) {
       const user = getUserById(userId)
       if (user?.role !== 'admin') {
         return Response.json({ ok: false, error: 'Admin kit requires admin role' }, { status: 403 })
       }
     }
 
-    // Run all commands in parallel
-    const commands = kit.commands.map(cmd => cmd.replaceAll('{player}', player))
-    const results = await Promise.all(commands.map(cmd => rconForRequest(req, cmd)))
-    const errors = results.filter(r => !r.ok).map(r => r.error || 'unknown')
-
-    if (errors.length > 0) {
-      return Response.json({ ok: false, error: `${errors.length} command(s) failed`, details: errors })
+    if (kit) {
+      const result = await rconForRequest(req, `fgmc kit ${player} ${kitId}`)
+      if (!result.ok) {
+        console.warn('[mcraftr] /api/minecraft/kit failed', { player, kitId, error: result.error || 'RCON error' })
+        return Response.json({ ok: false, error: result.error || 'RCON error' })
+      }
+      return Response.json({ ok: true, message: result.stdout || `${kit.label} kit issued to ${player}` })
     }
-    return Response.json({ ok: true, message: `${kit.label} kit issued to ${player}` })
+
+    const items = JSON.parse(customKit!.items_json) as CustomKitItem[]
+    for (const item of items) {
+      const result = await giveItemViaRcon(req, player, item.itemId, item.qty)
+      if (!result.ok) {
+        console.warn('[mcraftr] /api/minecraft/kit failed', { player, kitId, error: result.error || 'RCON error' })
+        return Response.json({ ok: false, error: result.error || 'RCON error' })
+      }
+    }
+
+    return Response.json({ ok: true, message: `${customKit!.label} kit issued to ${player}` })
   } catch (e: unknown) {
-    return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Server error' }, { status: 500 })
+    const error = e instanceof Error ? e.message : 'Server error'
+    console.warn('[mcraftr] /api/minecraft/kit exception', { error })
+    return Response.json({ ok: false, error }, { status: 500 })
   }
 }

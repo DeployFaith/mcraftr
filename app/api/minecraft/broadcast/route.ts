@@ -30,15 +30,20 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, error: 'Message cannot be empty' }, { status: 400 })
     }
 
-    const result = await rconForRequest(req, `say ${clean}`)
-    if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
+    const result = await rconForRequest(req, `fgmc broadcast ${clean}`)
+    if (!result.ok) {
+      console.warn('[mcraftr] /api/minecraft/broadcast failed', { error: result.error || 'RCON error' })
+      return Response.json({ ok: false, error: result.error || 'RCON error' })
+    }
 
     logAudit(userId, 'broadcast', undefined, clean)
     try {
       getDb().prepare('INSERT INTO chat_log (user_id, type, player, message) VALUES (?, ?, NULL, ?)').run(userId, 'broadcast', clean)
     } catch {}
-    return Response.json({ ok: true, message: `Broadcast sent` })
+    return Response.json({ ok: true, message: result.stdout || 'Broadcast sent' })
   } catch (e: unknown) {
-    return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Server error' }, { status: 500 })
+    const error = e instanceof Error ? e.message : 'Server error'
+    console.warn('[mcraftr] /api/minecraft/broadcast exception', { error })
+    return Response.json({ ok: false, error }, { status: 500 })
   }
 }

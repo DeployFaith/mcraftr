@@ -9,13 +9,16 @@ export const FEATURE_CATEGORIES = [
 export type FeatureCategory = typeof FEATURE_CATEGORIES[number]['id']
 
 export const FEATURE_DEFS = [
+  { key: 'enable_players_tab', label: 'Players Tab', desc: 'Show/hide the Players tab in navigation', category: 'tabs' },
+  { key: 'enable_actions_tab', label: 'Actions Tab', desc: 'Show/hide the Actions tab in navigation', category: 'tabs' },
   { key: 'enable_chat', label: 'Chat Tab', desc: 'Show/hide the Chat tab in navigation', category: 'tabs' },
   { key: 'enable_admin', label: 'Admin Tab', desc: 'Show/hide the Admin tab in navigation', category: 'tabs' },
 
   { key: 'enable_world', label: 'World Commands', desc: 'Allow weather and time world controls', category: 'actions' },
   { key: 'enable_player_commands', label: 'Player Commands', desc: 'Allow gamemode and ability actions', category: 'actions' },
   { key: 'enable_teleport', label: 'Teleport', desc: 'Allow player and coordinate teleport', category: 'actions' },
-  { key: 'enable_kits', label: 'Kit Assignment', desc: 'Allow giving predefined kits', category: 'actions' },
+  { key: 'enable_kits', label: 'Kit Assignment', desc: 'Allow giving built-in kits and managing custom saved kits', category: 'actions' },
+  { key: 'enable_custom_kits', label: 'Custom Kit Builder', desc: 'Allow building, saving, editing, and using custom kits', category: 'actions' },
   { key: 'enable_item_catalog', label: 'Item Catalog', desc: 'Allow item give catalog', category: 'actions' },
   { key: 'enable_inventory', label: 'Inventory', desc: 'Allow inventory viewer and item movement', category: 'actions' },
 

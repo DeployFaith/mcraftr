@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { startTransition, useState, useCallback, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { Users, Zap, Shield, MessageSquare, Settings } from 'lucide-react'
 import PlayersSection from './components/PlayersSection'
 import ActionsSection from './components/ActionsSection'
@@ -38,11 +38,10 @@ function normalizeTab(raw: string | null | undefined): TabId {
 export default function MinecraftClientPage({ initialTab, initialRole }: { initialTab: TabId; initialRole?: string }) {
   const { data: session } = useSession()
   const role = session?.role ?? initialRole
-  const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams()
 
   const [activeTab, setActiveTab] = useState<TabId>(initialTab)
+  const [visitedTabs, setVisitedTabs] = useState<TabId[]>([initialTab])
   const [players, setPlayers] = useState<string[]>([])
   const [features, setFeatures] = useState<FeatureFlags | null>(null)
 
@@ -64,23 +63,37 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
   }, [loadFeatures])
 
   useEffect(() => {
-    const urlTab = normalizeTab(searchParams.get('tab'))
-    if (urlTab !== activeTab) setActiveTab(urlTab)
-  }, [searchParams, activeTab])
+    const syncFromUrl = () => {
+      const params = new URLSearchParams(window.location.search)
+      const urlTab = normalizeTab(params.get('tab'))
+      startTransition(() => {
+        setActiveTab(urlTab)
+        setVisitedTabs(prev => (prev.includes(urlTab) ? prev : [...prev, urlTab]))
+      })
+    }
+    window.addEventListener('popstate', syncFromUrl)
+    return () => window.removeEventListener('popstate', syncFromUrl)
+  }, [])
 
   const handleTabChange = useCallback((id: TabId) => {
-    setActiveTab(id)
-    const params = new URLSearchParams(searchParams.toString())
+    startTransition(() => {
+      setActiveTab(id)
+      setVisitedTabs(prev => (prev.includes(id) ? prev : [...prev, id]))
+    })
+    const params = new URLSearchParams(window.location.search)
     params.set('tab', id)
     const qs = params.toString()
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-  }, [pathname, router, searchParams])
+    const nextUrl = qs ? `${pathname}?${qs}` : pathname
+    window.history.replaceState(null, '', nextUrl)
+  }, [pathname])
 
   const handlePlayersChange = useCallback((list: string[]) => {
     setPlayers(list)
   }, [])
 
   const tabs = ALL_TABS.filter(t => {
+    if (t.id === 'players' && features && !features.enable_players_tab) return false
+    if (t.id === 'actions' && features && !features.enable_actions_tab) return false
     if (t.id === 'chat' && features && !features.enable_chat) return false
     if (t.id === 'actions' && features) {
       const hasAnyAction = features.enable_world || features.enable_player_commands || features.enable_chat_write || features.enable_teleport || features.enable_kits || features.enable_item_catalog || features.enable_inventory
@@ -93,6 +106,14 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
     return !t.adminOnly || role === 'admin'
   })
   const visibleTab = tabs.find(t => t.id === activeTab) ? activeTab : 'players'
+
+  useEffect(() => {
+    setVisitedTabs(prev => (prev.includes(visibleTab) ? prev : [...prev, visibleTab]))
+  }, [visibleTab])
+
+  const shouldRenderTab = useCallback(
+      (id: TabId) => visibleTab === id || visitedTabs.includes(id),
+      [visibleTab, visitedTabs])
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-48px)]">
@@ -119,11 +140,31 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
       </nav>
 
       <div className="flex-1 max-w-4xl mx-auto w-full px-3 sm:px-4 py-3 md:py-4 md:pb-6" style={{ paddingBottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}>
-        {visibleTab === 'players' && <PlayersSection onPlayersChange={handlePlayersChange} />}
-        {visibleTab === 'actions' && <ActionsSection players={players} />}
-        {visibleTab === 'admin' && role === 'admin' && <AdminSection players={players} />}
-        {visibleTab === 'chat' && <ChatSection />}
-        {visibleTab === 'settings' && <SettingsSection role={role} />}
+        {shouldRenderTab('players') && (
+          <div className={visibleTab === 'players' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'players'}>
+            <PlayersSection onPlayersChange={handlePlayersChange} />
+          </div>
+        )}
+        {shouldRenderTab('actions') && (
+          <div className={visibleTab === 'actions' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'actions'}>
+            <ActionsSection players={players} />
+          </div>
+        )}
+        {role === 'admin' && shouldRenderTab('admin') && (
+          <div className={visibleTab === 'admin' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'admin'}>
+            <AdminSection players={players} />
+          </div>
+        )}
+        {shouldRenderTab('chat') && (
+          <div className={visibleTab === 'chat' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'chat'}>
+            <ChatSection />
+          </div>
+        )}
+        {shouldRenderTab('settings') && (
+          <div className={visibleTab === 'settings' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'settings'}>
+            <SettingsSection role={role} />
+          </div>
+        )}
       </div>
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--border)] safe-bottom" style={{ background: 'rgba(10,10,15,0.95)', backdropFilter: 'blur(12px)' }}>

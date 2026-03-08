@@ -5,6 +5,7 @@ import type { InvItem } from '../../api/minecraft/inventory/route'
 import ConfirmModal from './ConfirmModal'
 import type { ConfirmModalProps } from './ConfirmModal'
 import type { FeatureKey } from '@/lib/features'
+import CollapsibleCard from './CollapsibleCard'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -296,7 +297,7 @@ function PlayerPanel({
       const r = await fetch('/api/minecraft/inventory', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ player, item: item.id, count: item.count }),
+        body: JSON.stringify({ player, item: item.id, count: item.count, slot: item.slot }),
       })
       const d = await r.json()
       if (d.ok) {
@@ -662,9 +663,8 @@ export default function PlayersSection({ onPlayersChange }: Props) {
     <div className="space-y-4">
       <h2 className="font-mono text-base tracking-widest text-[var(--accent)]">PLAYERS</h2>
 
-      <div className="glass-card p-5">
+      <CollapsibleCard title="ONLINE NOW" storageKey="players:online" bodyClassName="p-5">
         <div className="flex items-center justify-between mb-4">
-          <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">ONLINE NOW</div>
           <button
             onClick={fetchPlayers}
             className="text-[13px] font-mono text-[var(--accent)] hover:opacity-70 border border-[var(--border)] px-2 py-1 rounded transition-opacity"
@@ -742,7 +742,7 @@ export default function PlayersSection({ onPlayersChange }: Props) {
             <div className="text-[13px] font-mono text-[var(--text-dim)]">The server is empty — not even a skeleton</div>
           )
         )}
-      </div>
+      </CollapsibleCard>
 
       {selectedPlayer && (
         <PlayerPanel

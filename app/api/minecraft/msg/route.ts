@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, error: 'Message is required' }, { status: 400 })
     }
     const clean = message.replace(/[\x00-\x1f\x7f]/g, '').slice(0, 256)
-    const result = await rconForRequest(req, `msg ${player} ${clean}`)
+    const result = await rconForRequest(req, `fgmc msg ${player} ${clean}`)
     if (!result.ok) return Response.json({ ok: false, error: result.error })
     try {
       getDb().prepare('INSERT INTO chat_log (user_id, type, player, message) VALUES (?, ?, ?, ?)').run(userId, 'msg', player, clean)

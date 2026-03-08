@@ -209,10 +209,27 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    const { player, item, count } = await req.json()
-    if (!player || !item) return Response.json({ ok: false, error: 'Missing player or item' }, { status: 400 })
+    const { player, item, count, slot } = await req.json()
+    if (!player) return Response.json({ ok: false, error: 'Missing player' }, { status: 400 })
     if (!/^\.?[a-zA-Z0-9_]{1,16}$/.test(player)) {
       return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
+    }
+    if (!item) {
+      const result = await rconForRequest(req, `clear ${player}`)
+      if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
+      return Response.json({ ok: true, message: `Cleared inventory for ${player}` })
+    }
+    if (slot != null) {
+      const commandSlot = nbtSlotToCommandSlot(Number(slot))
+      if (!commandSlot) {
+        return Response.json({ ok: false, error: 'Invalid slot number' }, { status: 400 })
+      }
+      const result = await rconForRequest(
+        req,
+        `item replace entity @a[name=${player},limit=1] ${commandSlot} with minecraft:air`
+      )
+      if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
+      return Response.json({ ok: true, message: `Cleared slot ${slot} for ${player}` })
     }
     if (typeof item !== 'string' || item.length > 128) {
       return Response.json({ ok: false, error: 'Invalid item ID' }, { status: 400 })

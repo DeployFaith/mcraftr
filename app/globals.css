@@ -15,6 +15,9 @@
   --accent-dim:  color-mix(in srgb, var(--accent) 18%, transparent);
   --accent-mid:  color-mix(in srgb, var(--accent) 40%, transparent);
   --accent-glow: var(--accent);
+  --app-font-sans: system-ui, sans-serif;
+  --app-font-mono: var(--font-operator), ui-monospace, monospace;
+  --app-font-size: 16px;
 }
 
 /* ── Light theme ──────────────────────────────────────────────────────────── */
@@ -34,9 +37,62 @@ html, body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, sans-serif;
+  font-family: var(--app-font-sans);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+}
+
+html {
+  font-size: var(--app-font-size);
+}
+
+[data-font="system"] {
+  --app-font-sans: system-ui, sans-serif;
+  --app-font-mono: system-ui, sans-serif;
+}
+
+[data-font="operator"] {
+  --app-font-sans: var(--font-operator), ui-monospace, monospace;
+  --app-font-mono: var(--font-operator), ui-monospace, monospace;
+}
+
+[data-font="minecraft"] {
+  --app-font-sans: var(--font-minecraft), monospace;
+  --app-font-mono: var(--font-minecraft), monospace;
+}
+
+[data-font="pixel"] {
+  --app-font-sans: var(--font-pixel), monospace;
+  --app-font-mono: var(--font-pixel), monospace;
+}
+
+[data-font="terminal"] {
+  --app-font-sans: var(--font-terminal), monospace;
+  --app-font-mono: var(--font-terminal), monospace;
+}
+
+[data-font-size="sm"] {
+  --app-font-size: 14px;
+}
+
+[data-font-size="md"] {
+  --app-font-size: 16px;
+}
+
+[data-font-size="lg"] {
+  --app-font-size: 18px;
+}
+
+[data-font-size="xl"] {
+  --app-font-size: 20px;
+}
+
+.font-mono {
+  font-family: var(--app-font-mono) !important;
+}
+
+.font-sans {
+  font-family: var(--app-font-sans) !important;
 }
 
 #__next {
