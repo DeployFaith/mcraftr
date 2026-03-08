@@ -5,13 +5,13 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const COMMANDS: Record<string, { cmds: string[]; label: string; requiresPlayer: boolean }> = {
-  day:           { requiresPlayer: false, label: 'Day',          cmds: ['time set day'] },
-  night:         { requiresPlayer: false, label: 'Night',        cmds: ['time set night'] },
-  clear_weather: { requiresPlayer: false, label: 'Clear sky',    cmds: ['weather clear 6000'] },
-  storm:         { requiresPlayer: false, label: 'Storm',        cmds: ['weather thunder 6000'] },
-  creative:      { requiresPlayer: true,  label: 'Creative',     cmds: ['gamemode creative {player}'] },
-  survival:      { requiresPlayer: true,  label: 'Survival',     cmds: ['gamemode survival {player}'] },
-  adventure:     { requiresPlayer: true,  label: 'Adventure',    cmds: ['gamemode adventure {player}'] },
+  day:           { requiresPlayer: false, label: 'Day',          cmds: ['fgmc world time day'] },
+  night:         { requiresPlayer: false, label: 'Night',        cmds: ['fgmc world time night'] },
+  clear_weather: { requiresPlayer: false, label: 'Clear sky',    cmds: ['fgmc world weather clear'] },
+  storm:         { requiresPlayer: false, label: 'Storm',        cmds: ['fgmc world weather storm'] },
+  creative:      { requiresPlayer: true,  label: 'Creative',     cmds: ['fgmc player gamemode creative {player}'] },
+  survival:      { requiresPlayer: true,  label: 'Survival',     cmds: ['fgmc player gamemode survival {player}'] },
+  adventure:     { requiresPlayer: true,  label: 'Adventure',    cmds: ['fgmc player gamemode adventure {player}'] },
   fly:           { requiresPlayer: true,  label: 'Fly',          cmds: ['fly {player}'] },
   heal:          { requiresPlayer: true,  label: 'Heal',         cmds: ['heal {player}', 'feed {player}'] },
   night_vision:  { requiresPlayer: true,  label: 'Night Vision', cmds: ['effect give {player} minecraft:night_vision 300 1'] },
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   try {
     const { command, player } = await req.json()
 
-    const PLAYER_RE = /^[a-zA-Z0-9_]{1,16}$/
+    const PLAYER_RE = /^\.?[a-zA-Z0-9_]{1,16}$/
 
     const def = COMMANDS[command]
     if (!def) return Response.json({ ok: false, error: `Unknown command: ${command}` }, { status: 400 })
@@ -49,13 +49,16 @@ export async function POST(req: NextRequest) {
     const errors: string[] = []
     const outputs: string[] = []
     for (const template of def.cmds) {
-      const cmd = player ? template.replaceAll('{player}', player) : template
+      const cmd = buildCommand(template, player)
       const result = await rconForRequest(req, cmd)
       if (!result.ok) errors.push(result.error || cmd)
       if (result.stdout) outputs.push(result.stdout)
     }
 
-    if (errors.length > 0) return Response.json({ ok: false, error: errors.join('; ') })
+    if (errors.length > 0) {
+      console.warn('[mcraftr] /api/minecraft/cmd failed', { command, player, errors })
+      return Response.json({ ok: false, error: errors.join('; ') })
+    }
 
     const target   = player ? ` → ${player}` : ''
     const combined = outputs.join(' ')
@@ -71,9 +74,17 @@ export async function POST(req: NextRequest) {
     }
 
     const verb    = activated === true ? 'Activated' : activated === false ? 'Deactivated' : ''
-    const message = verb ? `${verb}: ${def.label}${target}` : `${def.label}${target}`
+    const message = combined || (verb ? `${verb}: ${def.label}${target}` : `${def.label}${target}`)
     return Response.json({ ok: true, message, activated })
   } catch (e: unknown) {
-    return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Server error' }, { status: 500 })
+    const error = e instanceof Error ? e.message : 'Server error'
+    console.warn('[mcraftr] /api/minecraft/cmd exception', { error })
+    return Response.json({ ok: false, error }, { status: 500 })
   }
+}
+
+function buildCommand(template: string, player?: string): string {
+  if (!player) return template
+  if (template.includes('{player}')) return template.replaceAll('{player}', player)
+  return `${template} ${player}`
 }

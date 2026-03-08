@@ -58,6 +58,17 @@ export function getDb(): Database.Database {
       ts        INTEGER NOT NULL DEFAULT (unixepoch())
     );
 
+    CREATE TABLE IF NOT EXISTS custom_kits (
+      id          TEXT PRIMARY KEY,
+      user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      label       TEXT NOT NULL,
+      icon_type   TEXT NOT NULL,
+      icon_value  TEXT NOT NULL,
+      items_json  TEXT NOT NULL,
+      created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at  INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
     CREATE TABLE IF NOT EXISTS user_features (
       user_id           TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       enable_chat       INTEGER NOT NULL DEFAULT 1,

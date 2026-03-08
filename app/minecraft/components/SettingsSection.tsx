@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import { signOut } from 'next-auth/react'
-import { useTheme, ACCENTS } from '@/app/components/ThemeProvider'
+import { useTheme, ACCENTS, FONTS, FONT_SIZES } from '@/app/components/ThemeProvider'
 import { FEATURE_DEFS, FEATURE_CATEGORIES, type FeatureKey, type FeatureCategory } from '@/lib/features'
+import CollapsibleCard from './CollapsibleCard'
 // ── Small helpers ─────────────────────────────────────────────────────────────
 
 function StatusMsg({ ok, msg }: { ok: boolean; msg: string }) {
@@ -27,7 +28,7 @@ type FeatureFlags = Record<FeatureKey, boolean>
 export default function SettingsSection({ role: _role }: { role?: string }) {
   const [serverInfo, setServerInfo] = useState<{ host: string | null; port: number } | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
-  const { theme, setTheme, accent, setAccent } = useTheme()
+  const { theme, setTheme, accent, setAccent, font, setFont, fontSize, setFontSize } = useTheme()
 
   // Feature flags state
   const [features, setFeatures] = useState<FeatureFlags | null>(null)
@@ -238,9 +239,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
       <h2 className="font-mono text-base tracking-widest text-[var(--accent)]">SETTINGS</h2>
 
       {/* Appearance */}
-      <div className="glass-card p-5 space-y-4">
-        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">APPEARANCE</div>
-
+      <CollapsibleCard title="APPEARANCE" storageKey="settings:appearance" bodyClassName="p-5 space-y-4">
         <div>
           <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-2">THEME</div>
           <div className="flex gap-2">
@@ -286,12 +285,73 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
             ))}
           </div>
         </div>
-      </div>
+
+        <div>
+          <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-2">FONT</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {FONTS.map(option => (
+              <button
+                key={option.id}
+                onClick={() => setFont(option.id)}
+                className="text-left rounded-lg border px-3 py-3 transition-all"
+                style={font === option.id
+                  ? {
+                      borderColor: 'var(--accent)',
+                      background: 'var(--accent-dim)',
+                      color: 'var(--accent)',
+                    }
+                  : {
+                      borderColor: 'var(--border)',
+                      color: 'var(--text-dim)',
+                    }}
+              >
+                <div className="text-[13px] font-mono tracking-widest">{option.label}</div>
+                <div className="text-[15px] mt-1" style={{ color: font === option.id ? 'var(--accent)' : 'var(--text)' }}>
+                  {option.sample}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-2">FONT SIZE</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {FONT_SIZES.map(option => (
+              <button
+                key={option.id}
+                onClick={() => setFontSize(option.id)}
+                className="text-left rounded-lg border px-3 py-3 transition-all"
+                style={fontSize === option.id
+                  ? {
+                      borderColor: 'var(--accent)',
+                      background: 'var(--accent-dim)',
+                      color: 'var(--accent)',
+                    }
+                  : {
+                      borderColor: 'var(--border)',
+                      color: 'var(--text-dim)',
+                    }}
+              >
+                <div className="text-[13px] font-mono tracking-widest">{option.label}</div>
+                <div
+                  className="mt-1"
+                  style={{
+                    fontSize: option.size,
+                    color: fontSize === option.id ? 'var(--accent)' : 'var(--text)',
+                  }}
+                >
+                  {option.sample}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </CollapsibleCard>
 
       {/* Feature Toggles */}
-      <div className="glass-card p-5 space-y-4">
+      <CollapsibleCard title="FEATURE TOGGLES" storageKey="settings:features" bodyClassName="p-5 space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">FEATURE TOGGLES</div>
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setExpandedCategories({ tabs: true, actions: true, players: true, chat: true, admin: true })}
@@ -415,11 +475,10 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
             {featuresStatus.msg}
           </div>
         )}
-      </div>
+      </CollapsibleCard>
 
       {/* Server connection info */}
-      <div className="glass-card p-5 space-y-4">
-        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">SERVER CONNECTION</div>
+      <CollapsibleCard title="SERVER CONNECTION" storageKey="settings:server-connection" bodyClassName="p-5 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-[var(--panel)] rounded-lg p-3 border border-[var(--border)]">
             <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">HOST</div>
@@ -445,88 +504,100 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
             {disconnecting ? 'Disconnecting...' : 'Disconnect Server'}
           </button>
         </div>
-      </div>
+      </CollapsibleCard>
 
-      {/* Account — Change Password */}
-      <div className="glass-card p-5 space-y-4">
-        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">ACCOUNT — CHANGE PASSWORD</div>
-        <form onSubmit={handleChangePassword} className="space-y-2">
-          <input
-            type="password"
-            placeholder="Current password"
-            value={pwCurrent}
-            onChange={e => setPwCurrent(e.target.value)}
-            className={inputCls}
-            required
-            autoComplete="current-password"
-          />
-          <input
-            type="password"
-            placeholder="New password (min 8 chars)"
-            value={pwNew}
-            onChange={e => setPwNew(e.target.value)}
-            className={inputCls}
-            required
-            autoComplete="new-password"
-          />
-          <input
-            type="password"
-            placeholder="Confirm new password"
-            value={pwConfirm}
-            onChange={e => setPwConfirm(e.target.value)}
-            className={inputCls}
-            required
-            autoComplete="new-password"
-          />
-          <button
-            type="submit"
-            disabled={pwLoading}
-            className={btnPrimary}
-            style={{ borderColor: 'var(--accent-mid)', color: 'var(--accent)', background: 'var(--accent-dim)' }}
-          >
-            {pwLoading ? 'Updating...' : 'Update Password'}
-          </button>
-          {pwStatus && <StatusMsg ok={pwStatus.ok} msg={pwStatus.msg} />}
-        </form>
-      </div>
+      {/* Account Update */}
+      <CollapsibleCard title="ACCOUNT UPDATE" storageKey="settings:account-update" bodyClassName="p-5 space-y-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4 space-y-3">
+            <div>
+              <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">EMAIL</div>
+              <div className="text-[11px] font-mono text-[var(--text-dim)] opacity-70 mt-1">Change the address you sign in with.</div>
+            </div>
+            <form onSubmit={handleChangeEmail} className="space-y-2">
+              <input
+                type="email"
+                placeholder="New email address"
+                value={emailNew}
+                onChange={e => setEmailNew(e.target.value)}
+                className={inputCls}
+                required
+                autoComplete="email"
+              />
+              <input
+                type="password"
+                placeholder="Confirm with current password"
+                value={emailPw}
+                onChange={e => setEmailPw(e.target.value)}
+                className={inputCls}
+                required
+                autoComplete="current-password"
+              />
+              <button
+                type="submit"
+                disabled={emailLoading}
+                className={btnPrimary}
+                style={{ borderColor: 'var(--accent-mid)', color: 'var(--accent)', background: 'var(--accent-dim)' }}
+              >
+                {emailLoading ? 'Updating...' : 'Update Email'}
+              </button>
+              {emailStatus && <StatusMsg ok={emailStatus.ok} msg={emailStatus.msg} />}
+            </form>
+          </div>
 
-      {/* Account — Change Email */}
-      <div className="glass-card p-5 space-y-4">
-        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">ACCOUNT — CHANGE EMAIL</div>
-        <form onSubmit={handleChangeEmail} className="space-y-2">
-          <input
-            type="email"
-            placeholder="New email address"
-            value={emailNew}
-            onChange={e => setEmailNew(e.target.value)}
-            className={inputCls}
-            required
-            autoComplete="email"
-          />
-          <input
-            type="password"
-            placeholder="Confirm with current password"
-            value={emailPw}
-            onChange={e => setEmailPw(e.target.value)}
-            className={inputCls}
-            required
-            autoComplete="current-password"
-          />
-          <button
-            type="submit"
-            disabled={emailLoading}
-            className={btnPrimary}
-            style={{ borderColor: 'var(--accent-mid)', color: 'var(--accent)', background: 'var(--accent-dim)' }}
-          >
-            {emailLoading ? 'Updating...' : 'Update Email'}
-          </button>
-          {emailStatus && <StatusMsg ok={emailStatus.ok} msg={emailStatus.msg} />}
-        </form>
-      </div>
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4 space-y-3">
+            <div>
+              <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">PASSWORD</div>
+              <div className="text-[11px] font-mono text-[var(--text-dim)] opacity-70 mt-1">Keep the current password for confirmation, then set the new one.</div>
+            </div>
+            <form onSubmit={handleChangePassword} className="space-y-2">
+              <input
+                type="password"
+                placeholder="Current password"
+                value={pwCurrent}
+                onChange={e => setPwCurrent(e.target.value)}
+                className={inputCls}
+                required
+                autoComplete="current-password"
+              />
+              <input
+                type="password"
+                placeholder="New password (min 8 chars)"
+                value={pwNew}
+                onChange={e => setPwNew(e.target.value)}
+                className={inputCls}
+                required
+                autoComplete="new-password"
+              />
+              <input
+                type="password"
+                placeholder="Confirm new password"
+                value={pwConfirm}
+                onChange={e => setPwConfirm(e.target.value)}
+                className={inputCls}
+                required
+                autoComplete="new-password"
+              />
+              <button
+                type="submit"
+                disabled={pwLoading}
+                className={btnPrimary}
+                style={{ borderColor: 'var(--accent-mid)', color: 'var(--accent)', background: 'var(--accent-dim)' }}
+              >
+                {pwLoading ? 'Updating...' : 'Update Password'}
+              </button>
+              {pwStatus && <StatusMsg ok={pwStatus.ok} msg={pwStatus.msg} />}
+            </form>
+          </div>
+        </div>
+      </CollapsibleCard>
 
       {/* Account — Danger Zone */}
-      <div className="glass-card p-5 space-y-3" style={{ borderColor: '#ff335530' }}>
-        <div className="text-[13px] font-mono tracking-widest text-red-500">DANGER ZONE</div>
+      <CollapsibleCard
+        title={<span className="text-red-500">DANGER ZONE</span>}
+        storageKey="settings:danger-zone"
+        bodyClassName="p-5 space-y-3"
+      >
         <div className="flex items-center justify-between">
           <div>
             <div className="text-[15px] font-mono text-[var(--text)]">Delete Account</div>
@@ -539,7 +610,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
             Delete
           </button>
         </div>
-      </div>
+      </CollapsibleCard>
 
       {/* Delete modal */}
       {showDeleteModal && (

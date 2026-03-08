@@ -12,6 +12,7 @@ import { useToast } from './useToast'
 import Toasts from './Toasts'
 import ConfirmModal from './ConfirmModal'
 import type { ConfirmModalProps } from './ConfirmModal'
+import CollapsibleCard from './CollapsibleCard'
 
 const RCON_HISTORY_KEY = 'mcraftr:rcon:history'
 const RCON_HISTORY_MAX = 20
@@ -557,9 +558,8 @@ export default function AdminSection({ players }: Props) {
 
       {/* ── SERVER INFO ── */}
       {canServerInfo && (
-      <div className="glass-card p-4 space-y-4">
+      <CollapsibleCard title="SERVER INFO" storageKey="admin:server-info" bodyClassName="p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">SERVER INFO</div>
           <div className="flex items-center gap-3">
             {infoLastAt && (
               <span className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">
@@ -604,13 +604,12 @@ export default function AdminSection({ players }: Props) {
             <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-30 text-right">Auto-refreshes every 30s</div>
           </div>
         )}
-      </div>
+      </CollapsibleCard>
       )}
 
       {/* ── SERVER CONFIG ── */}
       {(canRules || canServerControls) && (
-      <div className="glass-card p-4 space-y-4">
-        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">SERVER CONFIG</div>
+      <CollapsibleCard title="SERVER CONFIG" storageKey="admin:server-config" bodyClassName="p-4 space-y-4">
 
         {canRules && (
         <div>
@@ -699,13 +698,12 @@ export default function AdminSection({ players }: Props) {
           </div>
         </div>
         )}
-      </div>
+      </CollapsibleCard>
       )}
 
       {/* ── MODERATION ── */}
       {canModeration && (
-      <div className="glass-card p-4 space-y-4">
-        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">MODERATION</div>
+      <CollapsibleCard title="MODERATION" storageKey="admin:moderation" bodyClassName="p-4 space-y-4">
 
         <div>
           <SectionLabel>TARGET PLAYER</SectionLabel>
@@ -771,14 +769,13 @@ export default function AdminSection({ players }: Props) {
             </div>
           )}
         </div>
-      </div>
+      </CollapsibleCard>
       )}
 
       {/* ── WHITELIST ── */}
       {canWhitelist && (
-      <div className="glass-card p-4 space-y-4">
+      <CollapsibleCard title="WHITELIST" storageKey="admin:whitelist" bodyClassName="p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">WHITELIST</div>
           <button onClick={fetchWhitelist} disabled={wlLoading}
             className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
             {wlLoading ? '…' : wlPlayers === null ? 'Load' : 'Refresh'}
@@ -817,13 +814,12 @@ export default function AdminSection({ players }: Props) {
             </div>
           </div>
         )}
-      </div>
+      </CollapsibleCard>
       )}
 
       {/* ── OPERATOR ── */}
       {canOperator && (
-      <div className="glass-card p-4 space-y-4">
-        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">OPERATOR</div>
+      <CollapsibleCard title="OPERATOR" storageKey="admin:operator" bodyClassName="p-4 space-y-4">
         <div>
           <SectionLabel>SELECT PLAYER</SectionLabel>
           <PlayerPicker online={players} selected={opTarget} onSelect={setOpTarget} placeholder="Or type player name…" />
@@ -838,13 +834,12 @@ export default function AdminSection({ players }: Props) {
             {opBusy === 'deop' ? '…' : <span className="flex items-center justify-center gap-1.5"><X size={13} strokeWidth={1.5} />Deop</span>}
           </button>
         </div>
-      </div>
+      </CollapsibleCard>
       )}
 
       {/* ── RCON CONSOLE ── */}
       {canRcon && (
-      <div className="glass-card p-4 space-y-3">
-        <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">RCON CONSOLE</div>
+      <CollapsibleCard title="RCON CONSOLE" storageKey="admin:rcon" bodyClassName="p-4 space-y-3">
         <div ref={rconOutputRef} className="bg-black/40 rounded-lg border border-[var(--border)] p-3 h-48 overflow-y-auto font-mono text-[13px] space-y-2">
           {rconEntries.length === 0 ? (
             <div className="text-[var(--text-dim)] opacity-30">Awaiting orders, operator…</div>
@@ -869,14 +864,13 @@ export default function AdminSection({ players }: Props) {
           </button>
         </div>
         <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-30">↑↓ to navigate history · Enter to send</div>
-      </div>
+      </CollapsibleCard>
       )}
 
       {/* ── AUDIT LOG ── */}
       {canAudit && (
-      <div className="glass-card p-4 space-y-4">
+      <CollapsibleCard title="AUDIT LOG" storageKey="admin:audit" bodyClassName="p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">AUDIT LOG</div>
           <button onClick={fetchAuditLog} disabled={auditLoading}
             className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
             {auditLoading ? '…' : auditEntries === null ? 'Load' : 'Refresh'}
@@ -899,14 +893,13 @@ export default function AdminSection({ players }: Props) {
             ))}
           </div>
         )}
-      </div>
+      </CollapsibleCard>
       )}
 
       {/* ── USER MANAGEMENT ── */}
       {canUserMgmt && (
-      <div className="glass-card p-4 space-y-4">
+      <CollapsibleCard title="USER MANAGEMENT" storageKey="admin:user-management" bodyClassName="p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">USER MANAGEMENT</div>
           <button onClick={fetchUsers} disabled={usersLoading}
             className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
             {usersLoading ? '…' : 'Refresh'}
@@ -968,14 +961,13 @@ export default function AdminSection({ players }: Props) {
             )}
           </form>
         </div>
-      </div>
+      </CollapsibleCard>
       )}
 
       {/* ── FEATURE POLICIES ── */}
       {canFeaturePolicies && (
-      <div className="glass-card p-4 space-y-4">
+      <CollapsibleCard title="FEATURE POLICIES" storageKey="admin:feature-policies" bodyClassName="p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">FEATURE POLICIES</div>
           <button onClick={fetchFeatureUsers} disabled={featureLoading}
             className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
             {featureLoading ? '…' : 'Refresh'}
@@ -1058,7 +1050,7 @@ export default function AdminSection({ players }: Props) {
             ))}
           </div>
         )}
-      </div>
+      </CollapsibleCard>
       )}
       {confirmModal && (
         <ConfirmModal

@@ -6,6 +6,8 @@ import { getUserFeatures } from '@/lib/users'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const PLAYER_RE = /^\.?[a-zA-Z0-9_]{1,16}$/
+
 export async function POST(req: NextRequest) {
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
@@ -15,7 +17,7 @@ export async function POST(req: NextRequest) {
     if (!player || typeof player !== 'string') {
       return Response.json({ ok: false, error: 'Player name is required' }, { status: 400 })
     }
-    if (!/^[a-zA-Z0-9_]{1,16}$/.test(player)) {
+    if (!PLAYER_RE.test(player)) {
       return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
     }
 

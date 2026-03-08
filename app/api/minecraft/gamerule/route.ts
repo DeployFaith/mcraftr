@@ -18,16 +18,15 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Fetch all gamerules in parallel
+    // Fetch all gamerules through FamilyGuard so values reflect all loaded worlds.
     const results = await Promise.all(
-      ADMIN_GAMERULES.map(rule => rconForRequest(req, `gamerule ${rule}`))
+      ADMIN_GAMERULES.map(rule => rconForRequest(req, `fgmc gamerule get ${rule}`))
     )
     const gamerules: Record<string, string> = {}
     ADMIN_GAMERULES.forEach((rule, i) => {
       const res = results[i]
       if (res.ok) {
-        // "Gamerule keepInventory is currently set to: false"
-        const m = res.stdout.match(/set to:\s*(\S+)/)
+        const m = res.stdout.match(/set to:\s*(\S+)/i)
         if (m) gamerules[rule] = m[1]
       }
     })
@@ -53,7 +52,7 @@ export async function POST(req: NextRequest) {
     if (value !== 'true' && value !== 'false') {
       return Response.json({ ok: false, error: 'Value must be true or false' }, { status: 400 })
     }
-    const result = await rconForRequest(req, `gamerule ${rule} ${value}`)
+    const result = await rconForRequest(req, `fgmc gamerule set ${rule} ${value}`)
     if (!result.ok) return Response.json({ ok: false, error: result.error })
     return Response.json({ ok: true, message: `${rule} set to ${value}` })
   } catch (e: unknown) {
