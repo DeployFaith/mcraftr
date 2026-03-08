@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { rconForRequest, getSessionUserId, getSessionActiveServerId } from '@/lib/rcon'
 import { logAudit } from '@/lib/audit'
 import { getUserFeatures } from '@/lib/users'
 
@@ -12,6 +12,8 @@ const PLAYER_RE = /^\.?[a-zA-Z0-9_]{1,16}$/
 export async function POST(req: NextRequest) {
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const serverId = await getSessionActiveServerId(req)
+  if (!serverId) return Response.json({ ok: false, error: 'No active server selected' }, { status: 400 })
   if (!getUserFeatures(userId).enable_admin_moderation) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   try {
     const { player, pardonIp } = await req.json()
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, error: failed[0].error || 'Pardon failed' })
     }
 
-    logAudit(userId, 'pardon', player)
+    logAudit(userId, 'pardon', player, undefined, serverId)
     return Response.json({
       ok: true,
       message: `Pardoned ${player}${pardonIp ? ' (+ IP)' : ''}`,

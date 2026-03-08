@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { rconForRequest, getSessionActiveServerId, getSessionUserId } from '@/lib/rcon'
 import { getDb } from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -9,33 +9,33 @@ export const dynamic = 'force-dynamic'
 // Persists player join timestamps across container restarts.
 // Uses the shared DB singleton from lib/db.ts.
 
-function getSessionStarts(userId: string, playerList: string[]): Record<string, number> {
+function getSessionStarts(userId: string, serverId: string, playerList: string[]): Record<string, number> {
   const db  = getDb()
   const now = Date.now()
 
   if (playerList.length === 0) {
-    db.prepare('DELETE FROM player_sessions WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM player_sessions WHERE user_id = ? AND server_id = ?').run(userId, serverId)
     return {}
   }
 
   // Upsert new players — IGNORE preserves existing join time for returning players
   const insert = db.prepare(
-    'INSERT OR IGNORE INTO player_sessions (user_id, player_name, joined_at) VALUES (?, ?, ?)'
+    'INSERT OR IGNORE INTO player_sessions (user_id, server_id, player_name, joined_at) VALUES (?, ?, ?, ?)'
   )
   db.transaction((names: string[]) => {
-    for (const name of names) insert.run(userId, name, now)
+    for (const name of names) insert.run(userId, serverId, name, now)
   })(playerList)
 
   // Remove players who left
   const placeholders = playerList.map(() => '?').join(', ')
   db.prepare(
-    `DELETE FROM player_sessions WHERE user_id = ? AND player_name NOT IN (${placeholders})`
-  ).run(userId, ...playerList)
+    `DELETE FROM player_sessions WHERE user_id = ? AND server_id = ? AND player_name NOT IN (${placeholders})`
+  ).run(userId, serverId, ...playerList)
 
   // Read back persisted join times
   const rows = db.prepare(
-    `SELECT player_name, joined_at FROM player_sessions WHERE user_id = ? AND player_name IN (${placeholders})`
-  ).all(userId, ...playerList) as { player_name: string; joined_at: number }[]
+    `SELECT player_name, joined_at FROM player_sessions WHERE user_id = ? AND server_id = ? AND player_name IN (${placeholders})`
+  ).all(userId, serverId, ...playerList) as { player_name: string; joined_at: number }[]
 
   const result: Record<string, number> = {}
   for (const row of rows) result[row.player_name] = row.joined_at
@@ -46,8 +46,12 @@ function getSessionStarts(userId: string, playerList: string[]): Record<string, 
 
 export async function GET(req: NextRequest) {
   const userId = await getSessionUserId(req)
+  const serverId = await getSessionActiveServerId(req)
   if (!userId) {
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  }
+  if (!serverId) {
+    return Response.json({ count: 0, players: '', ts: Date.now(), sessionStarts: {}, error: 'No active server' })
   }
   try {
     const data = await rconForRequest(req, 'list')
@@ -69,18 +73,18 @@ export async function GET(req: NextRequest) {
         .filter(Boolean)
     }
 
-    const sessionStarts = getSessionStarts(userId, playerList)
+    const sessionStarts = getSessionStarts(userId, serverId, playerList)
 
     // Update player directory — upsert last_seen for all currently online players
     if (playerList.length > 0) {
       const db = getDb()
       const upsert = db.prepare(
-        `INSERT INTO player_directory (user_id, player_name, last_seen)
-         VALUES (?, ?, unixepoch())
-         ON CONFLICT(user_id, player_name) DO UPDATE SET last_seen = unixepoch()`
+        `INSERT INTO player_directory (user_id, server_id, player_name, last_seen)
+         VALUES (?, ?, ?, unixepoch())
+         ON CONFLICT(user_id, server_id, player_name) DO UPDATE SET last_seen = unixepoch()`
       )
       db.transaction((names: string[]) => {
-        for (const name of names) upsert.run(userId, name)
+        for (const name of names) upsert.run(userId, serverId, name)
       })(playerList)
     }
 

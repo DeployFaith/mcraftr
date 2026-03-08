@@ -3,15 +3,17 @@
 import { startTransition, useState, useCallback, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
-import { Users, Zap, Shield, MessageSquare, Settings } from 'lucide-react'
+import { LayoutDashboard, Users, Zap, Shield, MessageSquare, Settings } from 'lucide-react'
+import DashboardSection from './components/DashboardSection'
 import PlayersSection from './components/PlayersSection'
 import ActionsSection from './components/ActionsSection'
 import ChatSection from './components/ChatSection'
 import AdminSection from './components/AdminSection'
 import SettingsSection from './components/SettingsSection'
 import type { FeatureKey } from '@/lib/features'
+import { playSound } from '@/app/components/soundfx'
 
-export type TabId = 'players' | 'actions' | 'admin' | 'chat' | 'settings'
+export type TabId = 'dashboard' | 'players' | 'actions' | 'admin' | 'chat' | 'settings'
 
 type FeatureFlags = Record<FeatureKey, boolean>
 
@@ -21,6 +23,7 @@ const ALL_TABS: {
   Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>
   adminOnly?: boolean
 }[] = [
+  { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { id: 'players', label: 'Players', Icon: Users },
   { id: 'actions', label: 'Actions', Icon: Zap },
   { id: 'admin', label: 'Admin', Icon: Shield, adminOnly: true },
@@ -28,11 +31,11 @@ const ALL_TABS: {
   { id: 'settings', label: 'Settings', Icon: Settings },
 ]
 
-const VALID_TABS: TabId[] = ['players', 'actions', 'admin', 'chat', 'settings']
+const VALID_TABS: TabId[] = ['dashboard', 'players', 'actions', 'admin', 'chat', 'settings']
 
 function normalizeTab(raw: string | null | undefined): TabId {
-  if (!raw) return 'players'
-  return VALID_TABS.includes(raw as TabId) ? (raw as TabId) : 'players'
+  if (!raw) return 'dashboard'
+  return VALID_TABS.includes(raw as TabId) ? (raw as TabId) : 'dashboard'
 }
 
 export default function MinecraftClientPage({ initialTab, initialRole }: { initialTab: TabId; initialRole?: string }) {
@@ -80,6 +83,7 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
       setActiveTab(id)
       setVisitedTabs(prev => (prev.includes(id) ? prev : [...prev, id]))
     })
+    playSound('uiClick')
     const params = new URLSearchParams(window.location.search)
     params.set('tab', id)
     const qs = params.toString()
@@ -92,6 +96,7 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
   }, [])
 
   const tabs = ALL_TABS.filter(t => {
+    if (t.id === 'dashboard' && features && !features.enable_dashboard_tab) return false
     if (t.id === 'players' && features && !features.enable_players_tab) return false
     if (t.id === 'actions' && features && !features.enable_actions_tab) return false
     if (t.id === 'chat' && features && !features.enable_chat) return false
@@ -105,7 +110,7 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
     }
     return !t.adminOnly || role === 'admin'
   })
-  const visibleTab = tabs.find(t => t.id === activeTab) ? activeTab : 'players'
+  const visibleTab = tabs.find(t => t.id === activeTab) ? activeTab : 'dashboard'
 
   useEffect(() => {
     setVisitedTabs(prev => (prev.includes(visibleTab) ? prev : [...prev, visibleTab]))
@@ -117,21 +122,37 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-48px)]">
-      <nav className="hidden md:flex border-b border-[var(--border)] sticky top-12 z-30 backdrop-blur-md" style={{ background: 'rgba(10,10,15,0.9)' }}>
-        <div className="max-w-4xl mx-auto flex w-full">
+      <nav className="hidden md:flex sticky top-14 z-30 border-b border-[var(--border)] backdrop-blur-md" style={{ background: 'rgba(10,10,15,0.88)' }}>
+        <div className="max-w-5xl mx-auto flex w-full gap-2 px-4 py-3">
           {tabs.map(({ id, label, Icon }) => {
             const active = visibleTab === id
             return (
               <button
                 key={id}
                 onClick={() => handleTabChange(id)}
-                className={`flex items-center gap-2 px-5 py-3 text-[13px] font-mono tracking-widest transition-all border-b-2 ${
+                className={`group flex items-center gap-2.5 rounded-full border px-4 py-2.5 text-[12px] font-mono tracking-[0.16em] transition-all ${
                   active
-                    ? 'border-[var(--accent)] text-[var(--accent)]'
-                    : 'border-transparent text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--border)]'
+                    ? 'text-[var(--accent)] shadow-[0_0_0_1px_var(--accent-mid),0_10px_30px_rgba(0,0,0,0.18)]'
+                    : 'text-[var(--text-dim)] hover:text-[var(--text)]'
                 }`}
+                style={active
+                  ? {
+                      borderColor: 'var(--accent-mid)',
+                      background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--panel) 84%, transparent))',
+                    }
+                  : {
+                      borderColor: 'var(--border)',
+                      background: 'color-mix(in srgb, var(--panel) 82%, transparent)',
+                    }}
               >
-                <Icon size={14} color={active ? 'var(--accent)' : 'var(--text-dim)'} strokeWidth={1.75} />
+                <span
+                  className="grid h-7 w-7 place-items-center rounded-full transition-all"
+                  style={active
+                    ? { background: 'var(--accent-dim)', color: 'var(--accent)' }
+                    : { background: 'color-mix(in srgb, var(--panel) 72%, transparent)', color: 'var(--text-dim)' }}
+                >
+                  <Icon size={14} color="currentColor" strokeWidth={1.9} />
+                </span>
                 <span>{label.toUpperCase()}</span>
               </button>
             )
@@ -140,6 +161,11 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
       </nav>
 
       <div className="flex-1 max-w-4xl mx-auto w-full px-3 sm:px-4 py-3 md:py-4 md:pb-6" style={{ paddingBottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}>
+        {shouldRenderTab('dashboard') && (
+          <div className={visibleTab === 'dashboard' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'dashboard'}>
+            <DashboardSection onNavigate={handleTabChange} />
+          </div>
+        )}
         {shouldRenderTab('players') && (
           <div className={visibleTab === 'players' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'players'}>
             <PlayersSection onPlayersChange={handlePlayersChange} />
@@ -168,16 +194,29 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
       </div>
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--border)] safe-bottom" style={{ background: 'rgba(10,10,15,0.95)', backdropFilter: 'blur(12px)' }}>
-        <div className="flex">
+        <div className="flex px-1.5 pt-1.5">
           {tabs.map(({ id, label, Icon }) => {
             const active = visibleTab === id
             return (
-              <button key={id} onClick={() => handleTabChange(id)} className="tap-target relative flex-1 flex flex-col items-center gap-1 py-3 transition-all">
-                <Icon size={20} color={active ? 'var(--accent)' : 'var(--text-dim)'} strokeWidth={1.75} />
+              <button
+                key={id}
+                onClick={() => handleTabChange(id)}
+                className="tap-target relative mx-0.5 flex-1 rounded-2xl flex flex-col items-center gap-1 py-3 transition-all"
+                style={active
+                  ? {
+                      background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--panel) 88%, transparent))',
+                      border: '1px solid var(--accent-mid)',
+                    }
+                  : {
+                      background: 'transparent',
+                      border: '1px solid transparent',
+                    }}
+              >
+                <Icon size={20} color={active ? 'var(--accent)' : 'var(--text-dim)'} strokeWidth={1.85} />
                 <span className="text-[13px] font-mono tracking-widest" style={{ color: active ? 'var(--accent)' : 'var(--text-dim)' }}>
                   {label.toUpperCase()}
                 </span>
-                {active && <span className="absolute bottom-0 w-8 h-0.5 rounded-full" style={{ background: 'var(--accent)' }} />}
+                {active && <span className="absolute bottom-1 w-8 h-0.5 rounded-full" style={{ background: 'var(--accent)' }} />}
               </button>
             )
           })}

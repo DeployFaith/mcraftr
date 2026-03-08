@@ -26,10 +26,14 @@ export default auth((req) => {
   // could be forged by any authenticated user to bypass this gate.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const hasServer = (session as any)?.hasServer as boolean | undefined
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const activeServerId = (session as any)?.activeServerId as string | null | undefined
 
-  if (!hasServer
+  if ((!hasServer || !activeServerId)
     && nextUrl.pathname !== '/connect'
     && !nextUrl.pathname.startsWith('/api/server')
+    && !nextUrl.pathname.startsWith('/api/servers')
+    && !nextUrl.pathname.startsWith('/api/account/saved-accounts')
   ) {
     return NextResponse.redirect(new URL('/connect', req.url))
   }

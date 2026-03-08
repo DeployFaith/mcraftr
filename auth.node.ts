@@ -42,8 +42,10 @@ export const { handlers, auth: nodeAuth, signIn, signOut } = NextAuth({
       // requiring a full sign-out/sign-in cycle.
       if (token.id) {
         const u = getUserById(token.id as string)
-        token.hasServer = !!u?.server
+        token.hasServer = (u?.servers.length ?? 0) > 0
         token.role = u?.role ?? 'user'
+        token.activeServerId = u?.activeServerId ?? null
+        token.activeServerLabel = u?.serverLabel ?? null
       }
       return token
     },

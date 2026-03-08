@@ -9,6 +9,7 @@ export const FEATURE_CATEGORIES = [
 export type FeatureCategory = typeof FEATURE_CATEGORIES[number]['id']
 
 export const FEATURE_DEFS = [
+  { key: 'enable_dashboard_tab', label: 'Dashboard Tab', desc: 'Show/hide the Dashboard tab in navigation', category: 'tabs' },
   { key: 'enable_players_tab', label: 'Players Tab', desc: 'Show/hide the Players tab in navigation', category: 'tabs' },
   { key: 'enable_actions_tab', label: 'Actions Tab', desc: 'Show/hide the Actions tab in navigation', category: 'tabs' },
   { key: 'enable_chat', label: 'Chat Tab', desc: 'Show/hide the Chat tab in navigation', category: 'tabs' },
@@ -36,6 +37,7 @@ export const FEATURE_DEFS = [
   { key: 'enable_admin_moderation', label: 'Moderation', desc: 'Kick, ban, pardon and view ban list', category: 'admin' },
   { key: 'enable_admin_whitelist', label: 'Whitelist', desc: 'Manage whitelist entries', category: 'admin' },
   { key: 'enable_admin_operator', label: 'Operator', desc: 'Grant or revoke operator status', category: 'admin' },
+  { key: 'enable_admin_schedules', label: 'Schedules', desc: 'Create and manage recurring server actions', category: 'admin' },
   { key: 'enable_rcon', label: 'RCON Console', desc: 'Allow raw RCON console commands', category: 'admin' },
   { key: 'enable_admin_audit', label: 'Audit Log', desc: 'View admin action audit history', category: 'admin' },
   { key: 'enable_admin_user_management', label: 'User Management', desc: 'Create users and change roles', category: 'admin' },

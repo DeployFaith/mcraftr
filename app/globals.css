@@ -2,6 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Mcraftr Sans';
+  src: url('/fonts/DejaVuSans.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Mcraftr Sans';
+  src: url('/fonts/DejaVuSans-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Mcraftr Mono';
+  src: url('/fonts/DejaVuSansMono.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Mcraftr Mono';
+  src: url('/fonts/DejaVuSansMono-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ── Dark theme (default) ─────────────────────────────────────────────────── */
 :root {
   --bg:          #0d0d14;
@@ -15,9 +47,18 @@
   --accent-dim:  color-mix(in srgb, var(--accent) 18%, transparent);
   --accent-mid:  color-mix(in srgb, var(--accent) 40%, transparent);
   --accent-glow: var(--accent);
+  --font-operator: 'Mcraftr Mono';
+  --font-minecraft: 'Mcraftr Sans';
+  --font-pixel: 'Mcraftr Mono';
+  --font-terminal: 'Mcraftr Mono';
   --app-font-sans: system-ui, sans-serif;
   --app-font-mono: var(--font-operator), ui-monospace, monospace;
   --app-font-size: 16px;
+  --app-font-weight: 400;
+  --app-font-letter-spacing: 0;
+  --app-font-line-height: 1.45;
+  --app-mono-transform: none;
+  --app-mono-spacing: 0;
 }
 
 /* ── Light theme ──────────────────────────────────────────────────────────── */
@@ -38,37 +79,66 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--app-font-sans);
+  font-weight: var(--app-font-weight);
+  letter-spacing: var(--app-font-letter-spacing);
+  line-height: var(--app-font-line-height);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
 
 html {
   font-size: var(--app-font-size);
+  scroll-behavior: smooth;
 }
 
 [data-font="system"] {
   --app-font-sans: system-ui, sans-serif;
   --app-font-mono: system-ui, sans-serif;
+  --app-font-weight: 400;
+  --app-font-letter-spacing: 0;
+  --app-font-line-height: 1.45;
+  --app-mono-transform: none;
+  --app-mono-spacing: 0;
 }
 
 [data-font="operator"] {
   --app-font-sans: var(--font-operator), ui-monospace, monospace;
   --app-font-mono: var(--font-operator), ui-monospace, monospace;
+  --app-font-weight: 400;
+  --app-font-letter-spacing: 0.01em;
+  --app-font-line-height: 1.45;
+  --app-mono-transform: none;
+  --app-mono-spacing: 0.01em;
 }
 
 [data-font="minecraft"] {
   --app-font-sans: var(--font-minecraft), monospace;
   --app-font-mono: var(--font-minecraft), monospace;
+  --app-font-weight: 700;
+  --app-font-letter-spacing: 0.015em;
+  --app-font-line-height: 1.4;
+  --app-mono-transform: none;
+  --app-mono-spacing: 0.015em;
 }
 
 [data-font="pixel"] {
   --app-font-sans: var(--font-pixel), monospace;
   --app-font-mono: var(--font-pixel), monospace;
+  --app-font-weight: 700;
+  --app-font-letter-spacing: 0.03em;
+  --app-font-line-height: 1.35;
+  --app-mono-transform: uppercase;
+  --app-mono-spacing: 0.04em;
 }
 
 [data-font="terminal"] {
   --app-font-sans: var(--font-terminal), monospace;
   --app-font-mono: var(--font-terminal), monospace;
+  --app-font-weight: 400;
+  --app-font-letter-spacing: 0.02em;
+  --app-font-line-height: 1.32;
+  --app-mono-transform: none;
+  --app-mono-spacing: 0.025em;
 }
 
 [data-font-size="sm"] {
@@ -89,10 +159,16 @@ html {
 
 .font-mono {
   font-family: var(--app-font-mono) !important;
+  letter-spacing: var(--app-mono-spacing) !important;
+  text-transform: var(--app-mono-transform);
 }
 
 .font-sans {
   font-family: var(--app-font-sans) !important;
+}
+
+button, input, select, textarea {
+  font: inherit;
 }
 
 #__next {

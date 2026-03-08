@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { rconForRequest, getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
+import { rconForRequest, getSessionUserId, getSessionActiveServerId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 import { getUserById } from '@/lib/users'
 import { logAudit } from '@/lib/audit'
 
@@ -13,6 +13,8 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const serverId = await getSessionActiveServerId(req)
+  if (!serverId) return Response.json({ ok: false, error: 'No active server selected' }, { status: 400 })
 
   const features = await getUserFeatureFlags(req)
   if (!checkFeatureAccess(features, 'enable_rcon')) {
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, error: result.error || 'RCON error' })
     }
 
-    logAudit(userId, 'cmd', undefined, cmd)
+    logAudit(userId, 'cmd', undefined, cmd, serverId)
     return Response.json({ ok: true, output: result.stdout || '(no output)' })
   } catch (e: unknown) {
     console.error('[mcraftr:rcon] route error', e)

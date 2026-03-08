@@ -1,34 +1,95 @@
 'use client'
-import { useState, useEffect, Suspense } from 'react'
+import { useCallback, useEffect, useState, Suspense } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import BrandLockup from '@/app/components/BrandLockup'
 
 type TestState = 'idle' | 'testing' | 'success' | 'fail'
 
+type SavedServer = {
+  id: string
+  label: string | null
+  host: string
+  port: number
+  createdAt: number
+  updatedAt: number
+}
+
 function ConnectForm() {
   const searchParams = useSearchParams()
-  const isEdit = searchParams.get('edit') === '1'
+  const wantsEdit = searchParams.get('edit') === '1'
   const { update: updateSession } = useSession()
-  const [host, setHost]         = useState('')
-  const [port, setPort]         = useState('25575')
+
+  const [label, setLabel] = useState('')
+  const [host, setHost] = useState('')
+  const [port, setPort] = useState('25575')
   const [password, setPassword] = useState('')
   const [showHelp, setShowHelp] = useState(false)
   const [testState, setTestState] = useState<TestState>('idle')
-  const [testMsg, setTestMsg]   = useState('')
-  const [saving, setSaving]     = useState(false)
-  const [error, setError]       = useState('')
+  const [testMsg, setTestMsg] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
+  const [loadingServers, setLoadingServers] = useState(true)
+  const [servers, setServers] = useState<SavedServer[]>([])
+  const [activeServerId, setActiveServerId] = useState<string | null>(null)
+  const [editingServerId, setEditingServerId] = useState<string | null>(null)
 
-  // Pre-populate fields when editing
-  useEffect(() => {
-    if (!isEdit) return
-    fetch('/api/server').then(r => r.json()).then(d => {
-      if (d.ok && d.host) {
-        setHost(d.host)
-        setPort(String(d.port ?? 25575))
+  const resetForm = useCallback(() => {
+    setEditingServerId(null)
+    setLabel('')
+    setHost('')
+    setPort('25575')
+    setPassword('')
+    setTestState('idle')
+    setTestMsg('')
+    setError('')
+    setInfo('')
+  }, [])
+
+  const loadServers = useCallback(async () => {
+    setLoadingServers(true)
+    try {
+      const res = await fetch('/api/servers', { cache: 'no-store' })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || 'Failed to load servers')
+      const nextServers = (data.servers ?? []) as SavedServer[]
+      setServers(nextServers)
+      setActiveServerId(data.activeServerId ?? null)
+
+      if (wantsEdit && !editingServerId) {
+        const active = nextServers.find(server => server.id === data.activeServerId) ?? nextServers[0]
+        if (active) {
+          setEditingServerId(active.id)
+          setLabel(active.label ?? '')
+          setHost(active.host)
+          setPort(String(active.port ?? 25575))
+          setPassword('')
+        }
       }
-    }).catch(() => {})
-  }, [isEdit])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load servers')
+    } finally {
+      setLoadingServers(false)
+    }
+  }, [editingServerId, wantsEdit])
+
+  useEffect(() => {
+    void loadServers()
+  }, [loadServers])
+
+  const startEditing = (server: SavedServer) => {
+    setEditingServerId(server.id)
+    setLabel(server.label ?? '')
+    setHost(server.host)
+    setPort(String(server.port ?? 25575))
+    setPassword('')
+    setTestState('idle')
+    setTestMsg('')
+    setError('')
+    setInfo('')
+  }
 
   const handleTest = async () => {
     if (!host || !password) {
@@ -65,195 +126,325 @@ function ConnectForm() {
     }
     setSaving(true)
     setError('')
+    setInfo('')
     try {
-      const res = await fetch('/api/server', {
-        method: 'POST',
+      const payload = {
+        label: label.trim() || null,
+        host,
+        port: parseInt(port) || 25575,
+        password,
+      }
+      const res = await fetch(editingServerId ? `/api/servers/${editingServerId}` : '/api/servers', {
+        method: editingServerId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ host, port: parseInt(port) || 25575, password }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
-      if (data.ok) {
-        // Refresh the JWT so hasServer=true is reflected before navigating.
-        // Without this, middleware would see the stale hasServer=false and
-        // redirect back to /connect immediately.
-        await updateSession()
-        window.location.href = '/minecraft'
-      } else {
+      if (!data.ok) {
         setError(data.error || 'Failed to save server')
         setSaving(false)
+        return
       }
+
+      await updateSession()
+      await loadServers()
+
+      if (editingServerId) {
+        setInfo('Server updated')
+      } else if (servers.length === 0) {
+        window.location.href = '/minecraft'
+        return
+      } else {
+        setInfo('Server added')
+      }
+
+      resetForm()
     } catch {
       setError('Something went wrong. Please try again.')
+    } finally {
       setSaving(false)
     }
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg)' }}>
-      <div className="w-full max-w-md">
+  const handleActivate = async (serverId: string) => {
+    try {
+      const res = await fetch('/api/servers/active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serverId }),
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || 'Failed to switch server')
+      await updateSession()
+      await loadServers()
+      setInfo('Active server updated')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to switch server')
+    }
+  }
 
+  const handleDelete = async (server: SavedServer) => {
+    if (!confirm(`Delete ${server.label?.trim() || `${server.host}:${server.port}`}?`)) return
+    try {
+      const res = await fetch(`/api/servers/${server.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || 'Failed to delete server')
+      await updateSession()
+      await loadServers()
+      if (editingServerId === server.id) resetForm()
+      setInfo('Server removed')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete server')
+    }
+  }
+
+  const heading = servers.length > 0 ? 'manage your minecraft servers' : 'connect your minecraft server'
+
+  return (
+    <div className="min-h-screen p-4 sm:p-6" style={{ background: 'var(--bg)' }}>
+      <div className="w-full max-w-5xl mx-auto py-6 sm:py-10">
         <div className="text-center mb-8">
-          <BrandLockup size="hero" className="justify-center" />
+          <Link href="/minecraft" className="inline-flex rounded-2xl px-3 py-2 transition-transform hover:-translate-y-0.5" aria-label="Return to Mcraftr">
+            <BrandLockup size="hero" className="justify-center" />
+          </Link>
           <div className="text-xs font-mono mt-1" style={{ color: 'var(--text-dim)' }}>
-            {isEdit ? 'update server connection' : 'connect your minecraft server'}
+            {heading}
+          </div>
+          <div className="text-[11px] font-mono mt-3" style={{ color: 'var(--text-dim)' }}>
+            Click the mark to go back, or finish here and return below.
           </div>
         </div>
 
-        <div className="glass-card p-6 space-y-5">
-
-          {/* Intro */}
-          <p className="text-sm font-mono" style={{ color: 'var(--text-dim)' }}>
-            {isEdit
-              ? 'Update your server address or RCON password below.'
-              : 'To get started, enter your Minecraft server\'s address and RCON password. You only need to do this once.'}
-          </p>
-
-          {/* Server address */}
-          <div>
-            <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
-              SERVER ADDRESS
-            </label>
-            <input
-              type="text"
-              value={host}
-              onChange={e => { setHost(e.target.value); setTestState('idle'); setTestMsg('') }}
-              placeholder="play.yourserver.com or 192.168.1.100"
-              className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
-              style={{
-                background: 'var(--panel)',
-                border: '1px solid var(--border)',
-                color: 'var(--text)',
-                fontSize: '16px',
-              }}
-              onFocus={e => (e.target.style.borderColor = 'var(--accent-mid)')}
-              onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-            />
-            <p className="text-[10px] font-mono mt-1" style={{ color: 'var(--text-dim)' }}>
-              The same address your kids use to join the server
+        <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="glass-card p-6 space-y-5">
+            <p className="text-sm font-mono" style={{ color: 'var(--text-dim)' }}>
+              {editingServerId
+                ? 'Update the selected saved server. Enter the password again when saving changes.'
+                : servers.length > 0
+                  ? 'Add another server or edit an existing saved server connection.'
+                  : 'To get started, enter your Minecraft server address and RCON password.'}
             </p>
+
+            <div>
+              <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                SERVER LABEL <span style={{ color: 'var(--text-dim)', fontWeight: 'normal' }}>(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={label}
+                onChange={e => { setLabel(e.target.value); setTestState('idle'); setTestMsg('') }}
+                placeholder="Family SMP, Kids World, Survival..."
+                className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
+              />
+            </div>
+
+            <div>
+              <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                SERVER ADDRESS
+              </label>
+              <input
+                type="text"
+                value={host}
+                onChange={e => { setHost(e.target.value); setTestState('idle'); setTestMsg('') }}
+                placeholder="play.yourserver.com or 192.168.1.100"
+                className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
+              />
+            </div>
+
+            <div>
+              <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                RCON PORT
+              </label>
+              <input
+                type="number"
+                value={port}
+                onChange={e => { setPort(e.target.value); setTestState('idle'); setTestMsg('') }}
+                className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
+              />
+            </div>
+
+            <div>
+              <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                RCON PASSWORD
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => { setPassword(e.target.value); setTestState('idle'); setTestMsg('') }}
+                placeholder={editingServerId ? 'Enter password again to save changes' : 'Found in your server control panel'}
+                className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowHelp(h => !h)}
+                className="text-[10px] font-mono mt-1.5 underline"
+                style={{ color: 'var(--accent)' }}
+              >
+                {showHelp ? 'Hide help' : 'Where do I find this?'}
+              </button>
+
+              {showHelp && (
+                <div className="mt-3 p-3 rounded-lg space-y-2 text-[11px] font-mono" style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                  <p className="font-bold" style={{ color: 'var(--text)' }}>Finding your RCON password:</p>
+                  <ul className="space-y-1.5 list-none">
+                    <li><span style={{ color: 'var(--accent)' }}>Apex Hosting</span> — Game Panel → Config Files → server.properties → look for <code>rcon.password</code></li>
+                    <li><span style={{ color: 'var(--accent)' }}>Shockbyte</span> — Multicraft panel → Files → Config Files → server.properties</li>
+                    <li><span style={{ color: 'var(--accent)' }}>Bisect Hosting</span> — Game Panel → Configuration → server.properties</li>
+                    <li><span style={{ color: 'var(--accent)' }}>Nodecraft</span> — Game panel → Configuration → server.properties</li>
+                    <li><span style={{ color: 'var(--accent)' }}>Self-hosted</span> — Open <code>server.properties</code>, set <code>enable-rcon=true</code>, and set <code>rcon.password</code>.</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {testState !== 'idle' && (
+              <div
+                className="text-xs font-mono px-3 py-2 rounded-lg"
+                style={{
+                  background: testState === 'success' ? '#0f2a0f' : testState === 'fail' ? '#2a0f0f' : 'var(--panel)',
+                  color: testState === 'success' ? '#86efac' : testState === 'fail' ? '#fca5a5' : 'var(--text-dim)',
+                  border: `1px solid ${testState === 'success' ? '#166534' : testState === 'fail' ? '#7f1d1d' : 'var(--border)'}`,
+                }}
+              >
+                {testState === 'testing' ? 'Testing connection…' : testMsg}
+              </div>
+            )}
+
+            {error && (
+              <div className="text-xs font-mono px-3 py-2 rounded-lg" style={{ background: '#2a0f0f', color: '#fca5a5', border: '1px solid #7f1d1d' }}>
+                {error}
+              </div>
+            )}
+
+            {info && (
+              <div className="text-xs font-mono px-3 py-2 rounded-lg" style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-mid)' }}>
+                {info}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handleTest}
+                disabled={testState === 'testing'}
+                className="flex-1 min-w-[160px] py-3 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-50"
+                style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)' }}
+              >
+                {testState === 'testing' ? 'Testing…' : 'Test Connection'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 min-w-[160px] py-3 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-50"
+                style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}
+              >
+                {saving ? 'Saving…' : editingServerId ? 'Save Changes' : servers.length > 0 ? 'Add Server' : 'Save & Continue →'}
+              </button>
+
+              {(editingServerId || servers.length > 0) && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="py-3 px-4 rounded-lg font-mono text-xs tracking-widest transition-all border"
+                  style={{ background: 'var(--panel)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}
+                >
+                  New Server
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* RCON port — collapsed by default, most users don't need it */}
-          <div>
-            <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
-              RCON PORT <span style={{ color: 'var(--text-dim)', fontWeight: 'normal' }}>(default: 25575 — leave this alone unless your host says otherwise)</span>
-            </label>
-            <input
-              type="number"
-              value={port}
-              onChange={e => { setPort(e.target.value); setTestState('idle'); setTestMsg('') }}
-              className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
-              style={{
-                background: 'var(--panel)',
-                border: '1px solid var(--border)',
-                color: 'var(--text)',
-                fontSize: '16px',
-              }}
-              onFocus={e => (e.target.style.borderColor = 'var(--accent-mid)')}
-              onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-            />
-          </div>
+          <div className="glass-card p-6 space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="text-[13px] font-mono tracking-widest text-[var(--accent)]">SAVED SERVERS</div>
+                <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1">One account can manage multiple servers. Pick one active server at a time.</div>
+              </div>
+            </div>
 
-          {/* RCON password */}
-          <div>
-            <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
-              RCON PASSWORD
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => { setPassword(e.target.value); setTestState('idle'); setTestMsg('') }}
-              placeholder="Found in your server control panel"
-              className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
-              style={{
-                background: 'var(--panel)',
-                border: '1px solid var(--border)',
-                color: 'var(--text)',
-                fontSize: '16px',
-              }}
-              onFocus={e => (e.target.style.borderColor = 'var(--accent-mid)')}
-              onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-            />
+            {loadingServers ? (
+              <div className="text-[12px] font-mono text-[var(--text-dim)]">Loading…</div>
+            ) : servers.length === 0 ? (
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4 text-[12px] font-mono text-[var(--text-dim)]">
+                No saved servers yet.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {servers.map(server => {
+                  const isActive = server.id === activeServerId
+                  const labelText = server.label?.trim() || `${server.host}:${server.port}`
+                  return (
+                    <div key={server.id} className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-mono text-[var(--text)] truncate">{labelText}</div>
+                          <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1 break-all">{server.host}:{server.port}</div>
+                        </div>
+                        <span
+                          className="shrink-0 rounded border px-2 py-1 text-[10px] font-mono tracking-widest"
+                          style={isActive
+                            ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
+                            : { borderColor: 'var(--border)', color: 'var(--text-dim)' }}
+                        >
+                          {isActive ? 'ACTIVE' : 'SAVED'}
+                        </span>
+                      </div>
 
-            {/* Help toggle */}
-            <button
-              type="button"
-              onClick={() => setShowHelp(h => !h)}
-              className="text-[10px] font-mono mt-1.5 underline"
-              style={{ color: 'var(--accent)' }}
-            >
-              {showHelp ? 'Hide help' : 'Where do I find this?'}
-            </button>
-
-            {showHelp && (
-              <div className="mt-3 p-3 rounded-lg space-y-2 text-[11px] font-mono" style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
-                <p className="font-bold" style={{ color: 'var(--text)' }}>Finding your RCON password:</p>
-                <ul className="space-y-1.5 list-none">
-                  <li><span style={{ color: 'var(--accent)' }}>Apex Hosting</span> — Game Panel → Config Files → server.properties → look for <code>rcon.password</code></li>
-                  <li><span style={{ color: 'var(--accent)' }}>Shockbyte</span> — Multicraft panel → Files → Config Files → server.properties</li>
-                  <li><span style={{ color: 'var(--accent)' }}>Bisect Hosting</span> — Game Panel → Configuration → server.properties</li>
-                  <li><span style={{ color: 'var(--accent)' }}>Nodecraft</span> — Game panel → Configuration → server.properties</li>
-                  <li><span style={{ color: 'var(--accent)' }}>Self-hosted</span> — Open <code>server.properties</code> in your server folder. Set <code>enable-rcon=true</code> and set <code>rcon.password</code> to anything you like, then restart your server.</li>
-                </ul>
-                <p className="pt-1" style={{ color: 'var(--text-dim)' }}>
-                  Make sure <code>enable-rcon=true</code> is also set. Most hosting providers have this on by default.
-                </p>
+                      <div className="flex flex-wrap gap-2">
+                        {!isActive && (
+                          <button
+                            type="button"
+                            onClick={() => void handleActivate(server.id)}
+                            className="rounded border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 text-[11px] font-mono text-[var(--accent)]"
+                          >
+                            Use This Server
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => startEditing(server)}
+                          className="rounded border border-[var(--border)] px-3 py-2 text-[11px] font-mono text-[var(--text-dim)]"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(server)}
+                          className="rounded border border-red-900 px-3 py-2 text-[11px] font-mono text-red-400"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
+        </div>
 
-          {/* Test connection feedback */}
-          {testState !== 'idle' && (
-            <div
-              className="text-xs font-mono px-3 py-2 rounded-lg"
-              style={{
-                background: testState === 'success' ? '#0f2a0f' : testState === 'fail' ? '#2a0f0f' : 'var(--panel)',
-                color: testState === 'success' ? '#86efac' : testState === 'fail' ? '#fca5a5' : 'var(--text-dim)',
-                border: `1px solid ${testState === 'success' ? '#166534' : testState === 'fail' ? '#7f1d1d' : 'var(--border)'}`,
-              }}
-            >
-              {testState === 'testing' ? 'Testing connection…' : testMsg}
-            </div>
-          )}
-
-          {error && (
-            <div className="text-xs font-mono px-3 py-2 rounded-lg" style={{ background: '#2a0f0f', color: '#fca5a5', border: '1px solid #7f1d1d' }}>
-              {error}
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-1">
-            {isEdit && (
-              <a
-                href="/minecraft"
-                className="flex-1 py-3 rounded-lg font-mono text-xs tracking-widest transition-all text-center"
-                style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}
-              >
-                Cancel
-              </a>
-            )}
-            <button
-              type="button"
-              onClick={handleTest}
-              disabled={testState === 'testing'}
-              className="flex-1 py-3 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-50"
-              style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)' }}
-            >
-              {testState === 'testing' ? 'Testing…' : 'Test Connection'}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="flex-1 py-3 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-50"
-              style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}
-            >
-              {saving ? 'Saving…' : testState === 'success' ? 'Connect Server →' : 'Save & Continue →'}
-            </button>
-          </div>
-
+        <div className="mt-8 flex justify-center">
+          <Link
+            href="/minecraft"
+            className="group inline-flex items-center gap-3 rounded-full border px-5 py-3 text-[12px] font-mono tracking-[0.14em] transition-all"
+            style={{
+              borderColor: 'var(--accent-mid)',
+              background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
+              color: 'var(--accent)',
+            }}
+          >
+            <span className="grid h-7 w-7 place-items-center rounded-full" style={{ background: 'var(--accent-dim)' }}>
+              <span className="transition-transform group-hover:-translate-x-0.5">←</span>
+            </span>
+            <span>RETURN TO MCRAFTR</span>
+          </Link>
         </div>
       </div>
     </div>
@@ -262,7 +453,7 @@ function ConnectForm() {
 
 export default function ConnectPage() {
   return (
-    <Suspense>
+    <Suspense fallback={null}>
       <ConnectForm />
     </Suspense>
   )

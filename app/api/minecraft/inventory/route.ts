@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { getSessionUserId, rconForRequest, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 import { VALID_ITEM_IDS } from '@/lib/items'
 import { Rcon } from 'rcon-client'
-import { getUserById } from '@/lib/users'
+import { getActiveServer } from '@/lib/users'
 import { getToken } from 'next-auth/jwt'
 import { checkRateLimit } from '@/lib/ratelimit'
 
@@ -73,10 +73,10 @@ async function rconInventory(req: NextRequest, cmds: string[]): Promise<{ ok: bo
   const rl = await checkRateLimit(req, 'inventory', userId)
   if (rl.limited) return { ok: false, results: [], error: 'Too many requests. Please try again later.' }
 
-  const user = getUserById(userId)
-  if (!user?.server) return { ok: false, results: [], error: 'No server configured' }
+  const server = getActiveServer(userId)
+  if (!server) return { ok: false, results: [], error: 'No server configured' }
 
-  const { host, port, password } = user.server
+  const { host, port, password } = server
 
   // Open one RCON connection and send all commands sequentially
   const client = new Rcon({ host, port, password, timeout: 10000 })
