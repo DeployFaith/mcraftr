@@ -13,6 +13,7 @@ import Toasts from './Toasts'
 import ConfirmModal from './ConfirmModal'
 import type { ConfirmModalProps } from './ConfirmModal'
 import CollapsibleCard from './CollapsibleCard'
+import ScheduleSection from './ScheduleSection'
 
 const RCON_HISTORY_KEY = 'mcraftr:rcon:history'
 const RCON_HISTORY_MAX = 20
@@ -111,6 +112,7 @@ export default function AdminSection({ players }: Props) {
   const canModeration = features ? features.enable_admin_moderation : true
   const canWhitelist = features ? features.enable_admin_whitelist : true
   const canOperator = features ? features.enable_admin_operator : true
+  const canSchedules = features ? features.enable_admin_schedules : true
   const canRcon = features ? features.enable_rcon : true
   const canAudit = features ? features.enable_admin_audit : true
   const canUserMgmt = features ? features.enable_admin_user_management : true
@@ -552,7 +554,7 @@ export default function AdminSection({ players }: Props) {
 
       <Toasts toasts={toasts} />
 
-      {!canServerInfo && !canRules && !canServerControls && !canModeration && !canWhitelist && !canOperator && !canRcon && !canAudit && !canUserMgmt && !canFeaturePolicies && (
+      {!canServerInfo && !canRules && !canServerControls && !canModeration && !canWhitelist && !canOperator && !canSchedules && !canRcon && !canAudit && !canUserMgmt && !canFeaturePolicies && (
         <div className="glass-card p-4 text-[13px] font-mono text-[var(--text-dim)]">All admin features are disabled for this account.</div>
       )}
 
@@ -609,7 +611,7 @@ export default function AdminSection({ players }: Props) {
 
       {/* ── SERVER CONFIG ── */}
       {(canRules || canServerControls) && (
-      <CollapsibleCard title="SERVER CONFIG" storageKey="admin:server-config" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="SAFE SERVER SETTINGS" storageKey="admin:server-config" bodyClassName="p-4 space-y-4">
 
         {canRules && (
         <div>
@@ -700,6 +702,8 @@ export default function AdminSection({ players }: Props) {
         )}
       </CollapsibleCard>
       )}
+
+      {canSchedules && <ScheduleSection />}
 
       {/* ── MODERATION ── */}
       {canModeration && (

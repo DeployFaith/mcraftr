@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { rconForRequest, getSessionUserId, getSessionActiveServerId } from '@/lib/rcon'
 import { logAudit } from '@/lib/audit'
 import { getUserFeatures } from '@/lib/users'
 
@@ -9,13 +9,15 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const serverId = await getSessionActiveServerId(req)
+  if (!serverId) return Response.json({ ok: false, error: 'No active server selected' }, { status: 400 })
   if (!getUserFeatures(userId).enable_admin_moderation) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   try {
     const { player, reason, banIp } = await req.json()
     if (!player || typeof player !== 'string') {
       return Response.json({ ok: false, error: 'Player name is required' }, { status: 400 })
     }
-    if (!/^[a-zA-Z0-9_]{1,16}$/.test(player)) {
+    if (!/^\.?[a-zA-Z0-9_]{1,16}$/.test(player)) {
       return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
     }
 
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, error: failed[0].error || 'Ban failed' })
     }
 
-    logAudit(userId, 'ban', player, cleanReason || undefined)
+    logAudit(userId, 'ban', player, cleanReason || undefined, serverId)
     return Response.json({
       ok: true,
       message: `Banned ${player}${banIp ? ' (+ IP)' : ''}${cleanReason ? `: ${cleanReason}` : ''}`,

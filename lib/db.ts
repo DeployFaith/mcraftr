@@ -9,6 +9,69 @@ const DB_FILE  = path.join(DATA_DIR, 'mcraftr.db')
 
 let _db: Database.Database | null = null
 
+function hasColumn(db: Database.Database, table: string, column: string): boolean {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+  return rows.some(row => row.name === column)
+}
+
+function hasTable(db: Database.Database, table: string): boolean {
+  const row = db.prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`
+  ).get(table) as { name?: string } | undefined
+  return !!row?.name
+}
+
+function ensureColumn(db: Database.Database, table: string, column: string, ddl: string): void {
+  if (!hasTable(db, table) || hasColumn(db, table, column)) return
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`)
+}
+
+function migratePlayerTables(db: Database.Database): void {
+  const hasLegacyPlayerSessions = hasTable(db, 'player_sessions') && !hasColumn(db, 'player_sessions', 'server_id')
+  if (hasLegacyPlayerSessions) {
+    db.exec(`
+      ALTER TABLE player_sessions RENAME TO player_sessions_legacy;
+      CREATE TABLE player_sessions (
+        user_id     TEXT NOT NULL,
+        server_id   TEXT NOT NULL,
+        player_name TEXT NOT NULL,
+        joined_at   INTEGER NOT NULL,
+        PRIMARY KEY (user_id, server_id, player_name)
+      );
+    `)
+    db.prepare(`
+      INSERT INTO player_sessions (user_id, server_id, player_name, joined_at)
+      SELECT ps.user_id, COALESCE(u.active_server_id, ''), ps.player_name, ps.joined_at
+      FROM player_sessions_legacy ps
+      LEFT JOIN users u ON u.id = ps.user_id
+      WHERE COALESCE(u.active_server_id, '') != ''
+    `).run()
+    db.exec('DROP TABLE player_sessions_legacy')
+  }
+
+  const hasLegacyPlayerDirectory = hasTable(db, 'player_directory') && !hasColumn(db, 'player_directory', 'server_id')
+  if (hasLegacyPlayerDirectory) {
+    db.exec(`
+      ALTER TABLE player_directory RENAME TO player_directory_legacy;
+      CREATE TABLE player_directory (
+        user_id     TEXT NOT NULL,
+        server_id   TEXT NOT NULL,
+        player_name TEXT NOT NULL,
+        last_seen   INTEGER NOT NULL DEFAULT (unixepoch()),
+        PRIMARY KEY (user_id, server_id, player_name)
+      );
+    `)
+    db.prepare(`
+      INSERT INTO player_directory (user_id, server_id, player_name, last_seen)
+      SELECT pd.user_id, COALESCE(u.active_server_id, ''), pd.player_name, pd.last_seen
+      FROM player_directory_legacy pd
+      LEFT JOIN users u ON u.id = pd.user_id
+      WHERE COALESCE(u.active_server_id, '') != ''
+    `).run()
+    db.exec('DROP TABLE player_directory_legacy')
+  }
+}
+
 export function getDb(): Database.Database {
   if (_db) return _db
 
@@ -24,6 +87,8 @@ export function getDb(): Database.Database {
       email        TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       role         TEXT NOT NULL DEFAULT 'user',
+      avatar_type  TEXT,
+      avatar_value TEXT,
       use_sidecar  INTEGER NOT NULL DEFAULT 0,
       created_at   INTEGER NOT NULL DEFAULT (unixepoch())
     );
@@ -37,21 +102,24 @@ export function getDb(): Database.Database {
 
     CREATE TABLE IF NOT EXISTS player_sessions (
       user_id     TEXT NOT NULL,
+      server_id   TEXT NOT NULL,
       player_name TEXT NOT NULL,
       joined_at   INTEGER NOT NULL,
-      PRIMARY KEY (user_id, player_name)
+      PRIMARY KEY (user_id, server_id, player_name)
     );
 
     CREATE TABLE IF NOT EXISTS player_directory (
       user_id     TEXT NOT NULL,
+      server_id   TEXT NOT NULL,
       player_name TEXT NOT NULL,
       last_seen   INTEGER NOT NULL DEFAULT (unixepoch()),
-      PRIMARY KEY (user_id, player_name)
+      PRIMARY KEY (user_id, server_id, player_name)
     );
 
     CREATE TABLE IF NOT EXISTS chat_log (
       id        INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id   TEXT NOT NULL,
+      server_id TEXT,
       type      TEXT NOT NULL,
       player    TEXT,
       message   TEXT NOT NULL,
@@ -68,6 +136,56 @@ export function getDb(): Database.Database {
       created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
       updated_at  INTEGER NOT NULL DEFAULT (unixepoch())
     );
+
+    CREATE TABLE IF NOT EXISTS scheduled_tasks (
+      id            TEXT PRIMARY KEY,
+      user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      server_id     TEXT NOT NULL,
+      label         TEXT NOT NULL,
+      enabled       INTEGER NOT NULL DEFAULT 1,
+      cadence       TEXT NOT NULL,
+      timezone      TEXT NOT NULL,
+      time_of_day   TEXT NOT NULL,
+      day_of_week   INTEGER,
+      day_of_month  INTEGER,
+      action_type   TEXT NOT NULL,
+      action_payload TEXT NOT NULL,
+      last_run_at   INTEGER,
+      next_run_at   INTEGER NOT NULL,
+      created_at    INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at    INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_server
+      ON scheduled_tasks(user_id, server_id, enabled, next_run_at);
+
+    CREATE TABLE IF NOT EXISTS scheduled_task_runs (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id     TEXT NOT NULL REFERENCES scheduled_tasks(id) ON DELETE CASCADE,
+      user_id     TEXT NOT NULL,
+      server_id   TEXT NOT NULL,
+      status      TEXT NOT NULL,
+      output      TEXT,
+      started_at  INTEGER NOT NULL,
+      finished_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_scheduled_task_runs_task
+      ON scheduled_task_runs(task_id, started_at DESC);
+
+    CREATE TABLE IF NOT EXISTS saved_servers (
+      id           TEXT PRIMARY KEY,
+      user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      label        TEXT,
+      host         TEXT NOT NULL,
+      port         INTEGER NOT NULL DEFAULT 25575,
+      password_enc TEXT NOT NULL,
+      created_at   INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at   INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_saved_servers_user_id
+      ON saved_servers(user_id, updated_at DESC, created_at DESC);
 
     CREATE TABLE IF NOT EXISTS user_features (
       user_id           TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -88,7 +206,24 @@ export function getDb(): Database.Database {
       updated_at   INTEGER NOT NULL DEFAULT (unixepoch()),
       PRIMARY KEY (user_id, feature_key)
     );
+
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id   TEXT NOT NULL,
+      server_id TEXT,
+      action    TEXT NOT NULL,
+      target    TEXT,
+      detail    TEXT,
+      ts        INTEGER NOT NULL DEFAULT (unixepoch())
+    );
   `)
+
+  ensureColumn(_db, 'users', 'active_server_id', 'active_server_id TEXT')
+  ensureColumn(_db, 'users', 'avatar_type', 'avatar_type TEXT')
+  ensureColumn(_db, 'users', 'avatar_value', 'avatar_value TEXT')
+  ensureColumn(_db, 'chat_log', 'server_id', 'server_id TEXT')
+  ensureColumn(_db, 'audit_log', 'server_id', 'server_id TEXT')
+  migratePlayerTables(_db)
 
   return _db
 }

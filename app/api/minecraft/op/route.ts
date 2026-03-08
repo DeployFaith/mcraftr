@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { rconForRequest, getSessionUserId, getSessionActiveServerId } from '@/lib/rcon'
 import { getUserById, getUserFeatures } from '@/lib/users'
 import { logAudit } from '@/lib/audit'
 
@@ -12,6 +12,8 @@ const PLAYER_RE = /^\.?[a-zA-Z0-9_]{1,16}$/
 export async function POST(req: NextRequest) {
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const serverId = await getSessionActiveServerId(req)
+  if (!serverId) return Response.json({ ok: false, error: 'No active server selected' }, { status: 400 })
   // op/deop grants full server operator privileges — admin only
   if (getUserById(userId)?.role !== 'admin') {
     return Response.json({ ok: false, error: 'Admin role required' }, { status: 403 })
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
     const result = await rconForRequest(req, `${action} ${player}`)
     if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
 
-    logAudit(userId, action === 'op' ? 'op' : 'deop', player)
+    logAudit(userId, action === 'op' ? 'op' : 'deop', player, undefined, serverId)
     return Response.json({
       ok: true,
       message: action === 'op' ? `Made ${player} an operator` : `Removed operator from ${player}`,

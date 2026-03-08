@@ -1,9 +1,44 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
-import { signOut } from 'next-auth/react'
-import { useTheme, ACCENTS, FONTS, FONT_SIZES } from '@/app/components/ThemeProvider'
+import { signOut, useSession } from 'next-auth/react'
+import { useTheme, ACCENTS, FONTS, FONT_SIZES, type ThemePack } from '@/app/components/ThemeProvider'
 import { FEATURE_DEFS, FEATURE_CATEGORIES, type FeatureKey, type FeatureCategory } from '@/lib/features'
 import CollapsibleCard from './CollapsibleCard'
+import ColorPickerModal from './ColorPickerModal'
+import { BUILTIN_MUSIC, BUILTIN_SOUNDS, DEFAULT_MUSIC_SETTINGS, DEFAULT_SOUND_SETTINGS, cleanupUnusedUploadedMedia, describeSource, loadMusicSettings, loadSoundSettings, playMediaSource, registerUploadedMediaIds, saveMusicSettings, saveSoundSettings, type MediaSource, type SoundEffectKey, type SoundSettings, type MusicSettings } from '@/app/components/soundfx'
+import { saveUploadedFiles } from '@/app/components/mediaLibrary'
+
+async function fileToAvatarDataUrl(file: File): Promise<string> {
+  const rawUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('Could not read image file'))
+    reader.readAsDataURL(file)
+  })
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('Could not load image'))
+    img.src = rawUrl
+  })
+
+  const size = 160
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Could not prepare avatar canvas')
+
+  const scale = Math.max(size / image.width, size / image.height)
+  const drawWidth = image.width * scale
+  const drawHeight = image.height * scale
+  const dx = (size - drawWidth) / 2
+  const dy = (size - drawHeight) / 2
+  ctx.clearRect(0, 0, size, size)
+  ctx.drawImage(image, dx, dy, drawWidth, drawHeight)
+  return canvas.toDataURL('image/png', 0.92)
+}
 // ── Small helpers ─────────────────────────────────────────────────────────────
 
 function StatusMsg({ ok, msg }: { ok: boolean; msg: string }) {
@@ -22,13 +57,56 @@ function StatusMsg({ ok, msg }: { ok: boolean; msg: string }) {
 }
 
 type FeatureFlags = Record<FeatureKey, boolean>
+type SavedServerSummary = {
+  id: string
+  label: string | null
+  host: string
+  port: number
+}
+
+type AccountAvatar = {
+  type: 'none' | 'builtin' | 'upload'
+  value: string | null
+}
+
+const BUILTIN_PROFILE_AVATARS = [
+  { id: 'creeper', label: 'Creeper' },
+  { id: 'grass-block', label: 'Grass Block' },
+  { id: 'diamond-pickaxe', label: 'Diamond Pickaxe' },
+  { id: 'redstone', label: 'Redstone' },
+  { id: 'slime', label: 'Slime' },
+  { id: 'nether-star', label: 'Nether Star' },
+] as const
+
+function resolveAvatarSrc(avatar: AccountAvatar | null) {
+  if (!avatar || avatar.type === 'none' || !avatar.value) return null
+  if (avatar.type === 'upload') return avatar.value
+  return `/profile-avatars/${avatar.value}.svg`
+}
 
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function SettingsSection({ role: _role }: { role?: string }) {
-  const [serverInfo, setServerInfo] = useState<{ host: string | null; port: number } | null>(null)
+  const { data: session, update: updateSession } = useSession()
+  const [servers, setServers] = useState<SavedServerSummary[]>([])
+  const [activeServerId, setActiveServerId] = useState<string | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
-  const { theme, setTheme, accent, setAccent, font, setFont, fontSize, setFontSize } = useTheme()
+  const { theme, setTheme, accent, setAccent, customAccent, setCustomAccent, themePack, setThemePack, font, setFont, fontSize, setFontSize } = useTheme()
+  const [customAccentInput, setCustomAccentInput] = useState(customAccent)
+  const [showAccentPicker, setShowAccentPicker] = useState(false)
+  const [customAccentStatus, setCustomAccentStatus] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [soundSettings, setSoundSettings] = useState<SoundSettings>(DEFAULT_SOUND_SETTINGS)
+  const [musicSettings, setMusicSettings] = useState<MusicSettings>(DEFAULT_MUSIC_SETTINGS)
+  const [avatar, setAvatar] = useState<AccountAvatar>({ type: 'none', value: null })
+  const [avatarSaving, setAvatarSaving] = useState(false)
+  const [avatarStatus, setAvatarStatus] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [soundUrlInputs, setSoundUrlInputs] = useState<Record<SoundEffectKey, string>>({
+    uiClick: '',
+    success: '',
+    notify: '',
+    error: '',
+  })
+  const [musicUrlInput, setMusicUrlInput] = useState('')
 
   // Feature flags state
   const [features, setFeatures] = useState<FeatureFlags | null>(null)
@@ -60,7 +138,26 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
   useEffect(() => {
     fetch('/api/account/preferences').then(r => r.json()).then(d => {
       if (d.ok && d.features) setFeatures(d.features)
+      if (d.ok && d.avatar) setAvatar(d.avatar)
     }).catch(() => {}).finally(() => setFeaturesLoading(false))
+  }, [])
+
+  useEffect(() => {
+    setCustomAccentInput(customAccent)
+  }, [customAccent])
+
+  useEffect(() => {
+    const syncSounds = () => setSoundSettings(loadSoundSettings())
+    syncSounds()
+    window.addEventListener('mcraftr:sound-settings-updated', syncSounds)
+    return () => window.removeEventListener('mcraftr:sound-settings-updated', syncSounds)
+  }, [])
+
+  useEffect(() => {
+    const syncMusic = () => setMusicSettings(loadMusicSettings())
+    syncMusic()
+    window.addEventListener('mcraftr:music-settings-updated', syncMusic)
+    return () => window.removeEventListener('mcraftr:music-settings-updated', syncMusic)
   }, [])
 
   const saveFeatureUpdates = async (updates: Partial<FeatureFlags>, optimistic: FeatureFlags) => {
@@ -127,22 +224,34 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
   const [deleteLoading, setDeleteLoading] = useState(false)
 
   useEffect(() => {
-    fetch('/api/server').then(r => r.json()).then(d => {
-      if (d.ok && d.host) setServerInfo({ host: d.host, port: d.port ?? 25575 })
+    fetch('/api/servers').then(r => r.json()).then(d => {
+      if (d.ok) {
+        setServers(d.servers ?? [])
+        setActiveServerId(d.activeServerId ?? null)
+      }
     }).catch(() => {})
   }, [])
 
   const disconnectServer = async () => {
-    if (!confirm('Disconnect this server? You will need to reconnect to use Mcraftr.')) return
+    if (!confirm('Remove the current active server from this account?')) return
     setDisconnecting(true)
     try {
-      await fetch('/api/server', { method: 'DELETE' })
-      window.location.href = '/connect'
+      const res = await fetch('/api/server', { method: 'DELETE' })
+      const data = await res.json().catch(() => ({ ok: false }))
+      if (!data.ok) throw new Error(data.error || 'Failed to remove server')
+      await updateSession()
+      if (data.hasServer && data.activeServerId) {
+        window.location.reload()
+      } else {
+        window.location.href = '/connect'
+      }
     } catch {
       alert('Failed to disconnect. Please try again.')
       setDisconnecting(false)
     }
   }
+
+  const activeServer = servers.find(server => server.id === activeServerId) ?? null
 
   // ── Change password ─────────────────────────────────────────────────────────
 
@@ -233,6 +342,179 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
 
   const inputCls = 'w-full px-3 py-2 rounded-lg font-mono text-[13px] bg-[var(--panel)] border border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)] transition-colors'
   const btnPrimary = 'px-4 py-2 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border'
+  const builtinSoundEntries = Object.entries(BUILTIN_SOUNDS) as Array<[SoundEffectKey, { label: string; url: string }]>
+
+  const commitCustomAccentText = () => {
+    if (!/^#[0-9a-fA-F]{6}$/.test(customAccentInput.trim())) {
+      setCustomAccentInput(customAccent)
+      setCustomAccentStatus({ ok: false, msg: 'Enter a full HEX color like #7df9ff.' })
+      return
+    }
+    setAccent('custom')
+    setCustomAccent(customAccentInput.trim())
+    setCustomAccentStatus({ ok: true, msg: `Custom accent set to ${customAccentInput.trim().toUpperCase()}.` })
+  }
+
+  const updateSoundSettings = (next: SoundSettings) => {
+    setSoundSettings(next)
+    saveSoundSettings(next)
+  }
+
+  const toggleAllSounds = (enabled: boolean) => {
+    updateSoundSettings({
+      masterEnabled: enabled,
+      volume: soundSettings.volume,
+      effects: { ...soundSettings.effects },
+    })
+  }
+
+  const toggleSoundEffect = (key: SoundEffectKey, enabled: boolean) => {
+    updateSoundSettings({
+      masterEnabled: soundSettings.masterEnabled,
+      volume: soundSettings.volume,
+      effects: {
+        ...soundSettings.effects,
+        [key]: {
+          ...soundSettings.effects[key],
+          enabled,
+        },
+      },
+    })
+  }
+
+  const setSoundSource = (key: SoundEffectKey, source: MediaSource) => {
+    updateSoundSettings({
+      masterEnabled: soundSettings.masterEnabled,
+      volume: soundSettings.volume,
+      effects: {
+        ...soundSettings.effects,
+        [key]: {
+          ...soundSettings.effects[key],
+          source,
+        },
+      },
+    })
+  }
+
+  const updateMusic = (next: MusicSettings) => {
+    setMusicSettings(next)
+    saveMusicSettings(next)
+  }
+
+  const addMusicTrack = (source: MediaSource) => {
+    updateMusic({
+      ...musicSettings,
+      tracks: [...musicSettings.tracks, source],
+    })
+  }
+
+  const removeMusicTrack = async (index: number) => {
+    const track = musicSettings.tracks[index]
+    const tracks = musicSettings.tracks.filter((_, i) => i !== index)
+    updateMusic({
+      ...musicSettings,
+      tracks: tracks.length > 0 ? tracks : DEFAULT_MUSIC_SETTINGS.tracks,
+    })
+    if (track?.type === 'upload') await cleanupUnusedUploadedMedia()
+  }
+
+  const importThemePack = async (file: File) => {
+    const raw = await file.text()
+    const parsed = JSON.parse(raw) as ThemePack
+    setThemePack(parsed)
+  }
+
+  const exportThemePack = () => {
+    const pack: ThemePack = {
+      name: themePack?.name || 'Mcraftr Theme',
+      vars: themePack?.vars || {},
+      accent: themePack?.accent || (accent === 'custom' ? customAccent : undefined),
+    }
+    const blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'mcraftr-theme.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const setSoundUrlSource = (key: SoundEffectKey) => {
+    const url = soundUrlInputs[key].trim()
+    if (!/^https?:\/\/\S+/i.test(url)) return
+    setSoundSource(key, { type: 'url', url, label: url })
+    setSoundUrlInputs(prev => ({ ...prev, [key]: '' }))
+  }
+
+  const uploadSoundFile = async (key: SoundEffectKey, files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const saved = await saveUploadedFiles('sound', Array.from(files).slice(0, 1))
+    registerUploadedMediaIds(saved.map(file => file.id))
+    const asset = saved[0]
+    setSoundSource(key, { type: 'upload', assetId: asset.id, label: asset.label })
+  }
+
+  const addMusicUrl = () => {
+    const url = musicUrlInput.trim()
+    if (!/^https?:\/\/\S+/i.test(url)) return
+    addMusicTrack({ type: 'url', url, label: url })
+    setMusicUrlInput('')
+  }
+
+  const uploadMusicFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const saved = await saveUploadedFiles('music', Array.from(files))
+    registerUploadedMediaIds(saved.map(file => file.id))
+    updateMusic({
+      ...musicSettings,
+      tracks: [
+        ...musicSettings.tracks,
+        ...saved.map(file => ({ type: 'upload', assetId: file.id, label: file.label } as MediaSource)),
+      ],
+    })
+  }
+
+  const persistAvatar = async (next: AccountAvatar, successMessage: string) => {
+    setAvatarSaving(true)
+    setAvatarStatus(null)
+    try {
+      const res = await fetch('/api/account/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar: next }),
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || 'Failed to save profile picture')
+      setAvatar(data.avatar ?? next)
+      setAvatarStatus({ ok: true, msg: successMessage })
+      window.dispatchEvent(new Event('mcraftr:account-preferences-updated'))
+    } catch (error) {
+      setAvatarStatus({ ok: false, msg: error instanceof Error ? error.message : 'Failed to save profile picture' })
+    } finally {
+      setAvatarSaving(false)
+    }
+  }
+
+  const handleBuiltinAvatar = async (value: string) => {
+    await persistAvatar({ type: 'builtin', value }, 'Profile picture updated.')
+  }
+
+  const handleUnsetAvatar = async () => {
+    await persistAvatar({ type: 'none', value: null }, 'Profile picture removed. Letter avatar restored.')
+  }
+
+  const handleAvatarUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    try {
+      const dataUrl = await fileToAvatarDataUrl(files[0])
+      await persistAvatar({ type: 'upload', value: dataUrl }, 'Uploaded profile picture saved.')
+    } catch (error) {
+      setAvatarStatus({ ok: false, msg: error instanceof Error ? error.message : 'Failed to process uploaded profile picture' })
+      setAvatarSaving(false)
+    }
+  }
+
+  const avatarSrc = resolveAvatarSrc(avatar)
 
   return (
     <div className="space-y-4">
@@ -277,13 +559,84 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
                   borderColor: accent === a.id ? 'var(--text)' : 'transparent',
                   boxShadow: accent === a.id ? `0 0 8px ${a.color}` : 'none',
                 }}
-              >
-                {accent === a.id && (
-                  <span className="text-[13px] font-bold" style={{ color: '#000', mixBlendMode: 'multiply' }}>✓</span>
-                )}
-              </button>
+                >
+                  {accent === a.id && (
+                    <span className="text-[13px] font-bold" style={{ color: '#000', mixBlendMode: 'multiply' }}>✓</span>
+                  )}
+                </button>
             ))}
+            <button
+              onClick={() => setAccent('custom')}
+              title="Custom"
+              className="w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center"
+              style={{
+                background: 'conic-gradient(from 180deg, #ff4d4d, #ff9a3c, #ffe45e, #8cff66, #56ffd2, #5aa9ff, #9d63ff, #ff6ad5, #ff4d4d)',
+                borderColor: accent === 'custom' ? 'var(--text)' : 'transparent',
+                boxShadow: accent === 'custom' ? `0 0 10px ${customAccent}` : 'none',
+              }}
+            >
+              {accent === 'custom' && (
+                <span className="text-[13px] font-bold" style={{ color: '#000', mixBlendMode: 'multiply' }}>✓</span>
+              )}
+            </button>
           </div>
+
+          {accent === 'custom' && (
+            <div className="mt-4 rounded-2xl border p-4 space-y-4" style={{ borderColor: 'var(--accent-mid)', background: 'color-mix(in srgb, var(--panel) 88%, transparent)' }}>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                <div
+                  className="h-20 w-20 rounded-[22px] border shadow-[0_18px_40px_rgba(0,0,0,0.18)]"
+                  style={{ background: customAccent, borderColor: 'var(--accent-mid)' }}
+                />
+                <div className="flex-1 space-y-2">
+                  <div className="text-[13px] font-mono tracking-[0.16em]" style={{ color: 'var(--text)' }}>
+                    CUSTOM ACCENT
+                  </div>
+                  <div className="text-[11px] font-mono" style={{ color: 'var(--text-dim)' }}>
+                    Current color: {customAccent.toUpperCase()}
+                  </div>
+                  <div className="text-[11px] font-mono" style={{ color: 'var(--text-dim)' }}>
+                    Open the full picker modal for the wheel, sliders, text input, and built-in eyedropper.
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAccent('custom')
+                      setShowAccentPicker(true)
+                    }}
+                    className="rounded-xl border px-4 py-3 text-[12px] font-mono tracking-widest"
+                    style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}
+                  >
+                    Open Picker
+                  </button>
+                  <button
+                    type="button"
+                    onClick={commitCustomAccentText}
+                    className="rounded-xl border px-4 py-3 text-[12px] font-mono tracking-widest"
+                    style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+                  >
+                    Apply HEX
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)] mb-1.5">HEX</div>
+                <input
+                  value={customAccentInput}
+                  onChange={e => setCustomAccentInput(e.target.value)}
+                  onBlur={commitCustomAccentText}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') commitCustomAccentText()
+                  }}
+                  className={inputCls}
+                />
+              </div>
+              {customAccentStatus && <StatusMsg ok={customAccentStatus.ok} msg={customAccentStatus.msg} />}
+            </div>
+          )}
         </div>
 
         <div>
@@ -344,6 +697,240 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
                   {option.sample}
                 </div>
               </button>
+            ))}
+          </div>
+        </div>
+      </CollapsibleCard>
+
+      <CollapsibleCard title="THEME PACKS" storageKey="settings:theme-packs" bodyClassName="p-5 space-y-4">
+        <div className="rounded-2xl border p-4 space-y-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--panel) 84%, transparent)' }}>
+          <div>
+            <div className="text-[13px] font-mono tracking-widest text-[var(--text)]">CUSTOM THEME PACK</div>
+            <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1">Upload a JSON theme pack to reskin the app, or export the current custom pack.</div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <label className="rounded-xl border px-4 py-3 text-[12px] font-mono tracking-widest cursor-pointer" style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}>
+              Upload Theme
+              <input
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={async e => {
+                  const file = e.target.files?.[0]
+                  if (file) await importThemePack(file)
+                  e.currentTarget.value = ''
+                }}
+              />
+            </label>
+            <button type="button" onClick={exportThemePack} className="rounded-xl border px-4 py-3 text-[12px] font-mono tracking-widest" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}>
+              Export Theme
+            </button>
+            <button type="button" onClick={() => setThemePack(null)} className="rounded-xl border px-4 py-3 text-[12px] font-mono tracking-widest" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}>
+              Clear Theme
+            </button>
+          </div>
+          <div className="text-[11px] font-mono text-[var(--text-dim)]">
+            {themePack ? `Loaded theme pack: ${themePack.name || 'Custom Theme'}` : 'No custom theme pack loaded.'}
+          </div>
+        </div>
+      </CollapsibleCard>
+
+      <CollapsibleCard title="SOUND FX" storageKey="settings:soundfx" bodyClassName="p-5 space-y-4">
+        <div className="rounded-2xl border p-4 space-y-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--panel) 84%, transparent)' }}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[13px] font-mono tracking-widest text-[var(--text)]">ALL SOUND FX</div>
+              <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1">Master mute plus per-effect custom sources. Built-in Minecraft-style effects are included by default.</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => toggleAllSounds(!soundSettings.masterEnabled)}
+              className="rounded-full border px-4 py-2 text-[11px] font-mono tracking-widest transition-all"
+              style={soundSettings.masterEnabled
+                ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
+                : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+            >
+              {soundSettings.masterEnabled ? 'ON' : 'OFF'}
+            </button>
+          </div>
+
+          <label className="space-y-1.5 block">
+            <div className="flex items-center justify-between text-[11px] font-mono tracking-widest text-[var(--text-dim)]">
+              <span>VOLUME</span>
+              <span>{Math.round(soundSettings.volume * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(soundSettings.volume * 100)}
+              onChange={e => updateSoundSettings({ ...soundSettings, volume: Number(e.target.value) / 100 })}
+              className="w-full"
+            />
+          </label>
+
+          <div className="rounded-xl border p-3 space-y-3" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg2) 70%, transparent)' }}>
+            <div>
+              <div className="text-[12px] font-mono tracking-widest text-[var(--text)]">BUILT-IN SOUND BANK</div>
+              <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1">Included sounds: UI Click, Success Orb, Notify Pling, and Villager No.</div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {builtinSoundEntries.map(([key, entry]) => (
+                <div key={key} className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2" style={{ borderColor: 'var(--border)', background: 'var(--panel)' }}>
+                  <div className="min-w-0">
+                    <div className="truncate text-[12px] font-mono tracking-widest text-[var(--text)]">{entry.label}</div>
+                    <div className="text-[11px] font-mono text-[var(--text-dim)]">{key}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void playMediaSource({ type: 'builtin', id: key }, Math.max(0.3, soundSettings.volume))}
+                    className="rounded-xl border px-3 py-2 text-[11px] font-mono tracking-widest"
+                    style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+                  >
+                    Preview
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {([
+              ['uiClick', 'UI Click', 'Navigation and interface clicks.'],
+              ['success', 'Success', 'Completed actions and positive toasts.'],
+              ['notify', 'Notification', 'Softer notices and inactive-state toasts.'],
+              ['error', 'Error', 'Failed actions and rejected operations.'],
+            ] as const).map(([key, label, desc]) => (
+              <div key={key} className="rounded-xl border p-3 space-y-3" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg2) 70%, transparent)' }}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[12px] font-mono tracking-widest text-[var(--text)]">{label}</div>
+                    <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1">{desc}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleSoundEffect(key, !soundSettings.effects[key].enabled)}
+                    className="rounded-full border px-4 py-2 text-[11px] font-mono tracking-widest transition-all"
+                    style={soundSettings.effects[key].enabled
+                      ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
+                      : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+                  >
+                    {soundSettings.effects[key].enabled ? 'ON' : 'OFF'}
+                  </button>
+                </div>
+                <div className="text-[11px] font-mono text-[var(--text-dim)]">Source: {describeSource(soundSettings.effects[key].source)}</div>
+                <div className="grid gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void playMediaSource(soundSettings.effects[key].source, Math.max(0.3, soundSettings.volume))}
+                      className="rounded-xl border px-3 py-2 text-[11px] font-mono tracking-widest"
+                      style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+                    >
+                      Preview Current
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      value={soundUrlInputs[key]}
+                      onChange={e => setSoundUrlInputs(prev => ({ ...prev, [key]: e.target.value }))}
+                      placeholder="https://example.com/sound.ogg"
+                      className={inputCls}
+                    />
+                    <button type="button" onClick={() => setSoundUrlSource(key)} className="rounded-xl border px-3 py-2 text-[11px] font-mono tracking-widest" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}>
+                      Use URL
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <label className="rounded-xl border px-3 py-2 text-[11px] font-mono tracking-widest cursor-pointer" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}>
+                      Upload
+                      <input type="file" accept="audio/*" className="hidden" onChange={async e => { await uploadSoundFile(key, e.target.files); e.currentTarget.value = '' }} />
+                    </label>
+                    <button type="button" onClick={() => setSoundSource(key, { type: 'builtin', id: key })} className="rounded-xl border px-3 py-2 text-[11px] font-mono tracking-widest" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}>
+                      Reset Built-in
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CollapsibleCard>
+
+      <CollapsibleCard title="BACKGROUND MUSIC" storageKey="settings:music" bodyClassName="p-5 space-y-4">
+        <div className="rounded-2xl border p-4 space-y-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--panel) 84%, transparent)' }}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[13px] font-mono tracking-widest text-[var(--text)]">MUSIC PLAYER</div>
+              <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1">Loop gentle Minecraft music in the background or use your own tracks.</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => updateMusic({ ...musicSettings, enabled: !musicSettings.enabled })}
+              className="rounded-full border px-4 py-2 text-[11px] font-mono tracking-widest transition-all"
+              style={musicSettings.enabled
+                ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
+                : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+            >
+              {musicSettings.enabled ? 'ON' : 'OFF'}
+            </button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="space-y-1.5 block">
+              <div className="flex items-center justify-between text-[11px] font-mono tracking-widest text-[var(--text-dim)]">
+                <span>MUSIC VOLUME</span>
+                <span>{Math.round(musicSettings.volume * 100)}%</span>
+              </div>
+              <input type="range" min={0} max={100} value={Math.round(musicSettings.volume * 100)} onChange={e => updateMusic({ ...musicSettings, volume: Number(e.target.value) / 100 })} className="w-full" />
+            </label>
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={() => updateMusic({ ...musicSettings, shuffle: !musicSettings.shuffle })}
+                className="rounded-full border px-4 py-2 text-[11px] font-mono tracking-widest transition-all"
+                style={musicSettings.shuffle
+                  ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
+                  : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+              >
+                {musicSettings.shuffle ? 'SHUFFLE ON' : 'SHUFFLE OFF'}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <div className="flex gap-2">
+              <input value={musicUrlInput} onChange={e => setMusicUrlInput(e.target.value)} placeholder="https://example.com/music.ogg" className={inputCls} />
+              <button type="button" onClick={addMusicUrl} className="rounded-xl border px-3 py-2 text-[11px] font-mono tracking-widest" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}>
+                Add URL
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <label className="rounded-xl border px-3 py-2 text-[11px] font-mono tracking-widest cursor-pointer" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}>
+                Upload Files
+                <input type="file" accept="audio/*" multiple className="hidden" onChange={async e => { await uploadMusicFiles(e.target.files); e.currentTarget.value = '' }} />
+              </label>
+              <label className="rounded-xl border px-3 py-2 text-[11px] font-mono tracking-widest cursor-pointer" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}>
+                Upload Folder
+                <input type="file" accept="audio/*" multiple className="hidden" {...({ webkitdirectory: 'true', directory: '' } as any)} onChange={async e => { await uploadMusicFiles(e.target.files); e.currentTarget.value = '' }} />
+              </label>
+              <button type="button" onClick={() => updateMusic({ ...musicSettings, tracks: DEFAULT_MUSIC_SETTINGS.tracks })} className="rounded-xl border px-3 py-2 text-[11px] font-mono tracking-widest" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}>
+                Reset Built-ins
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {musicSettings.tracks.map((track, index) => (
+              <div key={`${describeSource(track)}-${index}`} className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg2) 70%, transparent)' }}>
+                <div className="min-w-0">
+                  <div className="truncate text-[12px] font-mono text-[var(--text)]">{describeSource(track)}</div>
+                  <div className="text-[11px] font-mono text-[var(--text-dim)]">{track.type.toUpperCase()}</div>
+                </div>
+                <button type="button" onClick={() => void removeMusicTrack(index)} className="rounded-xl border px-3 py-2 text-[11px] font-mono tracking-widest" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}>
+                  Remove
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -481,33 +1068,139 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
       <CollapsibleCard title="SERVER CONNECTION" storageKey="settings:server-connection" bodyClassName="p-5 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-[var(--panel)] rounded-lg p-3 border border-[var(--border)]">
-            <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">HOST</div>
-            <div className="text-[13px] font-mono text-[var(--text)] truncate">{serverInfo?.host ?? '—'}</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">ACTIVE SERVER</div>
+            <div className="text-[13px] font-mono text-[var(--text)] truncate">
+              {activeServer ? (activeServer.label?.trim() || `${activeServer.host}:${activeServer.port}`) : '—'}
+            </div>
           </div>
           <div className="bg-[var(--panel)] rounded-lg p-3 border border-[var(--border)]">
-            <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">RCON PORT</div>
-            <div className="text-[13px] font-mono text-[var(--text)]">{serverInfo?.port ?? '—'}</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">SAVED SERVERS</div>
+            <div className="text-[13px] font-mono text-[var(--text)]">{servers.length}</div>
           </div>
         </div>
+        {servers.length > 0 && (
+          <div className="space-y-2">
+            {servers.map(server => {
+              const isActive = server.id === activeServerId
+              return (
+                <div key={server.id} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-mono text-[var(--text)] truncate">
+                      {server.label?.trim() || `${server.host}:${server.port}`}
+                    </div>
+                    <div className="text-[11px] font-mono text-[var(--text-dim)] truncate">
+                      {server.host}:{server.port}
+                    </div>
+                  </div>
+                  <span
+                    className="rounded border px-2 py-1 text-[10px] font-mono tracking-widest"
+                    style={isActive
+                      ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
+                      : { borderColor: 'var(--border)', color: 'var(--text-dim)' }}
+                  >
+                    {isActive ? 'ACTIVE' : 'SAVED'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
         <div className="flex flex-col sm:flex-row gap-2 pt-1">
           <a
-            href="/connect?edit=1"
+            href="/connect"
             className="flex-1 py-2.5 rounded-lg font-mono text-[13px] tracking-widest text-center transition-all border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]"
           >
-            Edit Connection
+            Manage Servers
           </a>
           <button
             onClick={disconnectServer}
             disabled={disconnecting}
             className="flex-1 py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-red-900 text-red-400 hover:border-red-700"
           >
-            {disconnecting ? 'Disconnecting...' : 'Disconnect Server'}
+            {disconnecting ? 'Removing...' : 'Remove Active Server'}
           </button>
         </div>
       </CollapsibleCard>
 
       {/* Account Update */}
       <CollapsibleCard title="ACCOUNT UPDATE" storageKey="settings:account-update" bodyClassName="p-5 space-y-4">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4 space-y-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+            <div className="space-y-3">
+              <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">PROFILE PICTURE</div>
+              {avatarSrc ? (
+                <img
+                  src={avatarSrc}
+                  alt="Current profile picture"
+                  className="h-24 w-24 rounded-full border object-cover"
+                  style={{ borderColor: 'var(--accent-mid)', background: 'var(--bg2)' }}
+                />
+              ) : (
+                <div className="grid h-24 w-24 place-items-center rounded-full border font-mono text-3xl font-bold" style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}>
+                  {(session?.user?.email ?? 'M').trim().charAt(0).toUpperCase() || 'M'}
+                </div>
+              )}
+              <div className="text-[11px] font-mono text-[var(--text-dim)]">
+                {avatar.type === 'builtin' ? 'Using a built-in avatar.' : avatar.type === 'upload' ? 'Using an uploaded avatar.' : 'No profile picture set. Letter avatar is active.'}
+              </div>
+            </div>
+
+            <div className="flex-1 space-y-4">
+              <div>
+                <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)] mb-2">BUILT-IN MINECRAFT AVATARS</div>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  {BUILTIN_PROFILE_AVATARS.map(option => {
+                    const selected = avatar.type === 'builtin' && avatar.value === option.id
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        disabled={avatarSaving}
+                        onClick={() => void handleBuiltinAvatar(option.id)}
+                        className="rounded-2xl border p-2 transition-all disabled:opacity-50"
+                        style={selected
+                          ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)' }
+                          : { borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg2) 75%, transparent)' }}
+                      >
+                        <img src={`/profile-avatars/${option.id}.svg`} alt={option.label} className="mx-auto h-12 w-12 rounded-xl object-cover" />
+                        <div className="mt-2 text-center text-[10px] font-mono tracking-widest" style={{ color: selected ? 'var(--accent)' : 'var(--text-dim)' }}>
+                          {option.label}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <label className="rounded-xl border px-4 py-3 text-[12px] font-mono tracking-widest cursor-pointer" style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}>
+                  Upload Picture
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                    className="hidden"
+                    onChange={async e => {
+                      await handleAvatarUpload(e.target.files)
+                      e.currentTarget.value = ''
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={avatarSaving || avatar.type === 'none'}
+                  onClick={() => void handleUnsetAvatar()}
+                  className="rounded-xl border px-4 py-3 text-[12px] font-mono tracking-widest disabled:opacity-40"
+                  style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+                >
+                  Unset Picture
+                </button>
+              </div>
+              <div className="text-[11px] font-mono text-[var(--text-dim)]">Uploads are resized to a square account avatar and can be replaced or removed at any time.</div>
+              {avatarStatus && <StatusMsg ok={avatarStatus.ok} msg={avatarStatus.msg} />}
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4 space-y-3">
             <div>
@@ -613,6 +1306,21 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
       </CollapsibleCard>
 
       {/* Delete modal */}
+      {showAccentPicker && (
+        <ColorPickerModal
+          initialColor={customAccent}
+          theme={theme}
+          onCancel={() => setShowAccentPicker(false)}
+          onApply={(color) => {
+            setAccent('custom')
+            setCustomAccent(color)
+            setCustomAccentInput(color)
+            setCustomAccentStatus({ ok: true, msg: `Custom accent set to ${color.toUpperCase()}.` })
+            setShowAccentPicker(false)
+          }}
+        />
+      )}
+
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
           <div className="glass-card p-6 w-full max-w-sm space-y-4" style={{ borderColor: '#ff335540' }}>

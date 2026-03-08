@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
-import { rconForRequest, getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
+import { rconForRequest, getSessionUserId, getSessionActiveServerId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 import { getDb } from '@/lib/db'
+import { logAudit } from '@/lib/audit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -10,6 +11,8 @@ const PLAYER_RE = /^\.?[a-zA-Z0-9_]{1,16}$/
 export async function POST(req: NextRequest) {
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const serverId = await getSessionActiveServerId(req)
+  if (!serverId) return Response.json({ ok: false, error: 'No active server selected' }, { status: 400 })
 
   const features = await getUserFeatureFlags(req)
   if (!checkFeatureAccess(features, 'enable_chat') || !checkFeatureAccess(features, 'enable_chat_write')) {
@@ -27,8 +30,9 @@ export async function POST(req: NextRequest) {
     const clean = message.replace(/[\x00-\x1f\x7f]/g, '').slice(0, 256)
     const result = await rconForRequest(req, `fgmc msg ${player} ${clean}`)
     if (!result.ok) return Response.json({ ok: false, error: result.error })
+    logAudit(userId, 'msg', player, clean, serverId)
     try {
-      getDb().prepare('INSERT INTO chat_log (user_id, type, player, message) VALUES (?, ?, ?, ?)').run(userId, 'msg', player, clean)
+      getDb().prepare('INSERT INTO chat_log (user_id, server_id, type, player, message) VALUES (?, ?, ?, ?, ?)').run(userId, serverId, 'msg', player, clean)
     } catch {}
     return Response.json({ ok: true, message: `Message sent to ${player}` })
   } catch (e: unknown) {

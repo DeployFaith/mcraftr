@@ -3,17 +3,11 @@
  *
  * All users connect directly via the RCON TCP protocol (rcon-client).
  */
-import { Rcon } from 'rcon-client'
-import { getUserById, getUserFeatures, type UserFeatures } from './users'
+import { rconDirect, type RconResult } from './rcon-client'
+import { getActiveServer, getUserById, getUserFeatures, type UserFeatures } from './users'
 import { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { checkRateLimit } from './ratelimit'
-
-export type RconResult = {
-  ok: boolean
-  stdout: string
-  error?: string
-}
 
 // ── Feature flag helpers ─────────────────────────────────────────────────────────
 
@@ -33,28 +27,6 @@ export function checkFeatureAccess(features: UserFeatures | null, feature: keyof
   return features[feature]
 }
 
-// ── Direct RCON path ──────────────────────────────────────────────────────────
-
-async function rconDirect(
-  host: string,
-  port: number,
-  password: string,
-  cmd: string
-): Promise<RconResult> {
-  const client = new Rcon({ host, port, password, timeout: 6000 })
-  try {
-    await client.connect()
-    const stdout = await client.send(cmd)
-    // Strip Minecraft color/formatting codes (§ followed by any char)
-    return { ok: true, stdout: stdout.replace(/§./g, '').trim() }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : 'RCON error'
-    return { ok: false, stdout: '', error: msg }
-  } finally {
-    try { await client.end() } catch { /* ignore */ }
-  }
-}
-
 // ── Auth helper — verify JWT and return userId, or null ───────────────────────
 
 export async function getSessionUserId(req: NextRequest): Promise<string | null> {
@@ -65,6 +37,15 @@ export async function getSessionUserId(req: NextRequest): Promise<string | null>
   })
   const userId = token?.id as string | undefined
   return userId ?? null
+}
+
+export async function getSessionActiveServerId(req: NextRequest): Promise<string | null> {
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+    cookieName: 'authjs.session-token',
+  })
+  return (token?.activeServerId as string | undefined) ?? null
 }
 
 // ── Public helper — resolves auth, rate-limits, dispatches RCON ──────────────
@@ -92,11 +73,12 @@ export async function rconForRequest(req: NextRequest, cmd: string): Promise<Rco
     return { ok: false, stdout: '', error: 'User not found' }
   }
 
-  if (!user.server) {
+  const activeServer = getActiveServer(userId)
+  if (!activeServer) {
     return { ok: false, stdout: '', error: 'No server configured' }
   }
 
-  return rconDirect(user.server.host, user.server.port, user.server.password, cmd)
+  return rconDirect(activeServer.host, activeServer.port, activeServer.password, cmd)
 }
 
 // ── Test a connection without saving it ──────────────────────────────────────

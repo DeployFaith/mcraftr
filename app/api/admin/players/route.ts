@@ -9,7 +9,9 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET, cookieName: 'authjs.session-token' })
   const userId = token?.id as string | undefined
+  const serverId = token?.activeServerId as string | undefined
   if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  if (!serverId) return Response.json({ ok: false, error: 'No active server' }, { status: 400 })
   const user = getUserById(userId)
   if (!user || user.role !== 'admin') return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })
 
@@ -27,11 +29,11 @@ export async function GET(req: NextRequest) {
   const db = getDb()
   const rows = cutoff !== null
     ? db.prepare(
-        'SELECT player_name, last_seen FROM player_directory WHERE user_id = ? AND last_seen >= ? ORDER BY last_seen DESC'
-      ).all(userId, cutoff) as { player_name: string; last_seen: number }[]
+        'SELECT player_name, last_seen FROM player_directory WHERE user_id = ? AND server_id = ? AND last_seen >= ? ORDER BY last_seen DESC'
+      ).all(userId, serverId, cutoff) as { player_name: string; last_seen: number }[]
     : db.prepare(
-        'SELECT player_name, last_seen FROM player_directory WHERE user_id = ? ORDER BY last_seen DESC'
-      ).all(userId) as { player_name: string; last_seen: number }[]
+        'SELECT player_name, last_seen FROM player_directory WHERE user_id = ? AND server_id = ? ORDER BY last_seen DESC'
+      ).all(userId, serverId) as { player_name: string; last_seen: number }[]
 
   return Response.json({ ok: true, players: rows })
 }

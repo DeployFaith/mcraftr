@@ -45,6 +45,8 @@ export const authConfig = {
       }
       session.hasServer = token.hasServer ?? false
       session.role = token.role ?? 'user'
+      session.activeServerId = token.activeServerId ?? null
+      session.activeServerLabel = token.activeServerLabel ?? null
       return session
     },
     authorized({ auth }: { auth: any }) {

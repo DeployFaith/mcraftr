@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@types/ioredis": "^4.28.10",
+    "@uiw/react-color": "^2.9.6",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",
     "ioredis": "^5.9.3",

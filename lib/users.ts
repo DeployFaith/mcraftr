@@ -14,12 +14,29 @@ export type ServerConfig = {
   password: string  // decrypted in-memory; always encrypted at rest
 }
 
+export type SavedServer = ServerConfig & {
+  id: string
+  userId: string
+  label: string | null
+  createdAt: number
+  updatedAt: number
+}
+
 export type User = {
   id: string
   email: string
   passwordHash: string
   role: 'admin' | 'user'
+  avatar: UserAvatar
+  activeServerId: string | null
+  servers: SavedServer[]
   server: ServerConfig | null
+  serverLabel: string | null
+}
+
+export type UserAvatar = {
+  type: 'none' | 'builtin' | 'upload'
+  value: string | null
 }
 
 // ── Encryption helpers ────────────────────────────────────────────────────────
@@ -108,6 +125,8 @@ function initDb(): Database.Database {
   // Re-encrypt any server passwords still using the legacy SHA-256 key
   reEncryptLegacyPasswords(db)
 
+  migrateServersToSavedServers(db)
+
   // Seed admin if table is still empty
   seedAdmin(db)
 
@@ -145,6 +164,60 @@ function reEncryptLegacyPasswords(db: Database.Database): void {
   if (migrated > 0) {
     console.log(`[mcraftr] Re-encrypted ${migrated} server password(s) to new key`)
   }
+}
+
+function migrateServersToSavedServers(db: Database.Database): void {
+  const legacyRows = db.prepare('SELECT user_id, host, port, password_enc FROM servers').all() as ServerRow[]
+  if (legacyRows.length === 0) return
+
+  const countSavedServers = db.prepare('SELECT COUNT(*) as n FROM saved_servers').get() as { n: number }
+  if (countSavedServers.n > 0) {
+    db.prepare(`
+      UPDATE chat_log
+      SET server_id = (
+        SELECT active_server_id FROM users WHERE users.id = chat_log.user_id
+      )
+      WHERE server_id IS NULL
+    `).run()
+    db.prepare(`
+      UPDATE audit_log
+      SET server_id = (
+        SELECT active_server_id FROM users WHERE users.id = audit_log.user_id
+      )
+      WHERE server_id IS NULL
+    `).run()
+    return
+  }
+
+  const insertSaved = db.prepare(`
+    INSERT INTO saved_servers (id, user_id, label, host, port, password_enc, created_at, updated_at)
+    VALUES (?, ?, NULL, ?, ?, ?, unixepoch(), unixepoch())
+  `)
+  const updateActive = db.prepare('UPDATE users SET active_server_id = ? WHERE id = ?')
+  const tx = db.transaction(() => {
+    for (const row of legacyRows) {
+      const serverId = crypto.randomUUID()
+      insertSaved.run(serverId, row.user_id, row.host, row.port, row.password_enc)
+      updateActive.run(serverId, row.user_id)
+    }
+
+    db.prepare(`
+      UPDATE chat_log
+      SET server_id = (
+        SELECT active_server_id FROM users WHERE users.id = chat_log.user_id
+      )
+      WHERE server_id IS NULL
+    `).run()
+    db.prepare(`
+      UPDATE audit_log
+      SET server_id = (
+        SELECT active_server_id FROM users WHERE users.id = audit_log.user_id
+      )
+      WHERE server_id IS NULL
+    `).run()
+  })
+
+  tx()
 }
 
 // ── Migration from users.json ─────────────────────────────────────────────────
@@ -223,6 +296,9 @@ type UserRow = {
   email: string
   password_hash: string
   role: 'admin' | 'user'
+  avatar_type?: string | null
+  avatar_value?: string | null
+  active_server_id?: string | null
 }
 
 type ServerRow = {
@@ -232,15 +308,48 @@ type ServerRow = {
   password_enc: string
 }
 
-function rowToUser(row: UserRow, serverRow: ServerRow | undefined | null): User {
+type SavedServerRow = {
+  id: string
+  user_id: string
+  label: string | null
+  host: string
+  port: number
+  password_enc: string
+  created_at: number
+  updated_at: number
+}
+
+function rowToSavedServer(row: SavedServerRow): SavedServer {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    label: row.label,
+    host: row.host,
+    port: row.port,
+    password: decryptPassword(row.password_enc),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+function rowToUser(row: UserRow, savedServerRows: SavedServerRow[]): User {
+  const servers = savedServerRows.map(rowToSavedServer)
+  const active = row.active_server_id
+    ? servers.find(server => server.id === row.active_server_id) ?? null
+    : (servers[0] ?? null)
   return {
     id:           row.id,
     email:        row.email,
     passwordHash: row.password_hash,
     role:         row.role,
-    server:       serverRow
-      ? { host: serverRow.host, port: serverRow.port, password: decryptPassword(serverRow.password_enc) }
-      : null,
+    avatar: {
+      type: row.avatar_type === 'builtin' || row.avatar_type === 'upload' ? row.avatar_type : 'none',
+      value: row.avatar_type === 'builtin' || row.avatar_type === 'upload' ? row.avatar_value ?? null : null,
+    },
+    activeServerId: active?.id ?? null,
+    servers,
+    server: active ? { host: active.host, port: active.port, password: active.password } : null,
+    serverLabel: active?.label ?? null,
   }
 }
 
@@ -250,48 +359,123 @@ export function getUserByEmail(email: string): User | undefined {
   const db = initDb()
   const row = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as UserRow | undefined
   if (!row) return undefined
-  const srv = db.prepare('SELECT * FROM servers WHERE user_id = ?').get(row.id) as ServerRow | undefined
-  return rowToUser(row, srv)
+  const servers = db.prepare(
+    'SELECT * FROM saved_servers WHERE user_id = ? ORDER BY updated_at DESC, created_at DESC'
+  ).all(row.id) as SavedServerRow[]
+  return rowToUser(row, servers)
 }
 
 export function getUserById(id: string): User | undefined {
   const db = initDb()
   const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined
   if (!row) return undefined
-  const srv = db.prepare('SELECT * FROM servers WHERE user_id = ?').get(id) as ServerRow | undefined
-  return rowToUser(row, srv)
+  const servers = db.prepare(
+    'SELECT * FROM saved_servers WHERE user_id = ? ORDER BY updated_at DESC, created_at DESC'
+  ).all(id) as SavedServerRow[]
+  return rowToUser(row, servers)
 }
 
-export function updateUserServer(id: string, server: ServerConfig): User {
+export function listUserServers(id: string): SavedServer[] {
+  const db = initDb()
+  const rows = db.prepare(
+    'SELECT * FROM saved_servers WHERE user_id = ? ORDER BY updated_at DESC, created_at DESC'
+  ).all(id) as SavedServerRow[]
+  return rows.map(rowToSavedServer)
+}
+
+export function getActiveServer(id: string): SavedServer | null {
+  const user = getUserById(id)
+  if (!user?.activeServerId) return null
+  return user.servers.find(server => server.id === user.activeServerId) ?? null
+}
+
+export function createUserServer(
+  userId: string,
+  server: ServerConfig & { label?: string | null },
+): SavedServer {
+  const db = initDb()
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow | undefined
+  if (!user) throw new Error('User not found')
+
+  const serverId = crypto.randomUUID()
+  const passwordEnc = encryptPassword(server.password)
+  db.prepare(`
+    INSERT INTO saved_servers (id, user_id, label, host, port, password_enc, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, unixepoch(), unixepoch())
+  `).run(serverId, userId, server.label?.trim() || null, server.host, server.port, passwordEnc)
+
+  if (!user.active_server_id) {
+    db.prepare('UPDATE users SET active_server_id = ? WHERE id = ?').run(serverId, userId)
+  }
+
+  const row = db.prepare('SELECT * FROM saved_servers WHERE id = ? AND user_id = ?').get(serverId, userId) as SavedServerRow
+  return rowToSavedServer(row)
+}
+
+export function updateUserServer(
+  userId: string,
+  server: ServerConfig & { label?: string | null; serverId?: string | null },
+): User {
+  const db = initDb()
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow | undefined
+  if (!user) throw new Error('User not found')
+
+  const passwordEnc = encryptPassword(server.password)
+  if (server.serverId) {
+    const result = db.prepare(`
+      UPDATE saved_servers
+      SET label = ?, host = ?, port = ?, password_enc = ?, updated_at = unixepoch()
+      WHERE id = ? AND user_id = ?
+    `).run(server.label?.trim() || null, server.host, server.port, passwordEnc, server.serverId, userId)
+    if (result.changes === 0) throw new Error('Server not found')
+  } else {
+    const created = createUserServer(userId, server)
+    if (!user.active_server_id) {
+      db.prepare('UPDATE users SET active_server_id = ? WHERE id = ?').run(created.id, userId)
+    }
+  }
+
+  return getUserById(userId)!
+}
+
+export function setActiveUserServer(userId: string, serverId: string): User {
+  const db = initDb()
+  const result = db.prepare(`
+    UPDATE users
+    SET active_server_id = ?
+    WHERE id = ? AND EXISTS (
+      SELECT 1 FROM saved_servers WHERE id = ? AND user_id = ?
+    )
+  `).run(serverId, userId, serverId, userId)
+  if (result.changes === 0) throw new Error('Server not found')
+  return getUserById(userId)!
+}
+
+export function deleteUserServer(id: string, serverId: string): User {
   const db = initDb()
   const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined
   if (!row) throw new Error('User not found')
+  const result = db.prepare('DELETE FROM saved_servers WHERE id = ? AND user_id = ?').run(serverId, id)
+  if (result.changes === 0) throw new Error('Server not found')
 
-  const passwordEnc = encryptPassword(server.password)
+  const remaining = db.prepare(
+    'SELECT id FROM saved_servers WHERE user_id = ? ORDER BY updated_at DESC, created_at DESC LIMIT 1'
+  ).get(id) as { id: string } | undefined
+  const nextActive = remaining?.id ?? null
+  db.prepare('UPDATE users SET active_server_id = ? WHERE id = ?').run(nextActive, id)
 
-  db.prepare(`
-    INSERT INTO servers (user_id, host, port, password_enc)
-    VALUES (@userId, @host, @port, @passwordEnc)
-    ON CONFLICT(user_id) DO UPDATE SET
-      host         = excluded.host,
-      port         = excluded.port,
-      password_enc = excluded.password_enc
-  `).run({
-    userId:      id,
-    host:        server.host,
-    port:        server.port,
-    passwordEnc: passwordEnc,
-  })
+  db.prepare('DELETE FROM chat_log WHERE user_id = ? AND server_id = ?').run(id, serverId)
+  db.prepare('DELETE FROM player_sessions WHERE user_id = ? AND server_id = ?').run(id, serverId)
+  db.prepare('DELETE FROM player_directory WHERE user_id = ? AND server_id = ?').run(id, serverId)
+  db.prepare('DELETE FROM audit_log WHERE user_id = ? AND server_id = ?').run(id, serverId)
 
-  return rowToUser(row, { user_id: id, host: server.host, port: server.port, password_enc: passwordEnc })
+  return getUserById(id)!
 }
 
 export function clearUserServer(id: string): User {
-  const db = initDb()
-  const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined
-  if (!row) throw new Error('User not found')
-  db.prepare('DELETE FROM servers WHERE user_id = ?').run(id)
-  return rowToUser(row, null)
+  const active = getUserById(id)?.activeServerId
+  if (!active) return getUserById(id)!
+  return deleteUserServer(id, active)
 }
 
 export function createUser(email: string, password: string): User {
@@ -310,7 +494,11 @@ export function createUser(email: string, password: string): User {
     email,
     passwordHash: '',  // not needed after creation
     role: 'user',
+    avatar: { type: 'none', value: null },
+    activeServerId: null,
+    servers: [],
     server: null,
+    serverLabel: null,
   }
 }
 
@@ -375,7 +563,15 @@ export function createUserByAdmin(email: string, password: string): User {
     VALUES (?, ?, ?, 'user')
   `).run(id, email, bcrypt.hashSync(password, 10))
 
-  return { id, email, passwordHash: '', role: 'user', server: null }
+  return { id, email, passwordHash: '', role: 'user', avatar: { type: 'none', value: null }, activeServerId: null, servers: [], server: null, serverLabel: null }
+}
+
+export function updateUserAvatar(id: string, avatar: UserAvatar): void {
+  const db = initDb()
+  const type = avatar.type === 'builtin' || avatar.type === 'upload' ? avatar.type : null
+  const value = type ? avatar.value ?? null : null
+  const result = db.prepare('UPDATE users SET avatar_type = ?, avatar_value = ? WHERE id = ?').run(type, value, id)
+  if (result.changes === 0) throw new Error('User not found')
 }
 
 export type UserFeatures = Record<FeatureKey, boolean>
