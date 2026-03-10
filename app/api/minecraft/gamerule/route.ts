@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server'
-import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { getSessionUserId } from '@/lib/rcon'
 import { getToken } from 'next-auth/jwt'
 import { getUserById, getUserFeatures } from '@/lib/users'
+import { runBridgeCommand } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,10 +19,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Fetch all gamerules through FamilyGuard so values reflect all loaded worlds.
     const results = await Promise.all(
-      ADMIN_GAMERULES.map(rule => rconForRequest(req, `fgmc gamerule get ${rule}`))
+      ADMIN_GAMERULES.map(rule => runBridgeCommand(req, `gamerule get ${rule}`))
     )
+    const firstError = results.find(result => !result.ok)
+    if (firstError && !firstError.ok) {
+      return Response.json({ ok: false, error: firstError.error || 'Bridge request failed', code: firstError.code }, { status: 502 })
+    }
     const gamerules: Record<string, string> = {}
     ADMIN_GAMERULES.forEach((rule, i) => {
       const res = results[i]
@@ -52,8 +56,8 @@ export async function POST(req: NextRequest) {
     if (value !== 'true' && value !== 'false') {
       return Response.json({ ok: false, error: 'Value must be true or false' }, { status: 400 })
     }
-    const result = await rconForRequest(req, `fgmc gamerule set ${rule} ${value}`)
-    if (!result.ok) return Response.json({ ok: false, error: result.error })
+    const result = await runBridgeCommand(req, `gamerule set ${rule} ${value}`)
+    if (!result.ok) return Response.json({ ok: false, error: result.error, code: result.code }, { status: 502 })
     return Response.json({ ok: true, message: `${rule} set to ${value}` })
   } catch (e: unknown) {
     return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Server error' }, { status: 500 })

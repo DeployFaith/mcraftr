@@ -6,21 +6,40 @@ export type RconResult = {
   error?: string
 }
 
+function sanitizeOutput(stdout: string): string {
+  return stdout.replace(/§./g, '').trim()
+}
+
 export async function rconDirect(
   host: string,
   port: number,
   password: string,
-  cmd: string
+  cmd: string,
 ): Promise<RconResult> {
-  const client = new Rcon({ host, port, password, timeout: 6000 })
+  let client: Rcon | null = null
   try {
-    await client.connect()
+    client = await Rcon.connect({
+      host,
+      port,
+      password,
+      timeout: 6000,
+    })
     const stdout = await client.send(cmd)
-    return { ok: true, stdout: stdout.replace(/§./g, '').trim() }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : 'RCON error'
-    return { ok: false, stdout: '', error: msg }
+    return {
+      ok: true,
+      stdout: sanitizeOutput(stdout),
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      stdout: '',
+      error: error instanceof Error ? error.message : 'RCON error',
+    }
   } finally {
-    try { await client.end() } catch { /* ignore */ }
+    if (client) {
+      try {
+        await client.end()
+      } catch {}
+    }
   }
 }

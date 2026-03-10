@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { X } from 'lucide-react'
 import type { EntityCatalogEntry } from './SpawnInspectModal'
 
 type Props = {
@@ -67,28 +68,41 @@ export default function EntityPresetEditorModal({ initial, busy = false, onCance
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-3 sm:items-center sm:p-4"
       style={{ background: 'rgba(4, 8, 14, 0.78)', backdropFilter: 'blur(10px)' }}
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-[880px] overflow-hidden rounded-[28px] border border-[var(--accent-mid)]"
+        className="flex w-full max-w-[880px] flex-col overflow-hidden rounded-[28px] border border-[var(--accent-mid)]"
         style={{
+          maxHeight: 'calc(100dvh - 1.5rem)',
           background: 'linear-gradient(180deg, color-mix(in srgb, var(--panel) 94%, transparent), color-mix(in srgb, var(--bg2) 90%, transparent))',
           boxShadow: '0 28px 90px rgba(0,0,0,0.42)',
         }}
         onClick={event => event.stopPropagation()}
       >
-        <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}>
-          <div className="font-mono text-[15px] tracking-[0.14em]" style={{ color: 'var(--accent)' }}>
-            {initial ? 'EDIT ENTITY PRESET' : 'NEW ENTITY PRESET'}
+        <div className="flex items-start justify-between gap-3 border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}>
+          <div>
+            <div className="font-mono text-[15px] tracking-[0.14em]" style={{ color: 'var(--accent)' }}>
+              {initial ? 'EDIT ENTITY PRESET' : 'NEW ENTITY PRESET'}
+            </div>
+            <div className="mt-1 text-[12px] font-mono" style={{ color: 'var(--text-dim)' }}>
+              Universal fields first, raw NBT last.
+            </div>
           </div>
-          <div className="mt-1 text-[12px] font-mono" style={{ color: 'var(--text-dim)' }}>
-            Universal fields first, raw NBT last.
-          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="tap-target grid h-10 w-10 place-items-center rounded-2xl border transition-all"
+            aria-label="Close entity preset editor"
+            style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+          >
+            <X size={18} strokeWidth={2} />
+          </button>
         </div>
 
-        <div className="grid gap-6 p-5 lg:grid-cols-[1fr_1fr]">
+        <div className="min-h-0 overflow-y-auto p-5 touch-pan-y [-webkit-overflow-scrolling:touch]">
+          <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
           <div className="space-y-4">
             {([
               ['Preset Id', 'id', draft.id],
@@ -189,8 +203,9 @@ export default function EntityPresetEditorModal({ initial, busy = false, onCance
             </div>
           </div>
         </div>
+        </div>
 
-        <div className="flex gap-3 border-t px-5 py-4" style={{ borderColor: 'var(--border)' }}>
+        <div className="flex shrink-0 gap-3 border-t px-5 py-4" style={{ borderColor: 'var(--border)' }}>
           <button
             type="button"
             onClick={onCancel}

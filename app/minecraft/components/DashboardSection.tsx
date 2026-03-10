@@ -26,9 +26,18 @@ type DashboardData = {
     mobGriefing: string | null
     pvp: string | null
     whitelistCount: number | null
+    bridgeError?: string | null
   }
   recentChat: Array<{ id: number; type: string; player: string | null; message: string; ts: number }>
   recentAudit: AuditEntry[]
+  stack?: {
+    bridgeOk: boolean
+    bridgeError?: string | null
+    sidecarOk: boolean
+    sidecarError?: string | null
+    worldCount: number
+    mapCount: number
+  }
 }
 
 function SummaryCard({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
@@ -61,7 +70,7 @@ function RulePill({ label, value }: { label: string; value: string | number | nu
   )
 }
 
-export default function DashboardSection({ onNavigate }: { onNavigate: (tab: 'players' | 'actions' | 'admin' | 'chat' | 'settings') => void }) {
+export default function DashboardSection({ onNavigate }: { onNavigate: (tab: 'players' | 'actions' | 'worlds' | 'admin' | 'chat' | 'settings') => void }) {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -123,6 +132,11 @@ export default function DashboardSection({ onNavigate }: { onNavigate: (tab: 'pl
 
           <div className="glass-card p-4 space-y-3">
             <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">SAFE SERVER SETTINGS SNAPSHOT</div>
+            {data.rules.bridgeError && (
+              <div className="rounded-lg border border-red-900 bg-red-950/30 px-3 py-2 text-[12px] font-mono text-red-300">
+                Bridge unavailable: {data.rules.bridgeError}
+              </div>
+            )}
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               <RulePill label="Keep Inventory" value={data.rules.keepInventory} />
               <RulePill label="Mob Griefing" value={data.rules.mobGriefing} />
@@ -159,10 +173,28 @@ export default function DashboardSection({ onNavigate }: { onNavigate: (tab: 'pl
                 <div className="grid gap-2 sm:grid-cols-2">
                   <button onClick={() => onNavigate('players')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Players</button>
                   <button onClick={() => onNavigate('actions')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Actions</button>
+                  <button onClick={() => onNavigate('worlds')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Worlds</button>
                   <button onClick={() => onNavigate('admin')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Admin</button>
                   <button onClick={() => onNavigate('settings')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Settings</button>
                 </div>
               </div>
+
+              {data.stack && (
+                <div className="glass-card p-4 space-y-3">
+                  <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">SERVER SURFACE</div>
+                  {(data.stack.bridgeError || data.stack.sidecarError) && (
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)]">
+                      {data.stack.bridgeError ? `Bridge: ${data.stack.bridgeError}` : `Sidecar: ${data.stack.sidecarError}`}
+                    </div>
+                  )}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <RulePill label="Bridge" value={data.stack.bridgeOk ? 'true' : 'false'} />
+                    <RulePill label="Sidecar" value={data.stack.sidecarOk ? 'true' : 'false'} />
+                    <RulePill label="Worlds" value={data.stack.worldCount} />
+                    <RulePill label="Maps" value={data.stack.mapCount} />
+                  </div>
+                </div>
+              )}
 
               <div className="glass-card p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">

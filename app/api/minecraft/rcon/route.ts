@@ -6,7 +6,7 @@ import { logAudit } from '@/lib/audit'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// Raw RCON console — admin only.
+// Raw server terminal execution path — admin only.
 // Uses the standard rcon rate limiter (30 cmds/60s per user).
 // The security agent can add a dedicated stricter limiter if desired.
 

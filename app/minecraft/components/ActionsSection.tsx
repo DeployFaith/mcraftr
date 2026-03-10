@@ -17,7 +17,7 @@ import ConfirmModal from './ConfirmModal'
 import type { ConfirmModalProps } from './ConfirmModal'
 import type { FeatureKey } from '@/lib/features'
 import PlayerPicker from './PlayerPicker'
-import CollapsibleCard from './CollapsibleCard'
+import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
 import KitIcon from './KitIcon'
 import {
   CUSTOM_KIT_CUSTOM_ICON_MAX_BYTES,
@@ -34,6 +34,8 @@ type LucideIcon = React.ComponentType<LucideProps>
 
 type Props = {
   players: string[]
+  selectedPlayer?: string
+  onSelectedPlayerChange?: (player: string) => void
 }
 
 type FeatureFlags = Record<FeatureKey, boolean>
@@ -67,6 +69,7 @@ const ABILITY_CMDS: { id: string; Icon: LucideIcon; label: string; oneShot?: boo
 
 const CAT_PAGE_SIZE = 24
 const MAX_STACK_BATCHES = 36
+const ACTIONS_COLLAPSIBLE_GROUP = 'actions-tab'
 
 function totalGiveQty(item: CatalogItem, fullStacks: number, extraQty: number) {
   const maxStack = Math.max(1, item.maxStack ?? 64)
@@ -278,7 +281,7 @@ function QuantityPicker({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function ActionsSection({ players }: Props) {
+export default function ActionsSection({ players, selectedPlayer: selectedPlayerProp, onSelectedPlayerChange }: Props) {
   const { toasts, addToast } = useToast()
   const [features, setFeatures] = useState<FeatureFlags | null>(null)
 
@@ -290,7 +293,8 @@ export default function ActionsSection({ players }: Props) {
   }, [])
 
   const [busyCmd,   setBusyCmd]   = useState<string | null>(null)
-  const [selectedPlayer, setSelectedPlayer] = useState('')
+  const [internalSelectedPlayer, setInternalSelectedPlayer] = useState('')
+  const selectedPlayer = selectedPlayerProp ?? internalSelectedPlayer
 
   // ── Effects state ─────────────────────────────────────────────────────────────
 
@@ -322,7 +326,8 @@ export default function ActionsSection({ players }: Props) {
   const isActive = (effectId: string) => selectedPlayer ? (activeEffects[selectedPlayer]?.has(effectId) ?? false) : false
 
   const handleSelectedPlayerChange = (next: string) => {
-    setSelectedPlayer(next)
+    if (onSelectedPlayerChange) onSelectedPlayerChange(next)
+    else setInternalSelectedPlayer(next)
     setTpTo('')
     if (next) {
       if (effectsTimerRef.current) clearTimeout(effectsTimerRef.current)
@@ -845,12 +850,31 @@ export default function ActionsSection({ players }: Props) {
   const canCatalog = features ? features.enable_item_catalog : true
   const canInventory = features ? features.enable_inventory : true
   const allSectionsDisabled = !canWorld && !canPlayerCmd && !canChatWrite && !canTeleport && !canKits && !canCatalog && !canInventory
+  const [collapseAllActive, setCollapseAllActive] = useState(false)
+  const toggleCollapseAll = () => {
+    const nextOpen = collapseAllActive
+    setCollapsibleGroupState(ACTIONS_COLLAPSIBLE_GROUP, nextOpen)
+    setCollapseAllActive(!collapseAllActive)
+  }
+  const collapseAllLabel = collapseAllActive ? 'Expand All' : 'Collapse All'
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4 pb-6">
       <h2 className="font-mono text-base tracking-widest text-[var(--accent)]">ACTIONS</h2>
+
+      {!allSectionsDisabled && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={toggleCollapseAll}
+            className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono tracking-widest text-[var(--text-dim)] transition-colors hover:border-[var(--accent-mid)] hover:text-[var(--accent)]"
+          >
+            {collapseAllLabel}
+          </button>
+        </div>
+      )}
 
       {allSectionsDisabled && (
         <div className="glass-card p-4 text-[13px] font-mono text-[var(--text-dim)]">
@@ -859,7 +883,7 @@ export default function ActionsSection({ players }: Props) {
       )}
 
       {!allSectionsDisabled && (
-        <CollapsibleCard title="ACTIVE PLAYER" storageKey="actions:active-player" bodyClassName="p-4 space-y-3">
+        <CollapsibleCard title="ACTIVE PLAYER" storageKey="actions:active-player" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-3">
           <PlayerPicker
             online={players}
             selected={selectedPlayer}
@@ -876,7 +900,7 @@ export default function ActionsSection({ players }: Props) {
 
       {/* ── WORLD COMMANDS ── */}
       {canWorld && (
-      <CollapsibleCard title="WORLD" storageKey="actions:world" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="WORLD" storageKey="actions:world" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
         <div>
           <SectionLabel>
             WEATHER / TIME {selectedPlayer && <span className="text-[var(--accent)] normal-case">— {selectedPlayer}</span>}
@@ -890,7 +914,7 @@ export default function ActionsSection({ players }: Props) {
 
       {/* ── PLAYER COMMANDS ── */}
       {canPlayerCmd && (
-      <CollapsibleCard title="PLAYER COMMANDS" storageKey="actions:player-commands" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="PLAYER COMMANDS" storageKey="actions:player-commands" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
 
         <div>
           <SectionLabel>GAMEMODE {selectedPlayer && <span className="text-[var(--accent)] normal-case">— {selectedPlayer}</span>}</SectionLabel>
@@ -933,7 +957,7 @@ export default function ActionsSection({ players }: Props) {
 
       {/* ── BROADCAST ── */}
       {canChatWrite && (
-      <CollapsibleCard title="BROADCAST" storageKey="actions:broadcast" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="BROADCAST" storageKey="actions:broadcast" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
         <div>
           <SectionLabel>MESSAGE TO ALL PLAYERS</SectionLabel>
           <textarea placeholder="Type a message…" value={bcMessage} onChange={e => setBcMessage(e.target.value)}
@@ -981,7 +1005,7 @@ export default function ActionsSection({ players }: Props) {
 
       {/* ── TELEPORT ── */}
       {canTeleport && (
-      <CollapsibleCard title="TELEPORT" storageKey="actions:teleport" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="TELEPORT" storageKey="actions:teleport" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
 
         <div>
           <SectionLabel>PLAYER → PLAYER</SectionLabel>
@@ -1046,7 +1070,7 @@ export default function ActionsSection({ players }: Props) {
 
       {/* ── KIT ASSIGNMENT ── */}
       {canKits && (
-      <CollapsibleCard title="KIT ASSIGNMENT" storageKey="actions:kits" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="KIT ASSIGNMENT" storageKey="actions:kits" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
 
         <div>
           <SectionLabel>1 · SELECT PLAYER</SectionLabel>
@@ -1481,7 +1505,7 @@ export default function ActionsSection({ players }: Props) {
 
       {/* ── ITEM CATALOG ── */}
       {canCatalog && (
-      <CollapsibleCard title="ITEM CATALOG" storageKey="actions:item-catalog" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="ITEM CATALOG" storageKey="actions:item-catalog" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
 
         <div>
           <SectionLabel>ACTIVE PLAYER</SectionLabel>
@@ -1611,7 +1635,7 @@ export default function ActionsSection({ players }: Props) {
 
       {/* ── INVENTORY VIEWER ── */}
       {canInventory && (
-      <CollapsibleCard title="INVENTORY VIEWER" storageKey="actions:inventory" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="INVENTORY VIEWER" storageKey="actions:inventory" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
 
         <div>
           <SectionLabel>SELECT PLAYER</SectionLabel>
@@ -1724,6 +1748,17 @@ export default function ActionsSection({ players }: Props) {
           {...confirmModal}
           onCancel={() => { setConfirmModal(null); setSelectedInvSlot(null) }}
         />
+      )}
+      {!allSectionsDisabled && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={toggleCollapseAll}
+            className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono tracking-widest text-[var(--text-dim)] transition-colors hover:border-[var(--accent-mid)] hover:text-[var(--accent)]"
+          >
+            {collapseAllLabel}
+          </button>
+        </div>
       )}
     </div>
   )

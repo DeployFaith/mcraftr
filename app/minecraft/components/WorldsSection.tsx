@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import CollapsibleCard from './CollapsibleCard'
+import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
 import PlayerPicker from './PlayerPicker'
 import SpawnInspectModal, { type EntityCatalogEntry, type LocationMode, type StructureCatalogEntry } from './SpawnInspectModal'
 import CatalogArtwork from './CatalogArtwork'
@@ -108,6 +108,54 @@ type PlacementEntry = {
   max_z: number
   created_at: number
 }
+
+type WorldSettingsEntry = WorldEntry & {
+  gamerules?: Record<string, boolean | null> | null
+}
+
+type LiveEntityEntry = {
+  uuid: string
+  id: string
+  label: string
+  category: string
+  dangerous: boolean
+  world: string
+  location?: {
+    x: number
+    y: number
+    z: number
+    yaw?: number
+    pitch?: number
+  } | null
+  customName?: string | null
+  persistent?: boolean
+  glowing?: boolean
+  invulnerable?: boolean
+  silent?: boolean
+  gravity?: boolean
+  health?: number | null
+}
+
+const WORLDS_COLLAPSIBLE_GROUP = 'worlds-tab'
+const WORLD_CATEGORY_PAGE_SIZE = 8
+const WORLD_GAMERULE_LABELS: Record<string, string> = {
+  keepInventory: 'Keep Inventory',
+  mobGriefing: 'Mob Griefing',
+  pvp: 'PvP',
+  doDaylightCycle: 'Daylight Cycle',
+  doWeatherCycle: 'Weather Cycle',
+  doFireTick: 'Fire Tick',
+  doMobSpawning: 'Mob Spawning',
+  naturalRegeneration: 'Natural Regen',
+}
+const WORLD_TOGGLE_SETTINGS = [
+  ['pvp', 'PvP'],
+  ['flight', 'Flight'],
+  ['weather', 'Weather'],
+  ['hidden', 'Hidden'],
+  ['autoload', 'Autoload'],
+] as const
+const WORLD_DIFFICULTIES = ['peaceful', 'easy', 'normal', 'hard'] as const
 
 function titleCase(value: string): string {
   return value
@@ -259,6 +307,14 @@ function inferSummary(entry: StructureCatalogEntry | EntityCatalogEntry) {
   return entry.summary || `${entry.category} entity ready for spawning.`
 }
 
+function categoryPage<T>(entries: T[], page: number, pageSize: number) {
+  return entries.slice(page * pageSize, page * pageSize + pageSize)
+}
+
+function clampPage(page: number, count: number) {
+  return Math.max(0, Math.min(page, Math.max(0, count - 1)))
+}
+
 function pillStyle(enabled: boolean | null) {
   return enabled
     ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
@@ -280,6 +336,9 @@ export default function WorldsSection({
   const [structures, setStructures] = useState<StructureCatalogEntry[]>([])
   const [entities, setEntities] = useState<EntityCatalogEntry[]>([])
   const [placements, setPlacements] = useState<PlacementEntry[]>([])
+  const [worldDetails, setWorldDetails] = useState<Record<string, WorldSettingsEntry>>({})
+  const [liveEntities, setLiveEntities] = useState<LiveEntityEntry[]>([])
+  const [playerWorlds, setPlayerWorlds] = useState<Record<string, string | null>>({})
   const [structureScan, setStructureScan] = useState<StructureScanData | null>(null)
   const [entityScan, setEntityScan] = useState<EntityScanData | null>(null)
   const [structureLoadError, setStructureLoadError] = useState<string | null>(null)
@@ -287,6 +346,7 @@ export default function WorldsSection({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
+  const [collapseAllActive, setCollapseAllActive] = useState(false)
 
   const [spawnWorld, setSpawnWorld] = useState('')
   const [spawnMode, setSpawnMode] = useState<LocationMode>('player')
@@ -307,6 +367,8 @@ export default function WorldsSection({
   const [structureRotation, setStructureRotation] = useState('0')
   const [structureIncludeAir, setStructureIncludeAir] = useState(false)
   const [structureBusy, setStructureBusy] = useState(false)
+  const [worldActionBusy, setWorldActionBusy] = useState<string | null>(null)
+  const [structureCategoryPage, setStructureCategoryPage] = useState(0)
 
   const [entitySearch, setEntitySearch] = useState('')
   const [entityCategory, setEntityCategory] = useState('all')
@@ -322,6 +384,8 @@ export default function WorldsSection({
   const [presetEditorBusy, setPresetEditorBusy] = useState(false)
   const [editingPreset, setEditingPreset] = useState<EntityCatalogEntry | null>(null)
   const [catalogBusy, setCatalogBusy] = useState(false)
+  const [entityCategoryPage, setEntityCategoryPage] = useState(0)
+  const [liveEntityWorldFilter, setLiveEntityWorldFilter] = useState('')
 
   const [placementWorldFilter, setPlacementWorldFilter] = useState('')
   const [placementMode, setPlacementMode] = useState<LocationMode>('coords')
@@ -347,6 +411,23 @@ export default function WorldsSection({
     }
   }, [])
 
+  const loadWorldDetail = useCallback(async (worldName: string) => {
+    if (!worldName) return
+    try {
+      const res = await fetch(`/api/minecraft/worlds/${encodeURIComponent(worldName)}`, { cache: 'no-store' })
+      const data = await res.json()
+      if (!data.ok || !data.world) throw new Error(data.error || 'Failed to load world settings')
+      setWorldDetails(current => ({ ...current, [worldName]: data.world as WorldSettingsEntry }))
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Failed to load world settings')
+    }
+  }, [])
+
+  const toggleCollapseAll = useCallback(() => {
+    setCollapsibleGroupState(WORLDS_COLLAPSIBLE_GROUP, collapseAllActive)
+    setCollapseAllActive(current => !current)
+  }, [collapseAllActive])
+
   const loadData = useCallback(async (showSpinner = false) => {
     if (showSpinner) setLoading(true)
     setError(null)
@@ -359,7 +440,7 @@ export default function WorldsSection({
         const res = await fetch('/api/minecraft/plugin-stack', { cache: 'no-store' })
         setPluginStack(await res.json())
       } catch (nextError) {
-        nextErrors.push(nextError instanceof Error ? nextError.message : 'Failed to load plugin status')
+        nextErrors.push(nextError instanceof Error ? nextError.message : 'Failed to load integration status')
       }
     }
 
@@ -414,6 +495,16 @@ export default function WorldsSection({
       }
     }
 
+    if (canEntityCatalog) {
+      try {
+        const res = await fetch('/api/minecraft/entities/live', { cache: 'no-store' })
+        const data = await res.json()
+        setLiveEntities(data.ok ? (data.entities ?? []) : [])
+      } catch {
+        setLiveEntities([])
+      }
+    }
+
     if (canStructureCatalog) {
       try {
         const res = await fetch('/api/minecraft/structures/placements', { cache: 'no-store' })
@@ -446,6 +537,27 @@ export default function WorldsSection({
     if (!placementWorldFilter && firstWorld) setPlacementWorldFilter(firstWorld)
   }, [entityWorld, placementWorldFilter, spawnWorld, structureWorld, worldsData])
 
+  useEffect(() => {
+    let cancelled = false
+    if (players.length === 0) {
+      setPlayerWorlds({})
+      return
+    }
+    void Promise.all(players.map(async player => {
+      try {
+        const res = await fetch(`/api/minecraft/player-location?player=${encodeURIComponent(player)}`, { cache: 'no-store' })
+        const data = await res.json()
+        return [player, data.ok ? (typeof data.world === 'string' ? data.world : null) : null] as const
+      } catch {
+        return [player, null] as const
+      }
+    })).then(entries => {
+      if (cancelled) return
+      setPlayerWorlds(Object.fromEntries(entries))
+    })
+    return () => { cancelled = true }
+  }, [players])
+
   const structureCategories = useMemo(
     () => ['all', ...Array.from(new Set(structures.map(entry => entry.category))).sort((a, b) => a.localeCompare(b))],
     [structures],
@@ -463,6 +575,14 @@ export default function WorldsSection({
     if (!entityCategories.includes(entityCategory)) setEntityCategory('all')
   }, [entityCategories, entityCategory])
 
+  useEffect(() => {
+    setStructureCategoryPage(0)
+  }, [structureCategory, structureSearch])
+
+  useEffect(() => {
+    setEntityCategoryPage(0)
+  }, [entityCategory, entitySearch])
+
   const filteredStructures = useMemo(() => {
     const needle = structureSearch.trim().toLowerCase()
     return structures.filter(entry => {
@@ -471,6 +591,16 @@ export default function WorldsSection({
       return entry.label.toLowerCase().includes(needle) || entry.id.toLowerCase().includes(needle)
     })
   }, [structureCategory, structureSearch, structures])
+
+  const groupedStructures = useMemo(() => {
+    const groups = new Map<string, StructureCatalogEntry[]>()
+    for (const entry of filteredStructures) {
+      const bucket = groups.get(entry.category)
+      if (bucket) bucket.push(entry)
+      else groups.set(entry.category, [entry])
+    }
+    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+  }, [filteredStructures])
 
   const filteredEntities = useMemo(() => {
     const needle = entitySearch.trim().toLowerCase()
@@ -481,9 +611,36 @@ export default function WorldsSection({
     })
   }, [entities, entityCategory, entitySearch])
 
+  const groupedEntities = useMemo(() => {
+    const groups = new Map<string, EntityCatalogEntry[]>()
+    for (const entry of filteredEntities) {
+      const bucket = groups.get(entry.category)
+      if (bucket) bucket.push(entry)
+      else groups.set(entry.category, [entry])
+    }
+    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+  }, [filteredEntities])
+
   const visiblePlacements = useMemo(() => {
     return placements.filter(entry => !placementWorldFilter || entry.world === placementWorldFilter)
   }, [placementWorldFilter, placements])
+
+  const visibleLiveEntities = useMemo(() => {
+    return liveEntities.filter(entry => !liveEntityWorldFilter || entry.world === liveEntityWorldFilter)
+  }, [liveEntities, liveEntityWorldFilter])
+
+  const structureCategoryPageCount = Math.max(1, Math.ceil(groupedStructures.length / WORLD_CATEGORY_PAGE_SIZE))
+  const entityCategoryPageCount = Math.max(1, Math.ceil(groupedEntities.length / WORLD_CATEGORY_PAGE_SIZE))
+  const pagedStructureGroups = categoryPage(groupedStructures, clampPage(structureCategoryPage, structureCategoryPageCount), WORLD_CATEGORY_PAGE_SIZE)
+  const pagedEntityGroups = categoryPage(groupedEntities, clampPage(entityCategoryPage, entityCategoryPageCount), WORLD_CATEGORY_PAGE_SIZE)
+
+  useEffect(() => {
+    setStructureCategoryPage(current => clampPage(current, structureCategoryPageCount))
+  }, [structureCategoryPageCount])
+
+  useEffect(() => {
+    setEntityCategoryPage(current => clampPage(current, entityCategoryPageCount))
+  }, [entityCategoryPageCount])
 
   const postJson = useCallback(async (url: string, body: Record<string, unknown>) => {
     const res = await fetch(url, {
@@ -496,6 +653,75 @@ export default function WorldsSection({
     playSound('success')
     return data
   }, [])
+
+  const resolvePlayerTarget = useCallback(async (player: string, expectedWorld?: string) => {
+    if (!player) throw new Error('Select a player first.')
+    const res = await fetch(`/api/minecraft/player-location?player=${encodeURIComponent(player)}`, { cache: 'no-store' })
+    const data = await res.json()
+    if (!data.ok || !data.location || typeof data.world !== 'string') {
+      throw new Error(data.error || 'Failed to resolve player location')
+    }
+    if (expectedWorld && data.world !== expectedWorld) {
+      throw new Error(`${player} is in ${data.world}, not ${expectedWorld}. Choose a player in that world or use coordinates.`)
+    }
+    return data as { ok: true; world: string; location: { x: number; y: number; z: number } }
+  }, [])
+
+  const handleWorldSettingChange = useCallback(async (worldName: string, key: string, value: string | boolean) => {
+    try {
+      setWorldActionBusy(`${worldName}:${key}`)
+      const res = await fetch(`/api/minecraft/worlds/${encodeURIComponent(worldName)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value }),
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || 'Failed to update world setting')
+      if (data.world) {
+        setWorldDetails(current => ({ ...current, [worldName]: data.world as WorldSettingsEntry }))
+      }
+      setStatus(`Updated ${worldName}: ${key}.`)
+      await loadData(false)
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Failed to update world setting')
+    } finally {
+      setWorldActionBusy(null)
+    }
+  }, [loadData])
+
+  const handleWorldDelete = useCallback(async (worldName: string) => {
+    if (typeof window !== 'undefined' && !window.confirm(`Delete ${worldName}? This removes the world from the server.`)) {
+      return
+    }
+    try {
+      setWorldActionBusy(`${worldName}:delete`)
+      const res = await fetch(`/api/minecraft/worlds/${encodeURIComponent(worldName)}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || 'Failed to delete world')
+      setStatus(`Deleted ${worldName}.`)
+      await loadData(true)
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Failed to delete world')
+    } finally {
+      setWorldActionBusy(null)
+    }
+  }, [loadData])
+
+  const handleWorldLoadToggle = useCallback(async (worldName: string, loaded: boolean) => {
+    try {
+      setWorldActionBusy(`${worldName}:${loaded ? 'unload' : 'load'}`)
+      const endpoint = loaded ? 'unload' : 'load'
+      const res = await fetch(`/api/minecraft/worlds/${encodeURIComponent(worldName)}/${endpoint}`, { method: 'POST' })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || `Failed to ${endpoint} world`)
+      setStatus(`${loaded ? 'Unloaded' : 'Loaded'} ${worldName}.`)
+      await loadData(true)
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Failed to update world load state')
+    } finally {
+      setWorldActionBusy(null)
+    }
+  }, [loadData])
 
   const handleSetSpawn = async () => {
     if (!spawnWorld) return
@@ -515,7 +741,15 @@ export default function WorldsSection({
     if (!selectedStructure) return
     setStructureBusy(true)
     try {
-      const payload = structureMode === 'player'
+      if (structureMode === 'world-player' && !structureWorld) {
+        throw new Error('Select a world first.')
+      }
+      const playerTarget = structureMode === 'player'
+        ? await resolvePlayerTarget(selectedPlayer)
+        : structureMode === 'world-player'
+          ? await resolvePlayerTarget(selectedPlayer, structureWorld)
+          : null
+      const payload = playerTarget
         ? {
             structureId: selectedStructure.id,
             structureLabel: selectedStructure.label,
@@ -613,7 +847,15 @@ export default function WorldsSection({
     if (!selectedEntity) return
     setEntityBusy(true)
     try {
-      const payload = entityMode === 'player'
+      if (entityMode === 'world-player' && !entityWorld) {
+        throw new Error('Select a world first.')
+      }
+      const playerTarget = entityMode === 'player'
+        ? await resolvePlayerTarget(selectedPlayer)
+        : entityMode === 'world-player'
+          ? await resolvePlayerTarget(selectedPlayer, entityWorld)
+          : null
+      const payload = playerTarget
         ? { ...selectedEntity, entityId: selectedEntity.entityId ?? selectedEntity.id, sourceKind: selectedEntity.sourceKind, locationMode: 'player', player: selectedPlayer, count: Number(entityCount) || 1 }
         : {
             ...selectedEntity,
@@ -725,6 +967,8 @@ export default function WorldsSection({
   }
 
   const currentSpawn = useMemo(() => worldsData?.worlds.find(entry => entry.name === spawnWorld)?.spawn ?? null, [spawnWorld, worldsData])
+  const worldNames = useMemo(() => worldsData?.worlds.map(entry => entry.name) ?? [], [worldsData])
+  const collapseAllLabel = collapseAllActive ? 'Expand All' : 'Collapse All'
 
   return (
     <div className="space-y-4 pb-6">
@@ -743,7 +987,17 @@ export default function WorldsSection({
         </button>
       </div>
 
-      <CollapsibleCard title="ACTIVE PLAYER" storageKey="worlds:active-player" bodyClassName="p-4 space-y-3">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={toggleCollapseAll}
+          className="rounded border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]"
+        >
+          {collapseAllLabel}
+        </button>
+      </div>
+
+      <CollapsibleCard title="ACTIVE PLAYER" storageKey="worlds:active-player" bodyClassName="p-4 space-y-3" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
         <PlayerPicker
           online={players}
           selected={selectedPlayer}
@@ -759,10 +1013,10 @@ export default function WorldsSection({
 
       {error && <div className="glass-card p-4 text-[13px] font-mono text-red-400">{error}</div>}
       {status && <div className="glass-card p-4 text-[13px] font-mono text-[var(--accent)]">{status}</div>}
-      {loading && !worldsData && <div className="glass-card p-4 text-[13px] font-mono text-[var(--text-dim)]">Loading world stack…</div>}
+      {loading && !worldsData && <div className="glass-card p-4 text-[13px] font-mono text-[var(--text-dim)]">Loading world and integration surface…</div>}
 
       {canPluginStatus && pluginStack && (
-        <CollapsibleCard title="PLUGIN STACK" storageKey="worlds:plugin-stack" bodyClassName="p-5 space-y-4">
+        <CollapsibleCard title="INTEGRATIONS" storageKey="worlds:plugin-stack" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4">
               <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">BRIDGE STATUS</div>
@@ -787,37 +1041,154 @@ export default function WorldsSection({
       )}
 
       {canWorldInventory && worldsData && (
-        <CollapsibleCard title="WORLD INVENTORY" storageKey="worlds:inventory" bodyClassName="p-5 space-y-4">
+        <CollapsibleCard title="WORLD INVENTORY" storageKey="worlds:inventory" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
           <div className="grid gap-3">
-            {worldsData.worlds.map(world => (
-              <div key={world.name} className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4 space-y-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="text-[14px] font-mono text-[var(--text)]">{world.alias?.trim() || world.name}</div>
-                    <div className="text-[11px] font-mono text-[var(--text-dim)]">
-                      {world.name} · {world.environment} · {world.loaded ? 'loaded' : 'unloaded'}
+            {worldsData.worlds.map(world => {
+              const detail = { ...world, ...(worldDetails[world.name] ?? {}) } as WorldSettingsEntry
+              const gamerules = worldDetails[world.name]?.gamerules ?? null
+              return (
+                <CollapsibleCard
+                  key={world.name}
+                  title={
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[14px] font-mono text-[var(--text)]">{detail.alias?.trim() || detail.name}</div>
+                        <div className="text-[11px] font-mono text-[var(--text-dim)]">
+                          {detail.name} · {detail.environment} · {detail.loaded ? 'loaded' : 'unloaded'}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded border px-2 py-1 text-[10px] font-mono tracking-widest" style={pillStyle(detail.pvp)}>PVP</span>
+                        <span className="rounded border px-2 py-1 text-[10px] font-mono tracking-widest" style={pillStyle(detail.allowFlight)}>FLIGHT</span>
+                        <span className="rounded border px-2 py-1 text-[10px] font-mono tracking-widest" style={pillStyle(detail.allowWeather)}>WEATHER</span>
+                      </div>
+                    </div>
+                  }
+                  storageKey={`worlds:inventory:${world.name}`}
+                  defaultOpen={false}
+                  bodyClassName="p-4 space-y-4"
+                  groupKey={WORLDS_COLLAPSIBLE_GROUP}
+                  onOpenChange={(open) => {
+                    if (open && !worldDetails[world.name]) void loadWorldDetail(world.name)
+                  }}
+                >
+                  <div className="grid gap-2 text-[12px] font-mono text-[var(--text-dim)] sm:grid-cols-2 xl:grid-cols-3">
+                    <div>Players: <span className="text-[var(--text)]">{detail.players}</span></div>
+                    <div>Difficulty: <span className="text-[var(--text)]">{detail.difficulty ?? '—'}</span></div>
+                    <div>Disk: <span className="text-[var(--text)]">{formatBytes(detail.fs?.sizeBytes)}</span></div>
+                    <div>Spawn: <span className="text-[var(--text)]">{detail.spawn ? `${detail.spawn.x}, ${detail.spawn.y}, ${detail.spawn.z}` : '—'}</span></div>
+                    <div>Path: <span className="text-[var(--text)]">{detail.fs?.path ?? '—'}</span></div>
+                    <div>Map: <span className="text-[var(--text)]">{detail.fs?.mapUrl ? 'Available' : 'Unavailable'}</span></div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">WORLD FLAGS</div>
+                    <div className="flex flex-wrap gap-2">
+                      {WORLD_TOGGLE_SETTINGS.map(([settingKey, label]) => {
+                        const currentValue = settingKey === 'pvp'
+                          ? detail.pvp
+                          : settingKey === 'flight'
+                            ? detail.allowFlight
+                            : settingKey === 'weather'
+                              ? detail.allowWeather
+                              : settingKey === 'hidden'
+                                ? detail.hidden
+                                : detail.autoLoad
+                        const busy = worldActionBusy === `${world.name}:${settingKey}`
+                        return (
+                          <button
+                            key={settingKey}
+                            type="button"
+                            disabled={busy || currentValue === null}
+                            onClick={() => void handleWorldSettingChange(world.name, settingKey, !currentValue)}
+                            className="rounded border px-3 py-2 text-[11px] font-mono tracking-widest disabled:opacity-40"
+                            style={pillStyle(currentValue)}
+                          >
+                            {busy ? '…' : `${label} ${currentValue ? 'ON' : 'OFF'}`}
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="rounded border px-2 py-1 text-[10px] font-mono tracking-widest" style={pillStyle(world.pvp)}>PVP</span>
-                    <span className="rounded border px-2 py-1 text-[10px] font-mono tracking-widest" style={pillStyle(world.allowFlight)}>FLIGHT</span>
-                    <span className="rounded border px-2 py-1 text-[10px] font-mono tracking-widest" style={pillStyle(world.allowWeather)}>WEATHER</span>
+
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">DIFFICULTY</div>
+                    <div className="grid gap-2 sm:grid-cols-4">
+                      {WORLD_DIFFICULTIES.map(level => (
+                        <button
+                          key={level}
+                          type="button"
+                          disabled={worldActionBusy === `${world.name}:difficulty`}
+                          onClick={() => void handleWorldSettingChange(world.name, 'difficulty', level)}
+                          className="rounded border px-3 py-2 text-[11px] font-mono tracking-widest disabled:opacity-40"
+                          style={detail.difficulty === level
+                            ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
+                            : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+                        >
+                          {level.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div className="grid gap-2 text-[12px] font-mono text-[var(--text-dim)] sm:grid-cols-2">
-                  <div>Players: <span className="text-[var(--text)]">{world.players}</span></div>
-                  <div>Difficulty: <span className="text-[var(--text)]">{world.difficulty ?? '—'}</span></div>
-                  <div>Disk: <span className="text-[var(--text)]">{formatBytes(world.fs?.sizeBytes)}</span></div>
-                  <div>Spawn: <span className="text-[var(--text)]">{world.spawn ? `${world.spawn.x}, ${world.spawn.y}, ${world.spawn.z}` : '—'}</span></div>
-                </div>
-              </div>
-            ))}
+
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">WORLD GAMERULES</div>
+                    {gamerules ? (
+                      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                        {Object.entries(WORLD_GAMERULE_LABELS).map(([rule, label]) => {
+                          const currentValue = gamerules?.[rule] ?? null
+                          const busy = worldActionBusy === `${world.name}:${rule}`
+                          return (
+                            <button
+                              key={rule}
+                              type="button"
+                              disabled={busy || currentValue === null}
+                              onClick={() => void handleWorldSettingChange(world.name, rule, !currentValue)}
+                              className="flex items-center justify-between rounded-xl border px-3 py-3 text-left font-mono text-[11px] disabled:opacity-40"
+                              style={currentValue
+                                ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
+                                : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+                            >
+                              <span>{label}</span>
+                              <span>{busy ? '…' : currentValue ? 'ON' : 'OFF'}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[11px] font-mono text-[var(--text-dim)]">
+                        Load this world&apos;s detail card to edit per-world gamerules. Unloaded worlds may not expose gamerules until loaded.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={worldActionBusy === `${world.name}:${detail.loaded ? 'unload' : 'load'}`}
+                      onClick={() => void handleWorldLoadToggle(world.name, detail.loaded)}
+                      className="rounded border border-[var(--border)] px-3 py-2 text-[11px] font-mono text-[var(--text-dim)] disabled:opacity-40"
+                    >
+                      {detail.loaded ? 'Unload World' : 'Load World'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={worldActionBusy === `${world.name}:delete`}
+                      onClick={() => void handleWorldDelete(world.name)}
+                      className="rounded border border-red-900 px-3 py-2 text-[11px] font-mono text-red-400 disabled:opacity-40"
+                    >
+                      Delete World
+                    </button>
+                  </div>
+                </CollapsibleCard>
+              )
+            })}
           </div>
         </CollapsibleCard>
       )}
 
       {canSpawnTools && worldsData && (
-        <CollapsibleCard title="WORLD SPAWN" storageKey="worlds:spawn" bodyClassName="p-5 space-y-4">
+        <CollapsibleCard title="WORLD SPAWN" storageKey="worlds:spawn" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
           <div className="grid gap-4 lg:grid-cols-[1fr_0.95fr]">
             <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 space-y-3">
               <label className="block space-y-1">
@@ -881,7 +1252,7 @@ export default function WorldsSection({
       )}
 
       {canStructureCatalog && (
-        <CollapsibleCard title="STRUCTURE CATALOG" storageKey="worlds:structures" bodyClassName="p-5 space-y-4">
+        <CollapsibleCard title="STRUCTURE CATALOG" storageKey="worlds:structures" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
           <input
             ref={structureUploadRef}
             type="file"
@@ -940,23 +1311,65 @@ export default function WorldsSection({
               {structureLoadError}
             </div>
           )}
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {filteredStructures.map(entry => (
-              <button
-                key={entry.id}
-                onClick={() => {
-                  setStructureModalMode('place')
-                  setPlacementToRemove(null)
-                  setSelectedStructure({ ...entry, summary: inferSummary(entry) })
-                }}
-                className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] text-left transition-all hover:-translate-y-0.5 hover:border-[var(--accent-mid)]"
+          {structureCategory === 'all' && groupedStructures.length > WORLD_CATEGORY_PAGE_SIZE && (
+            <div className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[11px] font-mono text-[var(--text-dim)]">
+              <span>Category page {clampPage(structureCategoryPage, structureCategoryPageCount) + 1} / {structureCategoryPageCount}</span>
+              <div className="flex gap-2">
+                <button type="button" disabled={structureCategoryPage <= 0} onClick={() => setStructureCategoryPage(page => Math.max(0, page - 1))} className="rounded border border-[var(--border)] px-3 py-1 disabled:opacity-40">Prev</button>
+                <button type="button" disabled={structureCategoryPage >= structureCategoryPageCount - 1} onClick={() => setStructureCategoryPage(page => Math.min(structureCategoryPageCount - 1, page + 1))} className="rounded border border-[var(--border)] px-3 py-1 disabled:opacity-40">Next</button>
+              </div>
+            </div>
+          )}
+          <div className="space-y-3">
+            {pagedStructureGroups.map(([category, entries]) => (
+              <CollapsibleCard
+                key={category}
+                title={`${category.toUpperCase()} (${entries.length})`}
+                storageKey={`worlds:structures:category:${category}`}
+                defaultOpen={structureCategory !== 'all'}
+                bodyClassName="p-3 space-y-3"
+                groupKey={WORLDS_COLLAPSIBLE_GROUP}
               >
-                <CatalogArtwork kind="structure" label={entry.label} category={entry.category} sourceKind={entry.sourceKind} imageUrl={entry.imageUrl} className="h-28 w-full object-cover" />
-                <div className="p-3">
-                  <div className="text-[13px] font-mono text-[var(--text)]">{entry.label}</div>
-                  <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">{entry.category} · {entry.sourceKind} · {entry.placementKind}</div>
-                </div>
-              </button>
+                {entries.map(entry => (
+                  <CollapsibleCard
+                    key={entry.id}
+                    title={
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-[13px] font-mono text-[var(--text)]">{entry.label}</div>
+                        <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">{entry.sourceKind} · {entry.placementKind}</div>
+                      </div>
+                    }
+                    storageKey={`worlds:structures:item:${entry.id}`}
+                    defaultOpen={false}
+                    bodyClassName="p-4 space-y-3"
+                    className="border border-[var(--border)] bg-[var(--panel)]"
+                    groupKey={WORLDS_COLLAPSIBLE_GROUP}
+                  >
+                    <CatalogArtwork kind="structure" label={entry.label} category={entry.category} sourceKind={entry.sourceKind} imageUrl={entry.imageUrl} className="h-32 w-full rounded-2xl border object-cover" />
+                    <div className="grid gap-2 text-[12px] font-mono text-[var(--text-dim)] sm:grid-cols-2">
+                      <div>Category: <span className="text-[var(--text)]">{entry.category}</span></div>
+                      <div>Format: <span className="text-[var(--text)]">{entry.format ?? entry.placementKind ?? 'native'}</span></div>
+                      <div>Size: <span className="text-[var(--text)]">{formatBytes(entry.sizeBytes)}</span></div>
+                      <div>Updated: <span className="text-[var(--text)]">{entry.updatedAt ? new Date(entry.updatedAt * 1000).toLocaleString() : '—'}</span></div>
+                    </div>
+                    {entry.summary && <div className="rounded-xl border border-[var(--border)] bg-[var(--bg2)] px-4 py-3 text-[12px] font-mono text-[var(--text-dim)]">{entry.summary}</div>}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStructureModalMode('place')
+                          setPlacementToRemove(null)
+                          setSelectedStructure({ ...entry, summary: inferSummary(entry) })
+                        }}
+                        className="rounded-lg border border-[var(--accent-mid)] px-3 py-2 text-[11px] font-mono text-[var(--accent)]"
+                        style={{ background: 'var(--accent-dim)' }}
+                      >
+                        Open Placement Target
+                      </button>
+                    </div>
+                  </CollapsibleCard>
+                ))}
+              </CollapsibleCard>
             ))}
           </div>
           {filteredStructures.length === 0 && (
@@ -972,7 +1385,10 @@ export default function WorldsSection({
       )}
 
       {canStructureCatalog && (
-        <CollapsibleCard title="PLACED STRUCTURES" storageKey="worlds:placements" bodyClassName="p-5 space-y-4">
+        <CollapsibleCard title="PLACED STRUCTURES" storageKey="worlds:placements" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[11px] font-mono text-[var(--text-dim)]">
+            This section tracks structure placements Mcraftr can reliably identify. Native worldgen structure instance discovery is not yet available from the current bridge surface.
+          </div>
           <div className="flex gap-2">
             {(['coords', 'player'] as const).map(mode => (
               <button
@@ -1033,7 +1449,7 @@ export default function WorldsSection({
       )}
 
       {canEntityCatalog && (
-        <CollapsibleCard title="ENTITY CATALOG" storageKey="worlds:entities" bodyClassName="p-5 space-y-4">
+        <CollapsibleCard title="ENTITY CATALOG" storageKey="worlds:entities" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
           <input
             ref={entityUploadRef}
             type="file"
@@ -1099,55 +1515,88 @@ export default function WorldsSection({
               {entityLoadError}
             </div>
           )}
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {filteredEntities.map(entry => (
-              <div
-                key={entry.id}
-                className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] transition-all hover:-translate-y-0.5 hover:border-[var(--accent-mid)]"
+          {entityCategory === 'all' && groupedEntities.length > WORLD_CATEGORY_PAGE_SIZE && (
+            <div className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[11px] font-mono text-[var(--text-dim)]">
+              <span>Category page {clampPage(entityCategoryPage, entityCategoryPageCount) + 1} / {entityCategoryPageCount}</span>
+              <div className="flex gap-2">
+                <button type="button" disabled={entityCategoryPage <= 0} onClick={() => setEntityCategoryPage(page => Math.max(0, page - 1))} className="rounded border border-[var(--border)] px-3 py-1 disabled:opacity-40">Prev</button>
+                <button type="button" disabled={entityCategoryPage >= entityCategoryPageCount - 1} onClick={() => setEntityCategoryPage(page => Math.min(entityCategoryPageCount - 1, page + 1))} className="rounded border border-[var(--border)] px-3 py-1 disabled:opacity-40">Next</button>
+              </div>
+            </div>
+          )}
+          <div className="space-y-3">
+            {pagedEntityGroups.map(([category, entries]) => (
+              <CollapsibleCard
+                key={category}
+                title={`${category.toUpperCase()} (${entries.length})`}
+                storageKey={`worlds:entities:category:${category}`}
+                defaultOpen={entityCategory !== 'all'}
+                bodyClassName="p-3 space-y-3"
+                groupKey={WORLDS_COLLAPSIBLE_GROUP}
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEntityCount(String(entry.defaultCount ?? 1))
-                    setSelectedEntity({ ...entry, summary: inferSummary(entry) })
-                  }}
-                  className="w-full text-left"
-                >
-                  <CatalogArtwork kind="entity" label={entry.label} category={entry.category} imageUrl={entry.imageUrl} className="h-28 w-full object-cover" />
-                  <div className="p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-[13px] font-mono text-[var(--text)]">{entry.label}</div>
-                      {entry.dangerous && <span className="text-[10px] font-mono tracking-widest text-red-300">DANGER</span>}
+                {entries.map(entry => (
+                  <CollapsibleCard
+                    key={entry.id}
+                    title={
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-[13px] font-mono text-[var(--text)]">{entry.label}</div>
+                        <div className="flex items-center gap-2 text-[10px] font-mono tracking-widest text-[var(--text-dim)]">
+                          <span>{entry.sourceKind ?? 'native'}</span>
+                          {entry.dangerous && <span className="text-red-300">DANGER</span>}
+                        </div>
+                      </div>
+                    }
+                    storageKey={`worlds:entities:item:${entry.id}`}
+                    defaultOpen={false}
+                    bodyClassName="p-4 space-y-3"
+                    className="border border-[var(--border)] bg-[var(--panel)]"
+                    groupKey={WORLDS_COLLAPSIBLE_GROUP}
+                  >
+                    <CatalogArtwork kind="entity" label={entry.label} category={entry.category} imageUrl={entry.imageUrl} className="h-32 w-full rounded-2xl border object-cover" />
+                    <div className="grid gap-2 text-[12px] font-mono text-[var(--text-dim)] sm:grid-cols-2">
+                      <div>Category: <span className="text-[var(--text)]">{entry.category}</span></div>
+                      <div>Source: <span className="text-[var(--text)]">{entry.sourceKind ?? 'native'}</span></div>
+                      <div>Default Count: <span className="text-[var(--text)]">{entry.defaultCount ?? 1}</span></div>
+                      <div>Entity Id: <span className="text-[var(--text)]">{entry.entityId ?? entry.id}</span></div>
                     </div>
-                    <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">{entry.category} · {entry.sourceKind ?? 'native'}</div>
-                  </div>
-                </button>
-                {(entry.editable || entry.relativePath) && (
-                  <div className="flex gap-2 border-t px-3 py-2" style={{ borderColor: 'var(--border)' }}>
-                    {entry.editable && (
+                    {entry.summary && <div className="rounded-xl border border-[var(--border)] bg-[var(--bg2)] px-4 py-3 text-[12px] font-mono text-[var(--text-dim)]">{entry.summary}</div>}
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
                         onClick={() => {
-                          setEditingPreset(entry)
-                          setPresetEditorOpen(true)
+                          setEntityCount(String(entry.defaultCount ?? 1))
+                          setSelectedEntity({ ...entry, summary: inferSummary(entry) })
                         }}
-                        className="rounded border border-[var(--border)] px-2 py-1 text-[11px] font-mono text-[var(--text-dim)]"
+                        className="rounded-lg border border-[var(--accent-mid)] px-3 py-2 text-[11px] font-mono text-[var(--accent)]"
+                        style={{ background: 'var(--accent-dim)' }}
                       >
-                        Edit
+                        Open Placement Target
                       </button>
-                    )}
-                    {entry.editable && entry.relativePath && (
-                      <button
-                        type="button"
-                        onClick={() => void handleDeletePreset(entry)}
-                        className="rounded border border-red-900 px-2 py-1 text-[11px] font-mono text-red-400"
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
+                      {entry.editable && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingPreset(entry)
+                            setPresetEditorOpen(true)
+                          }}
+                          className="rounded border border-[var(--border)] px-3 py-2 text-[11px] font-mono text-[var(--text-dim)]"
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {entry.editable && entry.relativePath && (
+                        <button
+                          type="button"
+                          onClick={() => void handleDeletePreset(entry)}
+                          className="rounded border border-red-900 px-3 py-2 text-[11px] font-mono text-red-400"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </CollapsibleCard>
+                ))}
+              </CollapsibleCard>
             ))}
           </div>
           {filteredEntities.length === 0 && (
@@ -1162,13 +1611,75 @@ export default function WorldsSection({
         </CollapsibleCard>
       )}
 
+      {canEntityCatalog && (
+        <CollapsibleCard title="PLACED ENTITIES" storageKey="worlds:entities-live" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-[12px] font-mono text-[var(--text-dim)]">
+              {liveEntities.length} live entities detected across loaded worlds
+            </div>
+            <select
+              value={liveEntityWorldFilter}
+              onChange={event => setLiveEntityWorldFilter(event.target.value)}
+              className="rounded-lg border border-[var(--border)] bg-[var(--bg2)] px-3 py-2 text-[12px] font-mono text-[var(--text)]"
+            >
+              <option value="">All worlds</option>
+              {worldNames.map(world => <option key={world} value={world}>{world}</option>)}
+            </select>
+          </div>
+          <div className="space-y-3">
+            {visibleLiveEntities.map(entry => (
+              <CollapsibleCard
+                key={entry.uuid}
+                title={
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[13px] font-mono text-[var(--text)]">{entry.label}</div>
+                    <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">{entry.world}</div>
+                  </div>
+                }
+                storageKey={`worlds:entities-live:${entry.uuid}`}
+                defaultOpen={false}
+                bodyClassName="p-4 space-y-3"
+                className="border border-[var(--border)] bg-[var(--panel)]"
+                groupKey={WORLDS_COLLAPSIBLE_GROUP}
+              >
+                <div className="grid gap-2 text-[12px] font-mono text-[var(--text-dim)] sm:grid-cols-2 xl:grid-cols-3">
+                  <div>Type: <span className="text-[var(--text)]">{entry.id}</span></div>
+                  <div>Category: <span className="text-[var(--text)]">{entry.category}</span></div>
+                  <div>World: <span className="text-[var(--text)]">{entry.world}</span></div>
+                  <div>Location: <span className="text-[var(--text)]">{entry.location ? `${Math.round(entry.location.x)}, ${Math.round(entry.location.y)}, ${Math.round(entry.location.z)}` : '—'}</span></div>
+                  <div>Health: <span className="text-[var(--text)]">{entry.health ?? '—'}</span></div>
+                  <div>Name: <span className="text-[var(--text)]">{entry.customName ?? '—'}</span></div>
+                </div>
+              </CollapsibleCard>
+            ))}
+            {visibleLiveEntities.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-[var(--border)] px-4 py-10 text-center text-[13px] font-mono text-[var(--text-dim)]">
+                No live entities match the current world filter.
+              </div>
+            )}
+          </div>
+        </CollapsibleCard>
+      )}
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={toggleCollapseAll}
+          className="rounded border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]"
+        >
+          {collapseAllLabel}
+        </button>
+      </div>
+
       {selectedStructure && structureModalMode === 'place' && (
         <SpawnInspectModal
           mode="place-structure"
           structure={selectedStructure}
           locationMode={structureMode}
           onLocationModeChange={setStructureMode}
+          worlds={worldNames}
           players={players}
+          playerWorlds={playerWorlds}
           selectedPlayer={selectedPlayer}
           onSelectedPlayerChange={onSelectedPlayerChange}
           world={structureWorld}
@@ -1198,7 +1709,9 @@ export default function WorldsSection({
           structure={selectedStructure}
           locationMode="coords"
           onLocationModeChange={() => {}}
+          worlds={worldNames}
           players={players}
+          playerWorlds={playerWorlds}
           selectedPlayer={selectedPlayer}
           onSelectedPlayerChange={onSelectedPlayerChange}
           world={placementToRemove.world}
@@ -1224,7 +1737,9 @@ export default function WorldsSection({
           entity={selectedEntity}
           locationMode={entityMode}
           onLocationModeChange={setEntityMode}
+          worlds={worldNames}
           players={players}
+          playerWorlds={playerWorlds}
           selectedPlayer={selectedPlayer}
           onSelectedPlayerChange={onSelectedPlayerChange}
           world={entityWorld}

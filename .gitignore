@@ -7,11 +7,17 @@ out/
 
 # Environment variables — never commit these
 .env
+.env.runtime
 .env.local
 .env.*.local
+.env.*
+!.env.example
 
 # Database and persistent data
 data/
+*.db
+*.sqlite
+test-results/
 
 # OS
 .DS_Store

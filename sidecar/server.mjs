@@ -373,9 +373,13 @@ function findLatestMojangJar() {
 }
 
 function listZipEntries(zipPath) {
-  return execFileSync('unzip', ['-Z1', zipPath], { encoding: 'utf8' })
+  return execFileSync('unzip', ['-l', zipPath], {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'ignore'],
+  })
     .split('\n')
-    .map(line => line.trim())
+    .map(line => line.match(/^\s*\d+\s+\S+\s+\S+\s+(.*)$/)?.[1]?.trim() ?? '')
     .filter(Boolean)
 }
 
@@ -392,7 +396,7 @@ function ensureBundledServerJar() {
     : latest.fullPath
   if (nestedServerJar) {
     if (!fs.existsSync(jarPath) || fs.statSync(jarPath).size === 0) {
-      const raw = execFileSync('unzip', ['-p', latest.fullPath, nestedServerJar], { encoding: 'buffer' })
+      const raw = execFileSync('unzip', ['-p', latest.fullPath, nestedServerJar], { encoding: 'buffer', maxBuffer: 64 * 1024 * 1024 })
       fs.writeFileSync(jarPath, raw)
     }
   }
@@ -519,7 +523,7 @@ function readStructureTemplateSize(resourceKey) {
   const native = buildNativeStructureCatalog()
   if (!native.jarPath) return null
   const entryName = `data/minecraft/structure/${resourceKey}.nbt`
-  const raw = execFileSync('unzip', ['-p', native.jarPath, entryName], { encoding: 'buffer' })
+  const raw = execFileSync('unzip', ['-p', native.jarPath, entryName], { encoding: 'buffer', maxBuffer: 64 * 1024 * 1024 })
   const data = gunzipSync(raw)
   let offset = 0
   if (data[offset] !== 10) throw new Error('Invalid NBT root')

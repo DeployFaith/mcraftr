@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 export default auth((req) => {
   const { nextUrl } = req
   const session = req.auth
+  const isApiRoute = nextUrl.pathname.startsWith('/api/')
 
   // Allow static assets from /public (e.g. logos, icons) through.
   if (/\.[^/]+$/.test(nextUrl.pathname)) {
@@ -18,6 +19,9 @@ export default auth((req) => {
 
   // Not signed in — redirect to login
   if (!session?.user) {
+    if (isApiRoute) {
+      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+    }
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
@@ -35,6 +39,9 @@ export default auth((req) => {
     && !nextUrl.pathname.startsWith('/api/servers')
     && !nextUrl.pathname.startsWith('/api/account/saved-accounts')
   ) {
+    if (isApiRoute) {
+      return NextResponse.json({ ok: false, error: 'No active server selected' }, { status: 400 })
+    }
     return NextResponse.redirect(new URL('/connect', req.url))
   }
 

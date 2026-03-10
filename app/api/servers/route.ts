@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
-import { createUserServer, getUserById, listUserServers } from '@/lib/users'
+import { createUserServer, getUserById, listUserServers, updateServerBridgeHealth } from '@/lib/users'
 import { getSessionUserId } from '@/lib/rcon'
+import { testBridgeConnection } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -50,6 +51,16 @@ export async function GET(req: NextRequest) {
       label: server.label,
       host: server.host,
       port: server.port,
+      bridge: {
+        enabled: server.bridge.enabled,
+        commandPrefix: server.bridge.commandPrefix,
+        providerId: server.bridge.providerId,
+        providerLabel: server.bridge.providerLabel,
+        protocolVersion: server.bridge.protocolVersion,
+        lastSeen: server.bridge.lastSeen,
+        lastError: server.bridge.lastError,
+        capabilities: server.bridge.capabilities,
+      },
       sidecar: {
         enabled: server.sidecar.enabled,
         url: server.sidecar.url,
@@ -73,6 +84,8 @@ export async function POST(req: NextRequest) {
       host,
       port,
       password,
+      bridgeEnabled,
+      bridgeCommandPrefix,
       sidecarEnabled,
       sidecarUrl,
       sidecarToken,
@@ -82,11 +95,15 @@ export async function POST(req: NextRequest) {
     if (!host || typeof host !== 'string' || !password || typeof password !== 'string') {
       return Response.json({ ok: false, error: 'Host and password are required' }, { status: 400 })
     }
-    const server = createUserServer(userId, {
+    const created = createUserServer(userId, {
       label: typeof label === 'string' ? label.trim() : null,
       host: host.trim(),
       port: parsePort(port),
       password,
+      bridge: {
+        enabled: parseFlag(bridgeEnabled),
+        commandPrefix: typeof bridgeCommandPrefix === 'string' ? bridgeCommandPrefix.trim() : 'mcraftr',
+      },
       sidecar: {
         enabled: parseFlag(sidecarEnabled),
         url: typeof sidecarUrl === 'string' ? sidecarUrl.trim() : null,
@@ -95,6 +112,20 @@ export async function POST(req: NextRequest) {
         entityPresetRoots: parseStringArray(sidecarEntityPresetRoots),
       },
     })
+    if (created.bridge.enabled) {
+      const bridge = await testBridgeConnection(created.host, created.port, password, created.bridge.commandPrefix)
+      updateServerBridgeHealth(userId, created.id, {
+        lastSeen: bridge.ok ? Math.floor(Date.now() / 1000) : null,
+        lastError: bridge.ok ? null : bridge.error || 'Bridge test failed',
+        capabilities: bridge.ok ? (bridge.capabilities ?? []) : [],
+        providerId: bridge.ok ? (bridge.providerId ?? null) : undefined,
+        providerLabel: bridge.ok ? (bridge.providerLabel ?? null) : undefined,
+        protocolVersion: bridge.ok ? (bridge.protocolVersion ?? null) : undefined,
+      })
+    } else {
+      updateServerBridgeHealth(userId, created.id, { lastSeen: null, lastError: null, capabilities: [] })
+    }
+    const server = listUserServers(userId).find(entry => entry.id === created.id) ?? created
     return Response.json({
       ok: true,
       server: {
@@ -102,6 +133,16 @@ export async function POST(req: NextRequest) {
         label: server.label,
         host: server.host,
         port: server.port,
+        bridge: {
+          enabled: server.bridge.enabled,
+          commandPrefix: server.bridge.commandPrefix,
+          providerId: server.bridge.providerId,
+          providerLabel: server.bridge.providerLabel,
+          protocolVersion: server.bridge.protocolVersion,
+          lastSeen: server.bridge.lastSeen,
+          lastError: server.bridge.lastError,
+          capabilities: server.bridge.capabilities,
+        },
         sidecar: {
           enabled: server.sidecar.enabled,
           url: server.sidecar.url,

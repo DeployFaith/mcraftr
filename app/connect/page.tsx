@@ -12,6 +12,16 @@ type SavedServer = {
   label: string | null
   host: string
   port: number
+  bridge?: {
+    enabled: boolean
+    commandPrefix: string
+    providerId: string | null
+    providerLabel: string | null
+    protocolVersion: string | null
+    lastSeen: number | null
+    lastError: string | null
+    capabilities: string[]
+  }
   sidecar?: {
     enabled: boolean
     url: string | null
@@ -34,6 +44,8 @@ function ConnectForm() {
   const [host, setHost] = useState('')
   const [port, setPort] = useState('25575')
   const [password, setPassword] = useState('')
+  const [bridgeEnabled, setBridgeEnabled] = useState(false)
+  const [bridgeCommandPrefix, setBridgeCommandPrefix] = useState('mcraftr')
   const [sidecarEnabled, setSidecarEnabled] = useState(false)
   const [sidecarUrl, setSidecarUrl] = useState('')
   const [sidecarToken, setSidecarToken] = useState('')
@@ -56,6 +68,8 @@ function ConnectForm() {
     setHost('')
     setPort('25575')
     setPassword('')
+    setBridgeEnabled(false)
+    setBridgeCommandPrefix('mcraftr')
     setSidecarEnabled(false)
     setSidecarUrl('')
     setSidecarToken('')
@@ -85,6 +99,8 @@ function ConnectForm() {
           setHost(active.host)
           setPort(String(active.port ?? 25575))
           setPassword('')
+          setBridgeEnabled(!!active.bridge?.enabled)
+          setBridgeCommandPrefix(active.bridge?.commandPrefix ?? 'mcraftr')
           setSidecarEnabled(!!active.sidecar?.enabled)
           setSidecarUrl(active.sidecar?.url ?? '')
           setSidecarToken('')
@@ -120,6 +136,8 @@ function ConnectForm() {
     setHost(server.host)
     setPort(String(server.port ?? 25575))
     setPassword('')
+    setBridgeEnabled(!!server.bridge?.enabled)
+    setBridgeCommandPrefix(server.bridge?.commandPrefix ?? 'mcraftr')
     setSidecarEnabled(!!server.sidecar?.enabled)
     setSidecarUrl(server.sidecar?.url ?? '')
     setSidecarToken('')
@@ -143,7 +161,13 @@ function ConnectForm() {
       const res = await fetch('/api/server', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ host, port: parseInt(port) || 25575, password }),
+        body: JSON.stringify({
+          host,
+          port: parseInt(port) || 25575,
+          password,
+          bridgeEnabled,
+          bridgeCommandPrefix: bridgeCommandPrefix.trim() || 'mcraftr',
+        }),
       })
       const data = await res.json()
       if (data.ok) {
@@ -173,6 +197,8 @@ function ConnectForm() {
         host,
         port: parseInt(port) || 25575,
         password,
+        bridgeEnabled,
+        bridgeCommandPrefix: bridgeCommandPrefix.trim() || 'mcraftr',
         sidecarEnabled,
         sidecarUrl: sidecarUrl.trim() || null,
         sidecarToken: sidecarToken.trim() || null,
@@ -194,13 +220,15 @@ function ConnectForm() {
       await updateSession()
       await loadServers()
 
+      const savedServer = data.server as SavedServer | undefined
+      const bridgeError = savedServer?.bridge?.enabled ? savedServer.bridge.lastError : null
       if (editingServerId) {
-        setInfo('Server updated')
+        setInfo(bridgeError ? `Server updated. Bridge warning: ${bridgeError}` : 'Server updated')
       } else if (servers.length === 0) {
         window.location.href = '/minecraft'
         return
       } else {
-        setInfo('Server added')
+        setInfo(bridgeError ? `Server added. Bridge warning: ${bridgeError}` : 'Server added')
       }
 
       resetForm()
@@ -350,9 +378,41 @@ function ConnectForm() {
             <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 space-y-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-[11px] font-mono tracking-widest" style={{ color: 'var(--text-dim)' }}>PLUGIN SIDECAR</div>
+                  <div className="text-[11px] font-mono tracking-widest" style={{ color: 'var(--text-dim)' }}>MCRAFTR BRIDGE</div>
                   <div className="text-[12px] font-mono mt-1" style={{ color: 'var(--text-dim)' }}>
-                    Optional private helper for plugin inventory, map links, schematics, and world folder discovery.
+                    Optional advanced integration for worlds, structures, entities, terminal catalog, and other extended server features.
+                  </div>
+                </div>
+                <label className="inline-flex items-center gap-2 text-[12px] font-mono" style={{ color: 'var(--text)' }}>
+                  <input type="checkbox" checked={bridgeEnabled} onChange={e => setBridgeEnabled(e.target.checked)} />
+                  ENABLED
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                  BRIDGE COMMAND PREFIX
+                </label>
+                <input
+                  type="text"
+                  value={bridgeCommandPrefix}
+                  onChange={e => setBridgeCommandPrefix(e.target.value)}
+                  placeholder="mcraftr"
+                  className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                  style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
+                />
+                <div className="mt-1 text-[10px] font-mono" style={{ color: 'var(--text-dim)' }}>
+                  Use <code>mcraftr</code> for the public bridge. Change this only if you intentionally run a custom adapter.
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-mono tracking-widest" style={{ color: 'var(--text-dim)' }}>SIDECAR</div>
+                  <div className="text-[12px] font-mono mt-1" style={{ color: 'var(--text-dim)' }}>
+                    Optional helper for map links, external catalogs, and filesystem-backed metadata discovery.
                   </div>
                 </div>
                 <label className="inline-flex items-center gap-2 text-[12px] font-mono" style={{ color: 'var(--text)' }}>
@@ -369,7 +429,7 @@ function ConnectForm() {
                   type="text"
                   value={sidecarUrl}
                   onChange={e => setSidecarUrl(e.target.value)}
-                  placeholder="https://sidecar.internal:9419/"
+                  placeholder="https://sidecar.example.com/"
                   className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
                   style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
                 />
@@ -508,6 +568,16 @@ function ConnectForm() {
                         <div className="min-w-0">
                           <div className="text-[13px] font-mono text-[var(--text)] truncate">{labelText}</div>
                           <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1 break-all">{server.host}:{server.port}</div>
+                          {server.bridge?.enabled && (
+                            <div className="text-[10px] font-mono text-[var(--text-dim)] mt-1 break-all">
+                              bridge · {server.bridge.commandPrefix}{server.bridge.providerLabel ? ` · ${server.bridge.providerLabel}` : ''}{server.bridge.lastSeen ? ` · seen ${new Date(server.bridge.lastSeen * 1000).toLocaleString()}` : ''}
+                            </div>
+                          )}
+                          {server.bridge?.enabled && server.bridge.lastError && (
+                            <div className="text-[10px] font-mono text-red-300 mt-1 break-all">
+                              bridge error · {server.bridge.lastError}
+                            </div>
+                          )}
                           {server.sidecar?.enabled && (
                             <div className="text-[10px] font-mono text-[var(--text-dim)] mt-1 break-all">
                               sidecar · {server.sidecar.url || 'configured'}{server.sidecar.lastSeen ? ` · seen ${new Date(server.sidecar.lastSeen * 1000).toLocaleString()}` : ''}

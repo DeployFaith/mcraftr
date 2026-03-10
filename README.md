@@ -43,7 +43,7 @@ It is designed around a simple model:
 ### Admin
 
 - Moderation tools: kick, ban, pardon, whitelist, op
-- Raw RCON console
+- Server terminal
 - Rules, difficulty, and curated gamerules
 - Scheduled recurring actions
 - Audit history
@@ -87,6 +87,8 @@ It is best when used as a focused Minecraft operations panel sitting in front of
 - `Dashboard`
 - `Players`
 - `Actions`
+- `Worlds`
+- `Terminal`
 - `Admin`
 - `Chat`
 - `Settings`
@@ -134,6 +136,8 @@ The repo ships with:
 
 `docker-compose.yml` publishes Mcraftr on `127.0.0.1:3054` and expects an external Docker network named `code_default`.
 
+Copy `.env.example` to `.env` and fill in your own values before first boot.
+
 Bring it up with:
 
 ```bash
@@ -161,7 +165,7 @@ rcon.port=25575
 rcon.password=your-secure-password
 ```
 
-Mcraftr only manages what the Minecraft server and installed plugins actually support. If you want specialized behavior, implement it server-side and expose it via command/API paths Mcraftr can call.
+Mcraftr only manages what the Minecraft server and installed integrations actually support. Advanced features can be provided through an optional Mcraftr bridge integration and/or sidecar.
 
 ## Environment Variables
 
@@ -238,7 +242,7 @@ ALLOW_REGISTRATION=false
 - Whitelist
 - Operator management
 - Schedules
-- RCON console
+- Server terminal
 - Audit log
 - User management
 - Feature policies

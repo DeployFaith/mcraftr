@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server'
-import { rconForRequest, getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
+import { getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 import { getUserById } from '@/lib/users'
 import { KITS_BY_ID } from '@/lib/kits'
 import { getDb } from '@/lib/db'
 import { giveItemViaRcon } from '@/lib/minecraft-give'
 import type { CustomKitItem } from '@/lib/custom-kits'
+import { runBridgeCommand } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -54,10 +55,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (kit) {
-      const result = await rconForRequest(req, `fgmc kit ${player} ${kitId}`)
+      const result = await runBridgeCommand(req, `kit ${player} ${kitId}`)
       if (!result.ok) {
         console.warn('[mcraftr] /api/minecraft/kit failed', { player, kitId, error: result.error || 'RCON error' })
-        return Response.json({ ok: false, error: result.error || 'RCON error' })
+        return Response.json({ ok: false, error: result.error || 'RCON error', code: result.code }, { status: 502 })
       }
       return Response.json({ ok: true, message: result.stdout || `${kit.label} kit issued to ${player}` })
     }

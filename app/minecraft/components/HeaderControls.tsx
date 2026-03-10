@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import { ChevronDown, LogOut, Menu, Plus, Server, UserRound } from 'lucide-react'
+import { FONTS, FONT_SIZES, useTheme } from '@/app/components/ThemeProvider'
+import { loadMusicSettings, loadSoundSettings, saveMusicSettings, saveSoundSettings } from '@/app/components/soundfx'
 
 type DeviceAccount = {
   userId: string
@@ -57,7 +59,12 @@ export default function HeaderControls() {
   const [loadingState, setLoadingState] = useState(true)
   const [open, setOpen] = useState(false)
   const [avatar, setAvatar] = useState<AccountAvatar | null>(null)
+  const [soundEnabled, setSoundEnabled] = useState(true)
+  const [soundVolume, setSoundVolume] = useState(0.55)
+  const [musicEnabled, setMusicEnabled] = useState(false)
+  const [musicVolume, setMusicVolume] = useState(0.3)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const { theme, setTheme, accent, setAccent, font, setFont, fontSize, setFontSize } = useTheme()
 
   const loadHeaderState = useCallback(async () => {
     setLoadingState(true)
@@ -93,6 +100,24 @@ export default function HeaderControls() {
     window.addEventListener('mcraftr:account-preferences-updated', sync)
     return () => window.removeEventListener('mcraftr:account-preferences-updated', sync)
   }, [loadHeaderState])
+
+  useEffect(() => {
+    const sync = () => {
+      const sound = loadSoundSettings()
+      const music = loadMusicSettings()
+      setSoundEnabled(sound.masterEnabled)
+      setSoundVolume(sound.volume)
+      setMusicEnabled(music.enabled)
+      setMusicVolume(music.volume)
+    }
+    sync()
+    window.addEventListener('mcraftr:sound-settings-updated', sync)
+    window.addEventListener('mcraftr:music-settings-updated', sync)
+    return () => {
+      window.removeEventListener('mcraftr:sound-settings-updated', sync)
+      window.removeEventListener('mcraftr:music-settings-updated', sync)
+    }
+  }, [])
 
   useEffect(() => {
     setActiveServerId(session?.activeServerId ?? null)
@@ -191,6 +216,24 @@ export default function HeaderControls() {
     }
   }
 
+  const updateSound = (nextEnabled: boolean, nextVolume: number) => {
+    const current = loadSoundSettings()
+    saveSoundSettings({
+      ...current,
+      masterEnabled: nextEnabled,
+      volume: Math.max(0, Math.min(1, nextVolume)),
+    })
+  }
+
+  const updateMusic = (nextEnabled: boolean, nextVolume: number) => {
+    const current = loadMusicSettings()
+    saveMusicSettings({
+      ...current,
+      enabled: nextEnabled,
+      volume: Math.max(0, Math.min(1, nextVolume)),
+    })
+  }
+
   return (
     <div className="relative" ref={menuRef}>
       <button
@@ -242,7 +285,7 @@ export default function HeaderControls() {
 
       {open && (
         <div
-          className="absolute right-0 top-[calc(100%+0.75rem)] w-[min(92vw,360px)] rounded-[24px] border p-4 shadow-[0_24px_64px_rgba(0,0,0,0.32)] backdrop-blur-2xl"
+          className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4rem)] max-h-[calc(100dvh-env(safe-area-inset-top)-5rem-env(safe-area-inset-bottom))] overflow-y-auto overscroll-contain rounded-[24px] border p-4 shadow-[0_24px_64px_rgba(0,0,0,0.32)] backdrop-blur-2xl touch-pan-y [-webkit-overflow-scrolling:touch] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[calc(100%+0.75rem)] sm:max-h-[min(82vh,42rem)] sm:w-[min(92vw,360px)]"
           style={{
             borderColor: 'var(--accent-mid)',
             background: 'color-mix(in srgb, var(--panel) 92%, transparent)',
@@ -322,6 +365,80 @@ export default function HeaderControls() {
                     </option>
                   ))}
                 </select>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border p-4 space-y-3" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg2) 74%, transparent)' }}>
+              <div className="text-[10px] font-mono uppercase tracking-[0.16em]" style={{ color: 'var(--text-dim)' }}>
+                Quick Appearance
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <select
+                  value={theme}
+                  onChange={event => setTheme(event.target.value as 'dark' | 'light')}
+                  className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
+                  style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+                >
+                  <option value="dark">Dark</option>
+                  <option value="light">Light</option>
+                </select>
+                <select
+                  value={accent}
+                  onChange={event => setAccent(event.target.value as typeof accent)}
+                  className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
+                  style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+                >
+                  <option value="cyan">Cyan</option>
+                  <option value="blue">Blue</option>
+                  <option value="purple">Purple</option>
+                  <option value="pink">Pink</option>
+                  <option value="orange">Orange</option>
+                  <option value="yellow">Yellow</option>
+                  <option value="red">Red</option>
+                  <option value="custom">Custom</option>
+                </select>
+                <select
+                  value={font}
+                  onChange={event => setFont(event.target.value as typeof font)}
+                  className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
+                  style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+                >
+                  {FONTS.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+                </select>
+                <select
+                  value={fontSize}
+                  onChange={event => setFontSize(event.target.value as typeof fontSize)}
+                  className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
+                  style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+                >
+                  {FONT_SIZES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border p-4 space-y-3" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg2) 74%, transparent)' }}>
+              <div className="text-[10px] font-mono uppercase tracking-[0.16em]" style={{ color: 'var(--text-dim)' }}>
+                Quick Audio
+              </div>
+              <div className="space-y-3">
+                <label className="block">
+                  <div className="mb-1 flex items-center justify-between text-[11px] font-mono" style={{ color: 'var(--text)' }}>
+                    <span>Sound FX</span>
+                    <button type="button" onClick={() => updateSound(!soundEnabled, soundVolume)} style={{ color: soundEnabled ? 'var(--accent)' : 'var(--text-dim)' }}>
+                      {soundEnabled ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
+                  <input type="range" min={0} max={1} step={0.01} value={soundVolume} onChange={event => updateSound(soundEnabled, Number(event.target.value))} className="w-full" />
+                </label>
+                <label className="block">
+                  <div className="mb-1 flex items-center justify-between text-[11px] font-mono" style={{ color: 'var(--text)' }}>
+                    <span>Music</span>
+                    <button type="button" onClick={() => updateMusic(!musicEnabled, musicVolume)} style={{ color: musicEnabled ? 'var(--accent)' : 'var(--text-dim)' }}>
+                      {musicEnabled ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
+                  <input type="range" min={0} max={1} step={0.01} value={musicVolume} onChange={event => updateMusic(musicEnabled, Number(event.target.value))} className="w-full" />
+                </label>
               </div>
             </div>
 

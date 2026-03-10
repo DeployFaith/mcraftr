@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags, rconForRequest } from '@/lib/rcon'
 import { logAudit } from '@/lib/audit'
 import { createStructurePlacement } from '@/lib/structure-placements'
-import { callSidecarForRequest, runFgmcJson } from '@/lib/world-stack'
+import { callSidecarForRequest, runBridgeJson } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
     command += ` coords ${world} ${x} ${y} ${z}`
   }
 
-  const bridge = await runFgmcJson<BridgeResponse>(req, command)
+  const bridge = await runBridgeJson<BridgeResponse>(req, command)
   if (!bridge.ok || bridge.data.ok === false) {
     return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || 'Failed to place structure' : bridge.error }, { status: 502 })
   }

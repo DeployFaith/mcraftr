@@ -64,7 +64,7 @@ function defaultForm(): ScheduleFormState {
   }
 }
 
-export default function ScheduleSection() {
+export default function ScheduleSection({ groupKey }: { groupKey?: string }) {
   const { toasts, addToast } = useToast()
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [runs, setRuns] = useState<ScheduleRun[]>([])
@@ -190,7 +190,7 @@ export default function ScheduleSection() {
   }
 
   return (
-    <CollapsibleCard title="SCHEDULES" storageKey="admin:schedules" bodyClassName="p-4 space-y-4">
+    <CollapsibleCard title="SCHEDULES" storageKey="admin:schedules" groupKey={groupKey} bodyClassName="p-4 space-y-4">
       <Toasts toasts={toasts} />
 
       <div className="text-[12px] font-mono text-[var(--text-dim)]">

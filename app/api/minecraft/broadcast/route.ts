@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server'
-import { rconForRequest, getSessionUserId, getSessionActiveServerId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
+import { getSessionUserId, getSessionActiveServerId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 import { checkRateLimit } from '@/lib/ratelimit'
 import { logAudit } from '@/lib/audit'
 import { getDb } from '@/lib/db'
+import { runBridgeCommand } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -32,10 +33,10 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, error: 'Message cannot be empty' }, { status: 400 })
     }
 
-    const result = await rconForRequest(req, `fgmc broadcast ${clean}`)
+    const result = await runBridgeCommand(req, `broadcast ${clean}`)
     if (!result.ok) {
       console.warn('[mcraftr] /api/minecraft/broadcast failed', { error: result.error || 'RCON error' })
-      return Response.json({ ok: false, error: result.error || 'RCON error' })
+      return Response.json({ ok: false, error: result.error || 'RCON error', code: result.code }, { status: 502 })
     }
 
     logAudit(userId, 'broadcast', undefined, clean, serverId)

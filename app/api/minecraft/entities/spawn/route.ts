@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags, rconForRequest } from '@/lib/rcon'
 import { logAudit } from '@/lib/audit'
-import { runFgmcJson } from '@/lib/world-stack'
+import { runBridgeJson } from '@/lib/server-bridge'
 import { buildPresetSnbt, normalizeEntityPresetInput } from '@/lib/entity-presets'
 
 export const runtime = 'nodejs'
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     command += ` coords ${world} ${x} ${y} ${z}`
   }
 
-  const bridge = await runFgmcJson<BridgeResponse>(req, command)
+  const bridge = await runBridgeJson<BridgeResponse>(req, command)
   if (!bridge.ok || bridge.data.ok === false) {
     return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || 'Failed to spawn entity' : bridge.error }, { status: 502 })
   }

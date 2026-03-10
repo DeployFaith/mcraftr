@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getUserFeatureFlags } from '@/lib/rcon'
-import { callSidecarForRequest } from '@/lib/world-stack'
+import { callSidecarForRequest, runBridgeJson } from '@/lib/server-bridge'
 import { FALLBACK_ENTITY_CATALOG } from '@/lib/entity-catalog'
 
 export const runtime = 'nodejs'
@@ -45,39 +45,102 @@ type SidecarResponse = {
   error?: string
 }
 
-export async function GET(req: NextRequest) {
-  const features = await getUserFeatureFlags(req)
-  if (!checkFeatureAccess(features, 'enable_entity_catalog')) {
-    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
-  }
+type BridgeResponse = {
+  ok: boolean
+  entities?: Array<{
+    id: string
+    label: string
+    category: string
+    dangerous: boolean
+    summary?: string | null
+    imageUrl?: string | null
+  }>
+  error?: string
+}
 
-  const sidecar = await callSidecarForRequest<SidecarResponse>(req, '/entities')
-  const nativeEntities = FALLBACK_ENTITY_CATALOG.map(entry => ({
+type NativeEntityEntry = {
+  id: string
+  entityId: string
+  label: string
+  category: string
+  dangerous: boolean
+  summary: string | null
+  imageUrl: string | null
+  sourceKind: string
+  editable: boolean
+  defaultCount: number
+  relativePath: null
+}
+
+function nativeFallbackEntities(): NativeEntityEntry[] {
+  return FALLBACK_ENTITY_CATALOG.map(entry => ({
     ...entry,
+    summary: entry.summary ?? null,
+    imageUrl: entry.imageUrl ?? null,
     entityId: entry.id,
     sourceKind: 'native',
     editable: false,
     defaultCount: 1,
     relativePath: null,
   }))
+}
 
-  if (!sidecar.ok || sidecar.data.ok === false) {
-    return Response.json({
-      ok: true,
-      entities: nativeEntities,
-      fallback: true,
-      warning: sidecar.ok ? sidecar.data.error || 'Failed to load custom entity presets' : sidecar.error,
-      scan: null,
-    })
+export async function GET(req: NextRequest) {
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_entity_catalog')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
 
-  const customEntities = (sidecar.data.entities ?? []).filter(entry => typeof entry.id === 'string')
+  const warnings: string[] = []
+  const bridge = await runBridgeJson<BridgeResponse>(req, 'entities list')
+  const sidecar = await callSidecarForRequest<SidecarResponse>(req, '/entities')
+
+  let nativeEntities: NativeEntityEntry[] = nativeFallbackEntities()
+  let nativeSource: 'bridge' | 'fallback' = 'fallback'
+
+  if (!bridge.ok) {
+    warnings.push(`Native entity catalog fallback in use: ${bridge.error}`)
+  } else if (bridge.data.ok === false) {
+    warnings.push(`Native entity catalog fallback in use: ${bridge.data.error || 'Bridge integration returned an error'}`)
+  } else {
+    const bridgeEntities = (bridge.data.entities ?? []).filter(entry => typeof entry.id === 'string' && entry.id.trim())
+    if (bridgeEntities.length === 0) {
+      warnings.push('Native entity catalog fallback in use: Bridge integration returned no entities.')
+    } else {
+      nativeEntities = bridgeEntities.map(entry => ({
+        id: entry.id,
+        entityId: entry.id,
+        label: entry.label,
+        category: entry.category,
+        dangerous: entry.dangerous,
+        summary: entry.summary ?? null,
+        imageUrl: entry.imageUrl ?? null,
+        sourceKind: 'native',
+        editable: false,
+        defaultCount: 1,
+        relativePath: null,
+      }))
+      nativeSource = 'bridge'
+    }
+  }
+
+  const customEntities = sidecar.ok && sidecar.data.ok !== false
+    ? (sidecar.data.entities ?? []).filter(entry => typeof entry.id === 'string')
+    : []
+
+  if (!sidecar.ok) {
+    warnings.push(`Custom entity presets unavailable: ${sidecar.error}`)
+  } else if (sidecar.data.ok === false) {
+    warnings.push(`Custom entity presets unavailable: ${sidecar.data.error || 'Sidecar returned an error'}`)
+  } else if (Array.isArray(sidecar.data.scan?.warnings) && sidecar.data.scan.warnings.length > 0) {
+    warnings.push(sidecar.data.scan.warnings[0])
+  }
+
   return Response.json({
     ok: true,
     entities: [...nativeEntities, ...customEntities],
-    scan: sidecar.data.scan ?? null,
-    warning: Array.isArray(sidecar.data.scan?.warnings) && sidecar.data.scan?.warnings.length > 0
-      ? sidecar.data.scan.warnings[0]
-      : null,
+    fallback: nativeSource !== 'bridge',
+    scan: sidecar.ok && sidecar.data.ok !== false ? sidecar.data.scan ?? null : null,
+    warning: warnings.length > 0 ? warnings.join(' ') : null,
   })
 }

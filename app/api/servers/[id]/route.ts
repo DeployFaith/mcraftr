@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
-import { deleteUserServer, getUserById, updateUserServer } from '@/lib/users'
+import { deleteUserServer, getUserById, listUserServers, updateServerBridgeHealth, updateUserServer } from '@/lib/users'
 import { getSessionUserId } from '@/lib/rcon'
+import { testBridgeConnection } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -50,6 +51,8 @@ export async function PUT(
       host,
       port,
       password,
+      bridgeEnabled,
+      bridgeCommandPrefix,
       sidecarEnabled,
       sidecarUrl,
       sidecarToken,
@@ -65,6 +68,10 @@ export async function PUT(
       host: host.trim(),
       port: parsePort(port),
       password,
+      bridge: {
+        enabled: parseFlag(bridgeEnabled),
+        commandPrefix: typeof bridgeCommandPrefix === 'string' ? bridgeCommandPrefix.trim() : 'mcraftr',
+      },
       sidecar: {
         enabled: parseFlag(sidecarEnabled),
         url: typeof sidecarUrl === 'string' ? sidecarUrl.trim() : null,
@@ -73,7 +80,21 @@ export async function PUT(
         entityPresetRoots: parseStringArray(sidecarEntityPresetRoots),
       },
     })
-    const server = user.servers.find(entry => entry.id === id)
+    const updated = user.servers.find(entry => entry.id === id)
+    if (updated?.bridge.enabled) {
+      const bridge = await testBridgeConnection(updated.host, updated.port, password, updated.bridge.commandPrefix)
+      updateServerBridgeHealth(userId, id, {
+        lastSeen: bridge.ok ? Math.floor(Date.now() / 1000) : null,
+        lastError: bridge.ok ? null : bridge.error || 'Bridge test failed',
+        capabilities: bridge.ok ? (bridge.capabilities ?? []) : [],
+        providerId: bridge.ok ? (bridge.providerId ?? null) : undefined,
+        providerLabel: bridge.ok ? (bridge.providerLabel ?? null) : undefined,
+        protocolVersion: bridge.ok ? (bridge.protocolVersion ?? null) : undefined,
+      })
+    } else {
+      updateServerBridgeHealth(userId, id, { lastSeen: null, lastError: null, capabilities: [] })
+    }
+    const server = listUserServers(userId).find(entry => entry.id === id) ?? updated ?? null
     return Response.json({ ok: true, server })
   } catch (e: unknown) {
     return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Failed to update server' }, { status: 500 })

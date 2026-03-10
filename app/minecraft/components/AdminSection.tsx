@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Sun, Moon, CloudSun, CloudRain, CloudLightning, Sunrise, Sunset, MoonStar,
   Save, Square, Star, X,
@@ -12,12 +12,10 @@ import { useToast } from './useToast'
 import Toasts from './Toasts'
 import ConfirmModal from './ConfirmModal'
 import type { ConfirmModalProps } from './ConfirmModal'
-import CollapsibleCard from './CollapsibleCard'
+import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
 import ScheduleSection from './ScheduleSection'
 
-const RCON_HISTORY_KEY = 'mcraftr:rcon:history'
-const RCON_HISTORY_MAX = 20
-type RconEntry = { ts: number; cmd: string; output: string; ok: boolean }
+const ADMIN_COLLAPSIBLE_GROUP = 'admin-tab'
 
 type ServerInfo = {
   online: number; max: number; version: string | null
@@ -117,6 +115,14 @@ export default function AdminSection({ players }: Props) {
   const canAudit = features ? features.enable_admin_audit : true
   const canUserMgmt = features ? features.enable_admin_user_management : true
   const canFeaturePolicies = features ? features.enable_admin_feature_policies : true
+  const [collapseAllActive, setCollapseAllActive] = useState(false)
+  const anySectionsEnabled = canServerInfo || canRules || canServerControls || canModeration || canWhitelist || canOperator || canSchedules || canRcon || canAudit || canUserMgmt || canFeaturePolicies
+  const toggleCollapseAll = () => {
+    const nextOpen = collapseAllActive
+    setCollapsibleGroupState(ADMIN_COLLAPSIBLE_GROUP, nextOpen)
+    setCollapseAllActive(!collapseAllActive)
+  }
+  const collapseAllLabel = collapseAllActive ? 'Expand All' : 'Collapse All'
 
 
   // ── Server Info ───────────────────────────────────────────────────────────────
@@ -349,65 +355,6 @@ export default function AdminSection({ players }: Props) {
     } finally { setOpBusy(null) }
   }
 
-  // ── RCON Console ──────────────────────────────────────────────────────────────
-
-  const [rconInput,   setRconInput]   = useState('')
-  const [rconBusy,    setRconBusy]    = useState(false)
-  const [rconEntries, setRconEntries] = useState<RconEntry[]>([])
-  const [rconHistIdx, setRconHistIdx] = useState(-1)
-  const rconOutputRef = useRef<HTMLDivElement>(null)
-  const rconInputRef  = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(RCON_HISTORY_KEY)
-      if (raw) setRconEntries(JSON.parse(raw) as RconEntry[])
-    } catch {}
-  }, [])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(RCON_HISTORY_KEY, JSON.stringify(rconEntries.slice(-RCON_HISTORY_MAX)))
-    } catch {}
-  }, [rconEntries])
-
-  useLayoutEffect(() => {
-    if (rconOutputRef.current) rconOutputRef.current.scrollTop = rconOutputRef.current.scrollHeight
-  }, [rconEntries])
-
-  const sendRcon = async () => {
-    const cmd = rconInput.trim()
-    if (!cmd || rconBusy) return
-    setRconBusy(true); setRconInput(''); setRconHistIdx(-1)
-    try {
-      const r = await fetch('/api/minecraft/rcon', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: cmd }),
-      })
-      const d = await r.json()
-      setRconEntries(prev => [...prev, { ts: Date.now(), cmd, output: d.ok ? (d.output ?? '(no output)') : (d.error ?? 'Error'), ok: d.ok }].slice(-RCON_HISTORY_MAX))
-    } catch (e) {
-      setRconEntries(prev => [...prev, { ts: Date.now(), cmd, output: e instanceof Error ? e.message : 'Network error', ok: false }].slice(-RCON_HISTORY_MAX))
-    } finally {
-      setRconBusy(false)
-      setTimeout(() => rconInputRef.current?.focus(), 50)
-    }
-  }
-
-  const rconKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') { e.preventDefault(); sendRcon(); return }
-    const cmds = rconEntries.map(en => en.cmd)
-    if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      const idx = rconHistIdx < cmds.length - 1 ? rconHistIdx + 1 : rconHistIdx
-      setRconHistIdx(idx); setRconInput(cmds[cmds.length - 1 - idx] ?? '')
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      const idx = rconHistIdx > 0 ? rconHistIdx - 1 : -1
-      setRconHistIdx(idx); setRconInput(idx === -1 ? '' : (cmds[cmds.length - 1 - idx] ?? ''))
-    }
-  }
-
   // ── Audit Log ─────────────────────────────────────────────────────────────────
 
   const [auditEntries, setAuditEntries] = useState<AuditEntry[] | null>(null)
@@ -554,13 +501,25 @@ export default function AdminSection({ players }: Props) {
 
       <Toasts toasts={toasts} />
 
+      {anySectionsEnabled && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={toggleCollapseAll}
+            className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono tracking-widest text-[var(--text-dim)] transition-colors hover:border-[var(--accent-mid)] hover:text-[var(--accent)]"
+          >
+            {collapseAllLabel}
+          </button>
+        </div>
+      )}
+
       {!canServerInfo && !canRules && !canServerControls && !canModeration && !canWhitelist && !canOperator && !canSchedules && !canRcon && !canAudit && !canUserMgmt && !canFeaturePolicies && (
         <div className="glass-card p-4 text-[13px] font-mono text-[var(--text-dim)]">All admin features are disabled for this account.</div>
       )}
 
       {/* ── SERVER INFO ── */}
       {canServerInfo && (
-      <CollapsibleCard title="SERVER INFO" storageKey="admin:server-info" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="SERVER INFO" storageKey="admin:server-info" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {infoLastAt && (
@@ -611,7 +570,7 @@ export default function AdminSection({ players }: Props) {
 
       {/* ── SERVER CONFIG ── */}
       {(canRules || canServerControls) && (
-      <CollapsibleCard title="SAFE SERVER SETTINGS" storageKey="admin:server-config" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="SAFE SERVER SETTINGS" storageKey="admin:server-config" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
 
         {canRules && (
         <div>
@@ -703,11 +662,11 @@ export default function AdminSection({ players }: Props) {
       </CollapsibleCard>
       )}
 
-      {canSchedules && <ScheduleSection />}
+      {canSchedules && <ScheduleSection groupKey={ADMIN_COLLAPSIBLE_GROUP} />}
 
       {/* ── MODERATION ── */}
       {canModeration && (
-      <CollapsibleCard title="MODERATION" storageKey="admin:moderation" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="MODERATION" storageKey="admin:moderation" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
 
         <div>
           <SectionLabel>TARGET PLAYER</SectionLabel>
@@ -778,7 +737,7 @@ export default function AdminSection({ players }: Props) {
 
       {/* ── WHITELIST ── */}
       {canWhitelist && (
-      <CollapsibleCard title="WHITELIST" storageKey="admin:whitelist" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="WHITELIST" storageKey="admin:whitelist" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <button onClick={fetchWhitelist} disabled={wlLoading}
             className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
@@ -823,7 +782,7 @@ export default function AdminSection({ players }: Props) {
 
       {/* ── OPERATOR ── */}
       {canOperator && (
-      <CollapsibleCard title="OPERATOR" storageKey="admin:operator" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="OPERATOR" storageKey="admin:operator" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
         <div>
           <SectionLabel>SELECT PLAYER</SectionLabel>
           <PlayerPicker online={players} selected={opTarget} onSelect={setOpTarget} placeholder="Or type player name…" />
@@ -841,39 +800,9 @@ export default function AdminSection({ players }: Props) {
       </CollapsibleCard>
       )}
 
-      {/* ── RCON CONSOLE ── */}
-      {canRcon && (
-      <CollapsibleCard title="RCON CONSOLE" storageKey="admin:rcon" bodyClassName="p-4 space-y-3">
-        <div ref={rconOutputRef} className="bg-black/40 rounded-lg border border-[var(--border)] p-3 h-48 overflow-y-auto font-mono text-[13px] space-y-2">
-          {rconEntries.length === 0 ? (
-            <div className="text-[var(--text-dim)] opacity-30">Awaiting orders, operator…</div>
-          ) : rconEntries.map((en, i) => (
-            <div key={i} className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <span className="text-[var(--text-dim)] opacity-60 text-[13px] shrink-0">{new Date(en.ts).toLocaleTimeString()}</span>
-                <span className="text-[var(--accent)]">{'>'} {en.cmd}</span>
-              </div>
-              <div className={`pl-4 text-[13px] ${en.ok ? 'text-[var(--text-dim)]' : 'text-red-400'}`}>{en.output}</div>
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input ref={rconInputRef} type="text" placeholder="Enter command…" value={rconInput}
-            onChange={e => setRconInput(e.target.value)} onKeyDown={rconKeyDown}
-            className="flex-1 bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
-            style={{ fontSize: '16px' }} />
-          <button onClick={sendRcon} disabled={!rconInput.trim() || rconBusy}
-            className="px-4 py-2 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-            {rconBusy ? '…' : 'Run'}
-          </button>
-        </div>
-        <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-30">↑↓ to navigate history · Enter to send</div>
-      </CollapsibleCard>
-      )}
-
       {/* ── AUDIT LOG ── */}
       {canAudit && (
-      <CollapsibleCard title="AUDIT LOG" storageKey="admin:audit" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="AUDIT LOG" storageKey="admin:audit" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <button onClick={fetchAuditLog} disabled={auditLoading}
             className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
@@ -902,7 +831,7 @@ export default function AdminSection({ players }: Props) {
 
       {/* ── USER MANAGEMENT ── */}
       {canUserMgmt && (
-      <CollapsibleCard title="USER MANAGEMENT" storageKey="admin:user-management" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="USER MANAGEMENT" storageKey="admin:user-management" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <button onClick={fetchUsers} disabled={usersLoading}
             className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
@@ -970,7 +899,7 @@ export default function AdminSection({ players }: Props) {
 
       {/* ── FEATURE POLICIES ── */}
       {canFeaturePolicies && (
-      <CollapsibleCard title="FEATURE POLICIES" storageKey="admin:feature-policies" bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="FEATURE POLICIES" storageKey="admin:feature-policies" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <button onClick={fetchFeatureUsers} disabled={featureLoading}
             className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
@@ -1061,6 +990,17 @@ export default function AdminSection({ players }: Props) {
           {...confirmModal}
           onCancel={() => setConfirmModal(null)}
         />
+      )}
+      {anySectionsEnabled && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={toggleCollapseAll}
+            className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono tracking-widest text-[var(--text-dim)] transition-colors hover:border-[var(--accent-mid)] hover:text-[var(--accent)]"
+          >
+            {collapseAllLabel}
+          </button>
+        </div>
       )}
     </div>
   )
