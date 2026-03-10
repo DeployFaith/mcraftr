@@ -180,6 +180,14 @@ export function getDb(): Database.Database {
       host         TEXT NOT NULL,
       port         INTEGER NOT NULL DEFAULT 25575,
       password_enc TEXT NOT NULL,
+      bridge_enabled INTEGER NOT NULL DEFAULT 0,
+      bridge_command_prefix TEXT NOT NULL DEFAULT 'mcraftr',
+      bridge_provider_id TEXT,
+      bridge_provider_label TEXT,
+      bridge_protocol_version TEXT,
+      bridge_last_seen INTEGER,
+      bridge_last_error TEXT,
+      bridge_capabilities_json TEXT,
       sidecar_enabled INTEGER NOT NULL DEFAULT 0,
       sidecar_url TEXT,
       sidecar_token_enc TEXT,
@@ -251,11 +259,64 @@ export function getDb(): Database.Database {
 
     CREATE INDEX IF NOT EXISTS idx_world_structure_placements_server
       ON world_structure_placements(server_id, world, removed_at, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS terminal_state (
+      user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      server_id   TEXT NOT NULL,
+      layout_json TEXT NOT NULL,
+      updated_at  INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (user_id, server_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS terminal_history (
+      id                 TEXT PRIMARY KEY,
+      user_id            TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      server_id          TEXT NOT NULL,
+      command            TEXT NOT NULL,
+      normalized_command TEXT NOT NULL,
+      output_text        TEXT NOT NULL,
+      output_json        TEXT,
+      ok                 INTEGER NOT NULL DEFAULT 0,
+      duration_ms        INTEGER NOT NULL DEFAULT 0,
+      risk_level         TEXT NOT NULL DEFAULT 'low',
+      source             TEXT NOT NULL DEFAULT 'manual',
+      wizard_id          TEXT,
+      truncated          INTEGER NOT NULL DEFAULT 0,
+      created_at         INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_terminal_history_server
+      ON terminal_history(user_id, server_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS terminal_saved_commands (
+      id           TEXT PRIMARY KEY,
+      user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      server_id    TEXT NOT NULL,
+      label        TEXT NOT NULL,
+      command      TEXT NOT NULL,
+      description  TEXT,
+      group_name   TEXT,
+      icon         TEXT,
+      created_at   INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at   INTEGER NOT NULL DEFAULT (unixepoch()),
+      last_used_at INTEGER
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_terminal_saved_commands_server
+      ON terminal_saved_commands(user_id, server_id, COALESCE(last_used_at, 0) DESC, updated_at DESC);
   `)
 
   ensureColumn(_db, 'users', 'active_server_id', 'active_server_id TEXT')
   ensureColumn(_db, 'users', 'avatar_type', 'avatar_type TEXT')
   ensureColumn(_db, 'users', 'avatar_value', 'avatar_value TEXT')
+  ensureColumn(_db, 'saved_servers', 'bridge_enabled', 'bridge_enabled INTEGER')
+  ensureColumn(_db, 'saved_servers', 'bridge_command_prefix', 'bridge_command_prefix TEXT')
+  ensureColumn(_db, 'saved_servers', 'bridge_provider_id', 'bridge_provider_id TEXT')
+  ensureColumn(_db, 'saved_servers', 'bridge_provider_label', 'bridge_provider_label TEXT')
+  ensureColumn(_db, 'saved_servers', 'bridge_protocol_version', 'bridge_protocol_version TEXT')
+  ensureColumn(_db, 'saved_servers', 'bridge_last_seen', 'bridge_last_seen INTEGER')
+  ensureColumn(_db, 'saved_servers', 'bridge_last_error', 'bridge_last_error TEXT')
+  ensureColumn(_db, 'saved_servers', 'bridge_capabilities_json', 'bridge_capabilities_json TEXT')
   ensureColumn(_db, 'saved_servers', 'sidecar_enabled', 'sidecar_enabled INTEGER NOT NULL DEFAULT 0')
   ensureColumn(_db, 'saved_servers', 'sidecar_url', 'sidecar_url TEXT')
   ensureColumn(_db, 'saved_servers', 'sidecar_token_enc', 'sidecar_token_enc TEXT')
@@ -265,6 +326,13 @@ export function getDb(): Database.Database {
   ensureColumn(_db, 'saved_servers', 'sidecar_entity_roots_json', 'sidecar_entity_roots_json TEXT')
   ensureColumn(_db, 'chat_log', 'server_id', 'server_id TEXT')
   ensureColumn(_db, 'audit_log', 'server_id', 'server_id TEXT')
+  _db.exec(`
+    UPDATE saved_servers
+    SET
+      bridge_enabled = COALESCE(bridge_enabled, 1),
+      bridge_command_prefix = COALESCE(NULLIF(TRIM(bridge_command_prefix), ''), '${(process.env.MCRAFTR_LEGACY_BRIDGE_PREFIX || 'mcraftr').replace(/'/g, "''")}')
+    WHERE bridge_enabled IS NULL OR bridge_command_prefix IS NULL
+  `)
   migratePlayerTables(_db)
 
   return _db

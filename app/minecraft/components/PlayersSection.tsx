@@ -5,7 +5,7 @@ import type { InvItem } from '../../api/minecraft/inventory/route'
 import ConfirmModal from './ConfirmModal'
 import type { ConfirmModalProps } from './ConfirmModal'
 import type { FeatureKey } from '@/lib/features'
-import CollapsibleCard from './CollapsibleCard'
+import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,6 +59,7 @@ const DIMENSION_COLORS: Record<string, string> = {
   'Nether':    '#f97316',
   'The End':   '#a78bfa',
 }
+const PLAYERS_COLLAPSIBLE_GROUP = 'players-tab'
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -632,6 +633,7 @@ export default function PlayersSection({ onPlayersChange }: Props) {
   const [loading, setLoading]         = useState(true)
   const [selectedPlayer, setSelected] = useState<string | null>(null)
   const [playerSearch, setPlayerSearch] = useState('')
+  const [collapseAllActive, setCollapseAllActive] = useState(false)
 
   const fetchPlayers = useCallback(async () => {
     try {
@@ -658,12 +660,28 @@ export default function PlayersSection({ onPlayersChange }: Props) {
   const playerList = data.players
     ? data.players.split(',').map(p => p.trim()).filter(Boolean)
     : []
+  const toggleCollapseAll = () => {
+    const nextOpen = collapseAllActive
+    setCollapsibleGroupState(PLAYERS_COLLAPSIBLE_GROUP, nextOpen)
+    setCollapseAllActive(!collapseAllActive)
+  }
+  const collapseAllLabel = collapseAllActive ? 'Expand All' : 'Collapse All'
 
   return (
     <div className="space-y-4">
       <h2 className="font-mono text-base tracking-widest text-[var(--accent)]">PLAYERS</h2>
 
-      <CollapsibleCard title="ONLINE NOW" storageKey="players:online" bodyClassName="p-5">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={toggleCollapseAll}
+          className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono tracking-widest text-[var(--text-dim)] transition-colors hover:border-[var(--accent-mid)] hover:text-[var(--accent)]"
+        >
+          {collapseAllLabel}
+        </button>
+      </div>
+
+      <CollapsibleCard title="ONLINE NOW" storageKey="players:online" groupKey={PLAYERS_COLLAPSIBLE_GROUP} bodyClassName="p-5">
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={fetchPlayers}
@@ -757,6 +775,16 @@ export default function PlayersSection({ onPlayersChange }: Props) {
           Updated {new Date(data.ts).toLocaleTimeString()}
         </div>
       )}
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={toggleCollapseAll}
+          className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono tracking-widest text-[var(--text-dim)] transition-colors hover:border-[var(--accent-mid)] hover:text-[var(--accent)]"
+        >
+          {collapseAllLabel}
+        </button>
+      </div>
     </div>
   )
 }

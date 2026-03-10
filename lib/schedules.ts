@@ -79,6 +79,8 @@ type DueScheduleRow = ScheduleRow & {
   host: string
   port: number
   password_enc: string
+  bridge_enabled: number | null
+  bridge_command_prefix: string | null
 }
 
 type ScheduleInput = {
@@ -332,16 +334,21 @@ function computeNextRunAt(input: ScheduleInput, fromMs: number): number {
   return candidate
 }
 
-function buildScheduleCommand(task: ScheduleRecord): string {
+function buildScheduleCommand(task: ScheduleRecord, bridge: { enabled: boolean; commandPrefix: string | null }): string {
   const payload = task.actionPayload
-  if (task.actionType === 'broadcast') return `fgmc broadcast ${(payload as { message: string }).message}`
+  const bridgePrefix = bridge.enabled ? ((bridge.commandPrefix ?? '').trim().replace(/^\/+/, '') || 'mcraftr') : null
+  const bridgeCommand = (suffix: string) => {
+    if (!bridgePrefix) throw new Error('Bridge integration is required for this scheduled action')
+    return `${bridgePrefix} ${suffix}`
+  }
+  if (task.actionType === 'broadcast') return bridgeCommand(`broadcast ${(payload as { message: string }).message}`)
   if (task.actionType === 'save_all') return 'save-all'
-  if (task.actionType === 'time') return `fgmc world time ${(payload as { value: string }).value}`
-  if (task.actionType === 'weather') return `fgmc world weather ${(payload as { value: string }).value}`
+  if (task.actionType === 'time') return bridgeCommand(`world time ${(payload as { value: string }).value}`)
+  if (task.actionType === 'weather') return bridgeCommand(`world weather ${(payload as { value: string }).value}`)
   if (task.actionType === 'difficulty') return `difficulty ${(payload as { value: string }).value}`
   if (task.actionType === 'gamerule') {
     const gamerule = payload as { rule: string; value: string }
-    return `fgmc gamerule set ${gamerule.rule} ${gamerule.value}`
+    return bridgeCommand(`gamerule set ${gamerule.rule} ${gamerule.value}`)
   }
   throw new Error('Unsupported schedule action')
 }
@@ -479,7 +486,7 @@ async function executeDueSchedules() {
     const now = Date.now()
     const db = getDb()
     const rows = db.prepare(`
-      SELECT st.*, ss.host, ss.port, ss.password_enc
+      SELECT st.*, ss.host, ss.port, ss.password_enc, ss.bridge_enabled, ss.bridge_command_prefix
       FROM scheduled_tasks st
       JOIN saved_servers ss
         ON ss.id = st.server_id AND ss.user_id = st.user_id
@@ -489,11 +496,14 @@ async function executeDueSchedules() {
 
     for (const row of rows) {
       const task = rowToSchedule(row)
-      const command = buildScheduleCommand(task)
       const startedAt = Date.now()
       let status: 'ok' | 'error' = 'ok'
       let output = ''
       try {
+        const command = buildScheduleCommand(task, {
+          enabled: !!row.bridge_enabled,
+          commandPrefix: row.bridge_command_prefix ?? null,
+        })
         const result = await rconDirect(row.host, row.port, decryptPassword(row.password_enc), command)
         if (!result.ok) {
           status = 'error'

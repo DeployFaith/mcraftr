@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
+import { X } from 'lucide-react'
 import CatalogArtwork from './CatalogArtwork'
 
-export type LocationMode = 'player' | 'coords'
+export type LocationMode = 'player' | 'world-player' | 'coords'
 
 export type StructureCatalogEntry = {
   id: string
@@ -54,7 +55,9 @@ type Props = {
   entity?: EntityCatalogEntry | null
   locationMode: LocationMode
   onLocationModeChange: (mode: LocationMode) => void
+  worlds: string[]
   players: string[]
+  playerWorlds?: Record<string, string | null>
   selectedPlayer: string
   onSelectedPlayerChange: (player: string) => void
   world: string
@@ -83,13 +86,81 @@ function formatBytes(value: number | null | undefined) {
   return `${(value / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function buildFootprint(width: number | null | undefined, length: number | null | undefined) {
+  const actualWidth = Math.max(1, width ?? 1)
+  const actualLength = Math.max(1, length ?? 1)
+  const maxCells = 8
+  const scale = Math.min(1, maxCells / Math.max(actualWidth, actualLength))
+  return {
+    actualWidth,
+    actualLength,
+    cellsWide: Math.max(1, Math.round(actualWidth * scale)),
+    cellsLong: Math.max(1, Math.round(actualLength * scale)),
+    scaled: scale < 1,
+  }
+}
+
+function StructureFootprintCard({ structure }: { structure: StructureCatalogEntry }) {
+  if (!structure.dimensions) return null
+  const footprint = buildFootprint(structure.dimensions.width, structure.dimensions.length)
+  const widthPx = footprint.cellsWide * 18
+  const lengthPx = footprint.cellsLong * 18
+
+  return (
+    <div className="rounded-2xl border px-3 py-3 font-mono text-[11px]" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg) 68%, transparent)' }}>
+      <div style={{ color: 'var(--text-dim)' }}>Footprint</div>
+      <div className="mt-1" style={{ color: 'var(--text)' }}>
+        {footprint.actualWidth}W × {footprint.actualLength}L
+        {structure.dimensions.height ? ` × ${structure.dimensions.height}H` : ''}
+      </div>
+      <div className="mt-3 flex items-start gap-3">
+        <div
+          className="relative grid shrink-0 place-items-center rounded-xl border p-3"
+          style={{
+            borderColor: 'var(--accent-mid)',
+            background: 'color-mix(in srgb, var(--accent) 12%, var(--panel))',
+            minWidth: '116px',
+            minHeight: '116px',
+          }}
+        >
+          <div
+            className="relative rounded-lg border"
+            style={{
+              width: `${widthPx}px`,
+              height: `${lengthPx}px`,
+              borderColor: 'color-mix(in srgb, var(--accent) 56%, var(--border))',
+              background: 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--accent) 34%, transparent) 0 10px, transparent 10px 18px), color-mix(in srgb, var(--accent) 18%, transparent)',
+              boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)',
+            }}
+          >
+            <span className="absolute left-1.5 top-1.5 h-2.5 w-2.5 rounded-full" style={{ background: 'var(--accent)' }} />
+            <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px]" style={{ color: 'var(--text-dim)' }}>
+              W {footprint.actualWidth}
+            </span>
+            <span className="absolute -right-5 top-1/2 -translate-y-1/2 rotate-90 text-[10px]" style={{ color: 'var(--text-dim)' }}>
+              L {footprint.actualLength}
+            </span>
+          </div>
+        </div>
+        <div className="space-y-1" style={{ color: 'var(--text-dim)' }}>
+          <div>Top-down footprint scaled from the real width and length.</div>
+          <div>The glowing marker shows the anchor corner used for placement.</div>
+          {footprint.scaled && <div>Scaled down to fit this preview card.</div>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function SpawnInspectModal({
   mode,
   structure,
   entity,
   locationMode,
   onLocationModeChange,
+  worlds,
   players,
+  playerWorlds = {},
   selectedPlayer,
   onSelectedPlayerChange,
   world,
@@ -111,6 +182,10 @@ export default function SpawnInspectModal({
   onConfirm,
 }: Props) {
   const target = structure ?? entity
+  const worldPlayers = useMemo(
+    () => players.filter(player => !world || playerWorlds[player] === world),
+    [playerWorlds, players, world],
+  )
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -124,20 +199,37 @@ export default function SpawnInspectModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-3 sm:items-center sm:p-4"
       style={{ background: 'rgba(4, 8, 14, 0.78)', backdropFilter: 'blur(10px)' }}
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-[920px] overflow-hidden rounded-[28px] border"
+        className="flex w-full max-w-[920px] flex-col overflow-hidden rounded-[28px] border"
         style={{
+          maxHeight: 'calc(100dvh - 1.5rem)',
           borderColor: dangerLabel ? 'rgba(255,90,114,0.5)' : 'var(--accent-mid)',
           background: 'linear-gradient(180deg, color-mix(in srgb, var(--panel) 94%, transparent), color-mix(in srgb, var(--bg2) 90%, transparent))',
           boxShadow: '0 28px 90px rgba(0,0,0,0.42)',
         }}
         onClick={event => event.stopPropagation()}
       >
-        <div className="grid gap-0 md:grid-cols-[1.05fr_0.95fr]">
+        <div className="flex items-start justify-between gap-3 border-b px-5 py-4 sm:px-6" style={{ borderColor: 'var(--border)' }}>
+          <div className="font-mono text-[12px] tracking-[0.16em]" style={{ color: 'var(--text-dim)' }}>
+            {mode === 'remove-structure' ? 'REMOVE TARGET' : 'PLACEMENT TARGET'}
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="tap-target grid h-10 w-10 place-items-center rounded-2xl border transition-all"
+            aria-label="Close picker"
+            style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+          >
+            <X size={18} strokeWidth={2} />
+          </button>
+        </div>
+
+        <div className="min-h-0 overflow-y-auto touch-pan-y [-webkit-overflow-scrolling:touch]">
+          <div className="grid gap-0 md:grid-cols-[1.05fr_0.95fr]">
           <div className="border-b p-5 md:border-b-0 md:border-r" style={{ borderColor: 'var(--border)' }}>
             <CatalogArtwork
               kind={structure ? 'structure' : 'entity'}
@@ -163,6 +255,9 @@ export default function SpawnInspectModal({
                 </div>
               )}
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {structure && (
+                  <StructureFootprintCard structure={structure} />
+                )}
                 {structure?.dimensions && (
                   <div className="rounded-2xl border px-3 py-3 font-mono text-[11px]" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg) 68%, transparent)' }}>
                     <div style={{ color: 'var(--text-dim)' }}>Dimensions</div>
@@ -189,15 +284,11 @@ export default function SpawnInspectModal({
           </div>
 
           <div className="p-5">
-            <div className="font-mono text-[12px] tracking-[0.16em]" style={{ color: 'var(--text-dim)' }}>
-              {mode === 'remove-structure' ? 'REMOVE TARGET' : 'PLACEMENT TARGET'}
-            </div>
-
             <div className="mt-4 space-y-4">
               {mode !== 'remove-structure' && (
                 <>
                   <div className="flex gap-2">
-                    {(['player', 'coords'] as const).map(entry => (
+                    {(['player', 'world-player', 'coords'] as const).map(entry => (
                       <button
                         key={entry}
                         type="button"
@@ -207,7 +298,7 @@ export default function SpawnInspectModal({
                           ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
                           : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
                       >
-                        {entry === 'player' ? 'Selected Player' : 'Coordinates'}
+                        {entry === 'player' ? 'Selected Player' : entry === 'world-player' ? 'World + Player' : 'Coordinates'}
                       </button>
                     ))}
                   </div>
@@ -226,19 +317,59 @@ export default function SpawnInspectModal({
                         <option value="">Select player</option>
                         {players.map(player => <option key={player} value={player}>{player}</option>)}
                       </select>
+                      <div className="font-mono text-[11px]" style={{ color: 'var(--text-dim)' }}>
+                        World is inferred from the selected player&apos;s live location.
+                      </div>
                     </label>
+                  ) : locationMode === 'world-player' ? (
+                    <>
+                      <label className="block space-y-1">
+                        <div className="font-mono text-[11px] tracking-[0.14em]" style={{ color: 'var(--text-dim)' }}>
+                          WORLD
+                        </div>
+                        <select
+                          value={world}
+                          onChange={event => onWorldChange(event.target.value)}
+                          className="w-full rounded-2xl border px-3 py-3 font-mono text-[13px] focus:outline-none"
+                          style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+                        >
+                          <option value="">Select world</option>
+                          {worlds.map(entry => <option key={entry} value={entry}>{entry}</option>)}
+                        </select>
+                      </label>
+                      <label className="block space-y-1">
+                        <div className="font-mono text-[11px] tracking-[0.14em]" style={{ color: 'var(--text-dim)' }}>
+                          PLAYER IN THAT WORLD
+                        </div>
+                        <select
+                          value={selectedPlayer}
+                          onChange={event => onSelectedPlayerChange(event.target.value)}
+                          className="w-full rounded-2xl border px-3 py-3 font-mono text-[13px] focus:outline-none"
+                          style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+                        >
+                          <option value="">{world ? 'Select player in world' : 'Select world first'}</option>
+                          {worldPlayers.map(player => <option key={player} value={player}>{player}</option>)}
+                        </select>
+                        <div className="font-mono text-[11px]" style={{ color: 'var(--text-dim)' }}>
+                          Choose a player already standing in the selected world, or switch to Coordinates.
+                        </div>
+                      </label>
+                    </>
                   ) : (
                     <>
                       <label className="block space-y-1">
                         <div className="font-mono text-[11px] tracking-[0.14em]" style={{ color: 'var(--text-dim)' }}>
                           WORLD
                         </div>
-                        <input
+                        <select
                           value={world}
                           onChange={event => onWorldChange(event.target.value)}
                           className="w-full rounded-2xl border px-3 py-3 font-mono text-[13px] focus:outline-none"
                           style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
-                        />
+                        >
+                          <option value="">Select world</option>
+                          {worlds.map(entry => <option key={entry} value={entry}>{entry}</option>)}
+                        </select>
                       </label>
                       <div className="grid gap-3 sm:grid-cols-3">
                         {([
@@ -311,28 +442,30 @@ export default function SpawnInspectModal({
               )}
             </div>
 
-            <div className="mt-6 flex gap-3">
-              <button
-                type="button"
-                onClick={onCancel}
-                className="flex-1 rounded-2xl border px-4 py-3 font-mono text-[12px] tracking-[0.16em]"
-                style={{ borderColor: 'var(--border)', color: 'var(--text-dim)', background: 'var(--panel)' }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={onConfirm}
-                className="flex-1 rounded-2xl border px-4 py-3 font-mono text-[12px] tracking-[0.16em] disabled:opacity-50"
-                style={dangerLabel
-                  ? { borderColor: 'rgba(255,90,114,0.48)', background: 'rgba(255,90,114,0.12)', color: '#ffb3bd' }
-                  : { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}
-              >
-                {busy ? 'Working…' : confirmLabel}
-              </button>
-            </div>
           </div>
+        </div>
+        </div>
+
+        <div className="flex shrink-0 gap-3 border-t px-5 py-4 sm:px-6" style={{ borderColor: 'var(--border)' }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 rounded-2xl border px-4 py-3 font-mono text-[12px] tracking-[0.16em]"
+            style={{ borderColor: 'var(--border)', color: 'var(--text-dim)', background: 'var(--panel)' }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onConfirm}
+            className="flex-1 rounded-2xl border px-4 py-3 font-mono text-[12px] tracking-[0.16em] disabled:opacity-50"
+            style={dangerLabel
+              ? { borderColor: 'rgba(255,90,114,0.48)', background: 'rgba(255,90,114,0.12)', color: '#ffb3bd' }
+              : { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}
+          >
+            {busy ? 'Working…' : confirmLabel}
+          </button>
         </div>
       </div>
     </div>

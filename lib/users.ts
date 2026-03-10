@@ -24,10 +24,22 @@ export type SidecarConfig = {
   entityPresetRoots: string[]
 }
 
+export type BridgeConfig = {
+  enabled: boolean
+  commandPrefix: string
+  providerId: string | null
+  providerLabel: string | null
+  protocolVersion: string | null
+  lastSeen: number | null
+  lastError: string | null
+  capabilities: string[]
+}
+
 export type SavedServer = ServerConfig & {
   id: string
   userId: string
   label: string | null
+  bridge: BridgeConfig
   sidecar: SidecarConfig
   createdAt: number
   updatedAt: number
@@ -330,6 +342,14 @@ type SavedServerRow = {
   host: string
   port: number
   password_enc: string
+  bridge_enabled?: number | null
+  bridge_command_prefix?: string | null
+  bridge_provider_id?: string | null
+  bridge_provider_label?: string | null
+  bridge_protocol_version?: string | null
+  bridge_last_seen?: number | null
+  bridge_last_error?: string | null
+  bridge_capabilities_json?: string | null
   sidecar_enabled?: number
   sidecar_url?: string | null
   sidecar_token_enc?: string | null
@@ -365,6 +385,11 @@ function parseStringArray(raw: string | null | undefined): string[] {
   }
 }
 
+function normalizeBridgeCommandPrefix(value: string | null | undefined): string {
+  const trimmed = value?.trim().replace(/^\/+/, '') || ''
+  return trimmed || 'mcraftr'
+}
+
 function rowToSavedServer(row: SavedServerRow): SavedServer {
   return {
     id: row.id,
@@ -373,6 +398,16 @@ function rowToSavedServer(row: SavedServerRow): SavedServer {
     host: row.host,
     port: row.port,
     password: decryptPassword(row.password_enc),
+    bridge: {
+      enabled: !!row.bridge_enabled,
+      commandPrefix: normalizeBridgeCommandPrefix(row.bridge_command_prefix),
+      providerId: row.bridge_provider_id ?? null,
+      providerLabel: row.bridge_provider_label ?? null,
+      protocolVersion: row.bridge_protocol_version ?? null,
+      lastSeen: row.bridge_last_seen ?? null,
+      lastError: row.bridge_last_error ?? null,
+      capabilities: parseSidecarCapabilities(row.bridge_capabilities_json),
+    },
     sidecar: {
       enabled: !!row.sidecar_enabled,
       url: row.sidecar_url ?? null,
@@ -448,6 +483,7 @@ export function createUserServer(
   userId: string,
   server: ServerConfig & {
     label?: string | null
+    bridge?: Partial<Pick<BridgeConfig, 'enabled' | 'commandPrefix' | 'providerId' | 'providerLabel' | 'protocolVersion' | 'lastSeen' | 'lastError' | 'capabilities'>>
     sidecar?: Partial<Pick<SidecarConfig, 'enabled' | 'url' | 'token' | 'lastSeen' | 'capabilities' | 'structureRoots' | 'entityPresetRoots'>>
   },
 ): SavedServer {
@@ -457,6 +493,14 @@ export function createUserServer(
 
   const serverId = crypto.randomUUID()
   const passwordEnc = encryptPassword(server.password)
+  const bridgeEnabled = server.bridge?.enabled ? 1 : 0
+  const bridgeCommandPrefix = normalizeBridgeCommandPrefix(server.bridge?.commandPrefix)
+  const bridgeProviderId = server.bridge?.providerId?.trim() || null
+  const bridgeProviderLabel = server.bridge?.providerLabel?.trim() || null
+  const bridgeProtocolVersion = server.bridge?.protocolVersion?.trim() || null
+  const bridgeLastSeen = server.bridge?.lastSeen ?? null
+  const bridgeLastError = server.bridge?.lastError?.trim() || null
+  const bridgeCapabilitiesJson = server.bridge?.capabilities?.length ? JSON.stringify(server.bridge.capabilities) : null
   const sidecarEnabled = server.sidecar?.enabled ? 1 : 0
   const sidecarUrl = server.sidecar?.url?.trim() || null
   const sidecarTokenEnc = server.sidecar?.token?.trim() ? encryptSecret(server.sidecar.token.trim()) : null
@@ -467,11 +511,12 @@ export function createUserServer(
   db.prepare(`
     INSERT INTO saved_servers (
       id, user_id, label, host, port, password_enc,
+      bridge_enabled, bridge_command_prefix, bridge_provider_id, bridge_provider_label, bridge_protocol_version, bridge_last_seen, bridge_last_error, bridge_capabilities_json,
       sidecar_enabled, sidecar_url, sidecar_token_enc, sidecar_last_seen, sidecar_capabilities_json,
       sidecar_structure_roots_json, sidecar_entity_roots_json,
       created_at, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), unixepoch())
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), unixepoch())
   `).run(
     serverId,
     userId,
@@ -479,6 +524,14 @@ export function createUserServer(
     server.host,
     server.port,
     passwordEnc,
+    bridgeEnabled,
+    bridgeCommandPrefix,
+    bridgeProviderId,
+    bridgeProviderLabel,
+    bridgeProtocolVersion,
+    bridgeLastSeen,
+    bridgeLastError,
+    bridgeCapabilitiesJson,
     sidecarEnabled,
     sidecarUrl,
     sidecarTokenEnc,
@@ -501,6 +554,7 @@ export function updateUserServer(
   server: ServerConfig & {
     label?: string | null
     serverId?: string | null
+    bridge?: Partial<Pick<BridgeConfig, 'enabled' | 'commandPrefix' | 'providerId' | 'providerLabel' | 'protocolVersion' | 'lastSeen' | 'lastError' | 'capabilities'>>
     sidecar?: Partial<Pick<SidecarConfig, 'enabled' | 'url' | 'token' | 'lastSeen' | 'capabilities' | 'structureRoots' | 'entityPresetRoots'>>
   },
 ): User {
@@ -515,6 +569,7 @@ export function updateUserServer(
     const nextSidecarTokenEnc = server.sidecar?.token?.trim()
       ? encryptSecret(server.sidecar.token.trim())
       : existing.sidecar_token_enc ?? null
+    const nextBridgeCommandPrefix = normalizeBridgeCommandPrefix(server.bridge?.commandPrefix ?? existing.bridge_command_prefix)
     const nextStructureRootsJson = server.sidecar?.structureRoots
       ? JSON.stringify(Array.from(new Set(server.sidecar.structureRoots.map(entry => entry.trim()).filter(Boolean))))
       : existing.sidecar_structure_roots_json ?? null
@@ -528,6 +583,14 @@ export function updateUserServer(
         host = ?,
         port = ?,
         password_enc = ?,
+        bridge_enabled = ?,
+        bridge_command_prefix = ?,
+        bridge_provider_id = ?,
+        bridge_provider_label = ?,
+        bridge_protocol_version = ?,
+        bridge_last_seen = ?,
+        bridge_last_error = ?,
+        bridge_capabilities_json = ?,
         sidecar_enabled = ?,
         sidecar_url = ?,
         sidecar_token_enc = ?,
@@ -542,6 +605,14 @@ export function updateUserServer(
       server.host,
       server.port,
       passwordEnc,
+      server.bridge?.enabled ? 1 : 0,
+      nextBridgeCommandPrefix,
+      (server.bridge?.providerId?.trim() || existing.bridge_provider_id) ?? null,
+      (server.bridge?.providerLabel?.trim() || existing.bridge_provider_label) ?? null,
+      (server.bridge?.protocolVersion?.trim() || existing.bridge_protocol_version) ?? null,
+      server.bridge?.lastSeen ?? existing.bridge_last_seen ?? null,
+      server.bridge?.lastError?.trim() ?? existing.bridge_last_error ?? null,
+      server.bridge?.capabilities?.length ? JSON.stringify(server.bridge.capabilities) : existing.bridge_capabilities_json ?? null,
       server.sidecar?.enabled ? 1 : 0,
       server.sidecar?.url?.trim() || null,
       nextSidecarTokenEnc,
@@ -593,6 +664,9 @@ export function deleteUserServer(id: string, serverId: string): User {
   db.prepare('DELETE FROM player_sessions WHERE user_id = ? AND server_id = ?').run(id, serverId)
   db.prepare('DELETE FROM player_directory WHERE user_id = ? AND server_id = ?').run(id, serverId)
   db.prepare('DELETE FROM audit_log WHERE user_id = ? AND server_id = ?').run(id, serverId)
+  db.prepare('DELETE FROM terminal_state WHERE user_id = ? AND server_id = ?').run(id, serverId)
+  db.prepare('DELETE FROM terminal_history WHERE user_id = ? AND server_id = ?').run(id, serverId)
+  db.prepare('DELETE FROM terminal_saved_commands WHERE user_id = ? AND server_id = ?').run(id, serverId)
 
   return getUserById(id)!
 }
@@ -616,6 +690,59 @@ export function updateServerSidecarHealth(
   `).run(
     next.lastSeen ?? null,
     next.capabilities ? JSON.stringify(next.capabilities) : null,
+    serverId,
+    userId,
+  )
+}
+
+export function updateServerBridgeHealth(
+  userId: string,
+  serverId: string,
+    next: {
+    lastSeen?: number | null
+    lastError?: string | null
+    capabilities?: string[] | null
+    providerId?: string | null
+    providerLabel?: string | null
+    protocolVersion?: string | null
+  },
+): void {
+  const db = initDb()
+  const existing = db.prepare(`
+    SELECT bridge_last_seen, bridge_last_error, bridge_capabilities_json, bridge_provider_id, bridge_provider_label, bridge_protocol_version
+    FROM saved_servers
+    WHERE id = ? AND user_id = ?
+  `).get(serverId, userId) as {
+    bridge_last_seen?: number | null
+    bridge_last_error?: string | null
+    bridge_capabilities_json?: string | null
+    bridge_provider_id?: string | null
+    bridge_provider_label?: string | null
+    bridge_protocol_version?: string | null
+  } | undefined
+  if (!existing) return
+
+  const has = (key: string) => Object.prototype.hasOwnProperty.call(next, key)
+  db.prepare(`
+    UPDATE saved_servers
+    SET
+      bridge_last_seen = ?,
+      bridge_last_error = ?,
+      bridge_capabilities_json = ?,
+      bridge_provider_id = ?,
+      bridge_provider_label = ?,
+      bridge_protocol_version = ?,
+      updated_at = updated_at
+    WHERE id = ? AND user_id = ?
+  `).run(
+    has('lastSeen') ? (next.lastSeen ?? null) : (existing.bridge_last_seen ?? null),
+    has('lastError') ? (next.lastError ?? null) : (existing.bridge_last_error ?? null),
+    has('capabilities')
+      ? (next.capabilities ? JSON.stringify(next.capabilities) : null)
+      : (existing.bridge_capabilities_json ?? null),
+    has('providerId') ? (next.providerId ?? null) : (existing.bridge_provider_id ?? null),
+    has('providerLabel') ? (next.providerLabel ?? null) : (existing.bridge_provider_label ?? null),
+    has('protocolVersion') ? (next.protocolVersion ?? null) : (existing.bridge_protocol_version ?? null),
     serverId,
     userId,
   )

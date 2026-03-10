@@ -2,9 +2,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Megaphone, MessageSquare, SendHorizontal, Trash2, Users } from 'lucide-react'
 import type { ChatEntry } from '@/app/api/minecraft/chat-log/route'
-import CollapsibleCard from './CollapsibleCard'
+import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
 
 const POLL_MS = 10_000
+const CHAT_COLLAPSIBLE_GROUP = 'chat-tab'
 type ComposeMode = 'broadcast' | 'msg'
 
 export default function ChatSection() {
@@ -18,6 +19,7 @@ export default function ChatSection() {
   const [busy, setBusy] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
+  const [collapseAllActive, setCollapseAllActive] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const fetchEntries = async (since: number, initial = false) => {
@@ -86,6 +88,12 @@ export default function ChatSection() {
     () => Array.from(new Set(entries.map(entry => entry.player).filter((value): value is string => !!value))),
     [entries]
   )
+  const toggleCollapseAll = () => {
+    const nextOpen = collapseAllActive
+    setCollapsibleGroupState(CHAT_COLLAPSIBLE_GROUP, nextOpen)
+    setCollapseAllActive(!collapseAllActive)
+  }
+  const collapseAllLabel = collapseAllActive ? 'Expand All' : 'Collapse All'
 
   const refreshEntries = async () => {
     setLastTs(0)
@@ -155,7 +163,17 @@ export default function ChatSection() {
     <div className="space-y-4 pb-6">
       <h2 className="font-mono text-base tracking-widest text-[var(--accent)]">CHAT</h2>
 
-      <CollapsibleCard title="COMPOSE" storageKey="chat:compose" bodyClassName="p-4 space-y-4">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={toggleCollapseAll}
+          className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono tracking-widest text-[var(--text-dim)] transition-colors hover:border-[var(--accent-mid)] hover:text-[var(--accent)]"
+        >
+          {collapseAllLabel}
+        </button>
+      </div>
+
+      <CollapsibleCard title="COMPOSE" storageKey="chat:compose" groupKey={CHAT_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex gap-2">
             <button
@@ -265,7 +283,7 @@ export default function ChatSection() {
         )}
       </CollapsibleCard>
 
-      <CollapsibleCard title="OUTBOUND HISTORY" storageKey="chat:history" bodyClassName="p-4 flex flex-col">
+      <CollapsibleCard title="OUTBOUND HISTORY" storageKey="chat:history" groupKey={CHAT_COLLAPSIBLE_GROUP} bodyClassName="p-4 flex flex-col">
         <div className="flex items-center justify-between gap-3 mb-3">
           <button
             onClick={() => void refreshEntries()}
@@ -330,6 +348,16 @@ export default function ChatSection() {
           Polls every 10s
         </div>
       </CollapsibleCard>
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={toggleCollapseAll}
+          className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono tracking-widest text-[var(--text-dim)] transition-colors hover:border-[var(--accent-mid)] hover:text-[var(--accent)]"
+        >
+          {collapseAllLabel}
+        </button>
+      </div>
     </div>
   )
 }

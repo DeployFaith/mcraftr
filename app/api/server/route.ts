@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createUserServer, deleteUserServer, getUserById, updateUserServer } from '@/lib/users'
 import { testRconConnection, getSessionUserId } from '@/lib/rcon'
+import { testBridgeConnection } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -87,7 +88,7 @@ export async function PUT(req: NextRequest) {
   if (!userId) return Response.json({ ok: false, error: 'Not authenticated' }, { status: 401 })
 
   try {
-    const { host, port, password } = await req.json()
+    const { host, port, password, bridgeEnabled, bridgeCommandPrefix } = await req.json()
     if (!host || !password) {
       return Response.json({ ok: false, error: 'Host and password are required' }, { status: 400 })
     }
@@ -101,7 +102,30 @@ export async function PUT(req: NextRequest) {
     }
 
     const clean = (result.stdout || 'OK').replace(/§./g, '')
-    return Response.json({ ok: true, message: `Connected! ${clean}` })
+    const bridgeRequested = bridgeEnabled === true || bridgeEnabled === 'true' || bridgeEnabled === 1
+    if (!bridgeRequested) {
+      return Response.json({ ok: true, message: `Connected! ${clean}` })
+    }
+
+    const bridge = await testBridgeConnection(
+      host.trim(),
+      parsePort(port),
+      password,
+      typeof bridgeCommandPrefix === 'string' ? bridgeCommandPrefix : 'mcraftr',
+    )
+    if (!bridge.ok) {
+      return Response.json({
+        ok: false,
+        error: `RCON connected, but ${bridge.error || 'the bridge test failed'}`,
+        bridge,
+      })
+    }
+
+    return Response.json({
+      ok: true,
+      message: `Connected! ${clean} Bridge prefix "${typeof bridgeCommandPrefix === 'string' ? bridgeCommandPrefix.trim().replace(/^\/+/, '') || 'mcraftr' : 'mcraftr'}" responded successfully.`,
+      bridge,
+    })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Test failed'
     return Response.json({ ok: false, error: msg }, { status: 500 })

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
 import { logAudit } from '@/lib/audit'
 import { getStructurePlacementById, markStructurePlacementRemoved } from '@/lib/structure-placements'
-import { runFgmcJson } from '@/lib/world-stack'
+import { runBridgeJson } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -40,13 +40,13 @@ export async function POST(req: NextRequest) {
     const height = placement.max_y - placement.min_y + 1
     const length = placement.max_z - placement.min_z + 1
     const command = `structures clear ${placement.world} ${placement.origin_x} ${placement.origin_y} ${placement.origin_z} ${width} ${height} ${length} ${placement.rotation}`
-    const bridge = await runFgmcJson<BridgeResponse>(req, command)
+    const bridge = await runBridgeJson<BridgeResponse>(req, command)
     if (!bridge.ok || bridge.data.ok === false) {
       return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || 'Failed to remove native structure' : bridge.error }, { status: 502 })
     }
   } else {
     const command = `structures remove ${placement.bridge_ref} ${placement.world} ${placement.origin_x} ${placement.origin_y} ${placement.origin_z} ${placement.rotation} ${placement.include_air ? 'air' : 'noair'}`
-    const bridge = await runFgmcJson<BridgeResponse>(req, command)
+    const bridge = await runBridgeJson<BridgeResponse>(req, command)
     if (!bridge.ok || bridge.data.ok === false) {
       return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || 'Failed to remove structure' : bridge.error }, { status: 502 })
     }

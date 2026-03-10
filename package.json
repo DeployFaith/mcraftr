@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "node server.js",
-    "lint": "next lint"
+    "lint": "next lint",
+    "sidecar": "node sidecar/server.mjs"
   },
   "dependencies": {
     "@types/ioredis": "^4.28.10",

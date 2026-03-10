@@ -4,6 +4,7 @@ import { getActiveServer, getUserById } from '@/lib/users'
 import { getAuditLog } from '@/lib/audit'
 import { getDb } from '@/lib/db'
 import { ensureScheduleRunnerStarted } from '@/lib/schedules'
+import { callSidecarForRequest, runBridgeCommand, runBridgeJson } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -101,9 +102,9 @@ export async function GET(req: NextRequest) {
     rconForRequest(req, 'weather'),
     rconForRequest(req, 'time query daytime'),
     rconForRequest(req, 'difficulty'),
-    rconForRequest(req, 'fgmc gamerule get keepInventory'),
-    rconForRequest(req, 'fgmc gamerule get mobGriefing'),
-    rconForRequest(req, 'fgmc gamerule get pvp'),
+    runBridgeCommand(req, 'gamerule get keepInventory'),
+    runBridgeCommand(req, 'gamerule get mobGriefing'),
+    runBridgeCommand(req, 'gamerule get pvp'),
     rconForRequest(req, 'whitelist list'),
   ])
 
@@ -120,6 +121,11 @@ export async function GET(req: NextRequest) {
   const recentAudit = user.role === 'admin' && checkFeatureAccess(features, 'enable_admin_audit')
     ? getAuditLog(6, serverId)
     : []
+
+  const [stackBridge, sidecarMaps] = await Promise.all([
+    runBridgeJson<{ ok: boolean; worlds?: unknown[] }>(req, 'worlds list'),
+    callSidecarForRequest<{ ok: boolean; maps?: unknown[] }>(req, '/maps'),
+  ])
 
   return Response.json({
     ok: true,
@@ -144,8 +150,19 @@ export async function GET(req: NextRequest) {
       mobGriefing: mobGriefingRes.ok ? parseRuleValue(mobGriefingRes.stdout) : null,
       pvp: pvpRes.ok ? parseRuleValue(pvpRes.stdout) : null,
       whitelistCount: whitelistRes.ok ? parseWhitelistCount(whitelistRes.stdout) : null,
+      bridgeError: (!keepInventoryRes.ok ? keepInventoryRes.error : null)
+        || (!mobGriefingRes.ok ? mobGriefingRes.error : null)
+        || (!pvpRes.ok ? pvpRes.error : null),
     },
     recentChat,
     recentAudit,
+    stack: {
+      bridgeOk: stackBridge.ok,
+      bridgeError: stackBridge.ok ? null : stackBridge.error,
+      sidecarOk: sidecarMaps.ok,
+      sidecarError: sidecarMaps.ok ? null : sidecarMaps.error,
+      worldCount: stackBridge.ok && Array.isArray(stackBridge.data.worlds) ? stackBridge.data.worlds.length : 0,
+      mapCount: sidecarMaps.ok && Array.isArray(sidecarMaps.data.maps) ? sidecarMaps.data.maps.length : 0,
+    },
   })
 }

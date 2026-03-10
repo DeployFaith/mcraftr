@@ -3,10 +3,19 @@ import { useState, useEffect, useMemo } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import { useTheme, ACCENTS, FONTS, FONT_SIZES, type ThemePack } from '@/app/components/ThemeProvider'
 import { FEATURE_DEFS, FEATURE_CATEGORIES, type FeatureKey, type FeatureCategory } from '@/lib/features'
-import CollapsibleCard from './CollapsibleCard'
+import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
 import ColorPickerModal from './ColorPickerModal'
 import { BUILTIN_MUSIC, BUILTIN_SOUNDS, DEFAULT_MUSIC_SETTINGS, DEFAULT_SOUND_SETTINGS, cleanupUnusedUploadedMedia, describeSource, loadMusicSettings, loadSoundSettings, playMediaSource, registerUploadedMediaIds, saveMusicSettings, saveSoundSettings, type MediaSource, type SoundEffectKey, type SoundSettings, type MusicSettings } from '@/app/components/soundfx'
 import { saveUploadedFiles } from '@/app/components/mediaLibrary'
+
+const SETTINGS_COLLAPSIBLE_GROUP = 'settings-tab'
+const FEATURE_CATEGORY_GROUP_STATE: Record<FeatureCategory, boolean> = {
+  tabs: true,
+  actions: true,
+  players: true,
+  chat: true,
+  admin: true,
+}
 
 async function fileToAvatarDataUrl(file: File): Promise<string> {
   const rawUrl = await new Promise<string>((resolve, reject) => {
@@ -62,6 +71,20 @@ type SavedServerSummary = {
   label: string | null
   host: string
   port: number
+  bridge?: {
+    enabled: boolean
+    commandPrefix: string
+    providerLabel: string | null
+    lastSeen: number | null
+    lastError: string | null
+    capabilities: string[]
+  }
+  sidecar?: {
+    enabled: boolean
+    url: string | null
+    lastSeen: number | null
+    capabilities: string[]
+  }
 }
 
 type AccountAvatar = {
@@ -120,6 +143,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
     chat: false,
     admin: false,
   })
+  const [collapseAllActive, setCollapseAllActive] = useState(false)
 
   const defsByCategory = useMemo(() => {
     const grouped: Record<FeatureCategory, Array<{ key: FeatureKey; label: string; desc: string; category: FeatureCategory }>> = {
@@ -159,6 +183,22 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
     window.addEventListener('mcraftr:music-settings-updated', syncMusic)
     return () => window.removeEventListener('mcraftr:music-settings-updated', syncMusic)
   }, [])
+
+  const toggleCollapseAll = () => {
+    const nextOpen = collapseAllActive
+    setCollapsibleGroupState(SETTINGS_COLLAPSIBLE_GROUP, nextOpen)
+    setExpandedCategories(nextOpen
+      ? FEATURE_CATEGORY_GROUP_STATE
+      : {
+          tabs: false,
+          actions: false,
+          players: false,
+          chat: false,
+          admin: false,
+        })
+    setCollapseAllActive(!collapseAllActive)
+  }
+  const collapseAllLabel = collapseAllActive ? 'Expand All' : 'Collapse All'
 
   const saveFeatureUpdates = async (updates: Partial<FeatureFlags>, optimistic: FeatureFlags) => {
     if (!features || featuresSaving) return
@@ -520,8 +560,18 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
     <div className="space-y-4">
       <h2 className="font-mono text-base tracking-widest text-[var(--accent)]">SETTINGS</h2>
 
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={toggleCollapseAll}
+          className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono tracking-widest text-[var(--text-dim)] transition-colors hover:border-[var(--accent-mid)] hover:text-[var(--accent)]"
+        >
+          {collapseAllLabel}
+        </button>
+      </div>
+
       {/* Appearance */}
-      <CollapsibleCard title="APPEARANCE" storageKey="settings:appearance" bodyClassName="p-5 space-y-4">
+      <CollapsibleCard title="APPEARANCE" storageKey="settings:appearance" groupKey={SETTINGS_COLLAPSIBLE_GROUP} bodyClassName="p-5 space-y-4">
         <div>
           <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-2">THEME</div>
           <div className="flex gap-2">
@@ -702,7 +752,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
         </div>
       </CollapsibleCard>
 
-      <CollapsibleCard title="THEME PACKS" storageKey="settings:theme-packs" bodyClassName="p-5 space-y-4">
+      <CollapsibleCard title="THEME PACKS" storageKey="settings:theme-packs" groupKey={SETTINGS_COLLAPSIBLE_GROUP} bodyClassName="p-5 space-y-4">
         <div className="rounded-2xl border p-4 space-y-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--panel) 84%, transparent)' }}>
           <div>
             <div className="text-[13px] font-mono tracking-widest text-[var(--text)]">CUSTOM THEME PACK</div>
@@ -735,7 +785,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
         </div>
       </CollapsibleCard>
 
-      <CollapsibleCard title="SOUND FX" storageKey="settings:soundfx" bodyClassName="p-5 space-y-4">
+      <CollapsibleCard title="SOUND FX" storageKey="settings:soundfx" groupKey={SETTINGS_COLLAPSIBLE_GROUP} bodyClassName="p-5 space-y-4">
         <div className="rounded-2xl border p-4 space-y-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--panel) 84%, transparent)' }}>
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -857,7 +907,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
         </div>
       </CollapsibleCard>
 
-      <CollapsibleCard title="BACKGROUND MUSIC" storageKey="settings:music" bodyClassName="p-5 space-y-4">
+      <CollapsibleCard title="BACKGROUND MUSIC" storageKey="settings:music" groupKey={SETTINGS_COLLAPSIBLE_GROUP} bodyClassName="p-5 space-y-4">
         <div className="rounded-2xl border p-4 space-y-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--panel) 84%, transparent)' }}>
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -937,7 +987,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
       </CollapsibleCard>
 
       {/* Feature Toggles */}
-      <CollapsibleCard title="FEATURE TOGGLES" storageKey="settings:features" bodyClassName="p-5 space-y-4">
+      <CollapsibleCard title="FEATURE TOGGLES" storageKey="settings:features" groupKey={SETTINGS_COLLAPSIBLE_GROUP} bodyClassName="p-5 space-y-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <button
@@ -1065,7 +1115,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
       </CollapsibleCard>
 
       {/* Server connection info */}
-      <CollapsibleCard title="SERVER CONNECTION" storageKey="settings:server-connection" bodyClassName="p-5 space-y-4">
+      <CollapsibleCard title="SERVER CONNECTION" storageKey="settings:server-connection" groupKey={SETTINGS_COLLAPSIBLE_GROUP} bodyClassName="p-5 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-[var(--panel)] rounded-lg p-3 border border-[var(--border)]">
             <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">ACTIVE SERVER</div>
@@ -1078,6 +1128,37 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
             <div className="text-[13px] font-mono text-[var(--text)]">{servers.length}</div>
           </div>
         </div>
+        {activeServer?.bridge?.enabled && (
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-3">
+            <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">ACTIVE BRIDGE</div>
+            <div className="text-[13px] font-mono text-[var(--text)] break-all">
+              {activeServer.bridge.providerLabel || activeServer.bridge.commandPrefix}
+            </div>
+            <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1">
+              {(activeServer.bridge.capabilities ?? []).length > 0
+                ? activeServer.bridge.capabilities.join(', ')
+                : 'No capabilities reported yet'}
+            </div>
+            {activeServer.bridge.lastError && (
+              <div className="mt-2 rounded border border-red-900 bg-red-950/30 px-2 py-1 text-[10px] font-mono text-red-300">
+                {activeServer.bridge.lastError}
+              </div>
+            )}
+          </div>
+        )}
+        {activeServer?.sidecar?.enabled && (
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-3">
+            <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">ACTIVE SIDECAR</div>
+            <div className="text-[13px] font-mono text-[var(--text)] break-all">
+              {activeServer.sidecar.url || 'Configured'}
+            </div>
+            <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1">
+              {(activeServer.sidecar.capabilities ?? []).length > 0
+                ? activeServer.sidecar.capabilities.join(', ')
+                : 'No capabilities reported yet'}
+            </div>
+          </div>
+        )}
         {servers.length > 0 && (
           <div className="space-y-2">
             {servers.map(server => {
@@ -1091,6 +1172,21 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
                     <div className="text-[11px] font-mono text-[var(--text-dim)] truncate">
                       {server.host}:{server.port}
                     </div>
+                    {server.bridge?.enabled && (
+                      <div className="text-[10px] font-mono text-[var(--text-dim)] truncate mt-1">
+                        bridge · {server.bridge.commandPrefix}{server.bridge.providerLabel ? ` · ${server.bridge.providerLabel}` : ''}{server.bridge.lastSeen ? ` · seen ${new Date(server.bridge.lastSeen * 1000).toLocaleString()}` : ''}
+                      </div>
+                    )}
+                    {server.bridge?.enabled && server.bridge.lastError && (
+                      <div className="text-[10px] font-mono text-red-300 truncate mt-1">
+                        {server.bridge.lastError}
+                      </div>
+                    )}
+                    {server.sidecar?.enabled && (
+                      <div className="text-[10px] font-mono text-[var(--text-dim)] truncate mt-1">
+                        sidecar · {server.sidecar.url || 'configured'}{server.sidecar.lastSeen ? ` · seen ${new Date(server.sidecar.lastSeen * 1000).toLocaleString()}` : ''}
+                      </div>
+                    )}
                   </div>
                   <span
                     className="rounded border px-2 py-1 text-[10px] font-mono tracking-widest"
@@ -1123,7 +1219,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
       </CollapsibleCard>
 
       {/* Account Update */}
-      <CollapsibleCard title="ACCOUNT UPDATE" storageKey="settings:account-update" bodyClassName="p-5 space-y-4">
+      <CollapsibleCard title="ACCOUNT UPDATE" storageKey="settings:account-update" groupKey={SETTINGS_COLLAPSIBLE_GROUP} bodyClassName="p-5 space-y-4">
         <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4 space-y-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
             <div className="space-y-3">
@@ -1289,6 +1385,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
       <CollapsibleCard
         title={<span className="text-red-500">DANGER ZONE</span>}
         storageKey="settings:danger-zone"
+        groupKey={SETTINGS_COLLAPSIBLE_GROUP}
         bodyClassName="p-5 space-y-3"
       >
         <div className="flex items-center justify-between">
@@ -1360,6 +1457,16 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
           </div>
         </div>
       )}
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={toggleCollapseAll}
+          className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono tracking-widest text-[var(--text-dim)] transition-colors hover:border-[var(--accent-mid)] hover:text-[var(--accent)]"
+        >
+          {collapseAllLabel}
+        </button>
+      </div>
     </div>
   )
 }

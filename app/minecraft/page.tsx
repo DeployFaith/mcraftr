@@ -1,13 +1,13 @@
 import { nodeAuth } from '@/auth.node'
 import MinecraftClientPage, { type TabId } from './MinecraftClientPage'
 
-const VALID_TABS: TabId[] = ['dashboard', 'players', 'actions', 'admin', 'chat', 'settings']
+const VALID_TABS: TabId[] = ['dashboard', 'players', 'actions', 'worlds', 'terminal', 'admin', 'chat', 'settings']
 
 function normalizeTab(raw: string | undefined, isAdmin: boolean): TabId {
   if (!raw) return 'dashboard'
   const tab = raw as TabId
   if (!VALID_TABS.includes(tab)) return 'dashboard'
-  if (tab === 'admin' && !isAdmin) return 'dashboard'
+  if ((tab === 'admin' || tab === 'terminal') && !isAdmin) return 'dashboard'
   return tab
 }
 

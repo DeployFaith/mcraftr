@@ -5,6 +5,10 @@ export type AuditAction =
   | 'give' | 'clear_item' | 'gamemode' | 'difficulty'
   | 'gamerule' | 'save_all' | 'stop_server' | 'tp'
   | 'whitelist_add' | 'whitelist_remove' | 'broadcast' | 'msg' | 'cmd'
+  | 'world_create' | 'world_clone' | 'world_load' | 'world_unload' | 'world_tp' | 'world_spawn' | 'world_setting' | 'world_delete' | 'worldedit'
+  | 'structure_place' | 'structure_remove' | 'structure_clear'
+  | 'entity_spawn'
+  | 'terminal_cmd'
   | 'create_user' | 'delete_user' | 'set_role'
   | 'schedule_create' | 'schedule_update' | 'schedule_delete' | 'schedule_run'
 

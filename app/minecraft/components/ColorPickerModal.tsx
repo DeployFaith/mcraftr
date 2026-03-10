@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Pipette } from 'lucide-react'
+import { Pipette, X } from 'lucide-react'
 import { Chrome } from '@uiw/react-color'
 
 type EyeDropperResult = { sRGBHex: string }
@@ -70,36 +70,49 @@ export default function ColorPickerModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-3 sm:items-center sm:p-4"
       style={{ background: 'rgba(4, 8, 14, 0.76)', backdropFilter: 'blur(10px)' }}
       onClick={onCancel}
     >
       <div
         data-color-mode={theme}
-        className="w-full max-w-[560px] overflow-hidden rounded-[28px] border"
+        className="flex w-full max-w-[560px] flex-col overflow-hidden rounded-[28px] border"
         style={{
+          maxHeight: 'calc(100dvh - 1.5rem)',
           borderColor: 'var(--accent-mid)',
           background: 'linear-gradient(180deg, color-mix(in srgb, var(--panel) 94%, transparent), color-mix(in srgb, var(--bg2) 90%, transparent))',
           boxShadow: '0 28px 90px rgba(0,0,0,0.42)',
         }}
         onClick={event => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b px-6 py-5" style={{ borderColor: 'var(--border)' }}>
+        <div className="flex items-start justify-between gap-4 border-b px-5 py-4 sm:px-6 sm:py-5" style={{ borderColor: 'var(--border)' }}>
           <div>
             <div className="font-mono text-[15px] tracking-[0.18em]" style={{ color: 'var(--text)' }}>
               CUSTOM ACCENT PICKER
             </div>
             <div className="mt-2 font-mono text-[11px]" style={{ color: 'var(--text-dim)' }}>
-              Use the picker below. The eyedropper is built into the picker when your browser supports it.
+              Use the picker below. Mobile always has an on-screen close button.
             </div>
           </div>
-          <div
-            className="h-14 w-14 rounded-2xl border"
-            style={{ borderColor: 'var(--accent-mid)', background: draftColor }}
-          />
+          <div className="flex items-start gap-2">
+            <div
+              className="h-12 w-12 rounded-2xl border sm:h-14 sm:w-14"
+              style={{ borderColor: 'var(--accent-mid)', background: draftColor }}
+            />
+            <button
+              type="button"
+              onClick={onCancel}
+              className="tap-target grid h-10 w-10 place-items-center rounded-2xl border transition-all"
+              aria-label="Close color picker"
+              style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+            >
+              <X size={18} strokeWidth={2} />
+            </button>
+          </div>
         </div>
 
-        <div className="grid gap-5 px-6 py-6 md:grid-cols-[minmax(0,1fr)_160px]">
+        <div className="min-h-0 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6 touch-pan-y [-webkit-overflow-scrolling:touch]">
+          <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_160px]">
           <div className="overflow-hidden rounded-[22px] border p-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg) 68%, transparent)' }}>
             <Chrome
               color={draftColor}
@@ -162,13 +175,14 @@ export default function ColorPickerModal({
               <div className="mt-3 space-y-2 font-mono text-[11px]" style={{ color: 'var(--text-dim)' }}>
                 <div>Click, drag, or type a color.</div>
                 <div>Use the Eyedropper button here in the modal.</div>
-                <div>Press `Esc` to close.</div>
+                <div>Tap Close or Cancel to leave this picker on mobile.</div>
               </div>
             </div>
           </div>
         </div>
+        </div>
 
-        <div className="flex gap-3 border-t px-6 py-5" style={{ borderColor: 'var(--border)' }}>
+        <div className="flex shrink-0 gap-3 border-t px-5 py-4 sm:px-6 sm:py-5" style={{ borderColor: 'var(--border)' }}>
           <button
             type="button"
             onClick={onCancel}

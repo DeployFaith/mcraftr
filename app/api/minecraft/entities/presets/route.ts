@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getUserFeatureFlags } from '@/lib/rcon'
-import { callSidecarForRequest } from '@/lib/world-stack'
+import { callSidecarForRequest } from '@/lib/server-bridge'
 import { normalizeEntityPresetInput } from '@/lib/entity-presets'
 
 export const runtime = 'nodejs'

@@ -171,6 +171,13 @@ button, input, select, textarea {
   font: inherit;
 }
 
+input,
+textarea,
+input::placeholder,
+textarea::placeholder {
+  text-transform: none !important;
+}
+
 #__next {
   min-height: 100%;
 }
