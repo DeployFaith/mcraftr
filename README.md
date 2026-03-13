@@ -2,6 +2,8 @@
 
 Mcraftr is a self-hosted Minecraft admin panel built for fast, opinionated server management over RCON. It gives you a polished web UI for moderation, player tools, server actions, chat, schedules, theming, and account management without turning into a full host-control panel.
 
+Mcraftr is proprietary software owned by DeployFaith. The source is not offered under an open-source license.
+
 Mcraftr supports two connection profiles:
 
 - `Quick Connect` — RCON-only compatibility mode for broad server support
@@ -122,36 +124,105 @@ Each Mcraftr account can save multiple Minecraft servers.
 
 ## Deployment
 
-### Requirements
+Mcraftr is easiest to install with Docker Compose.
+
+### What You Need
 
 - Docker
 - Docker Compose
-- A reachable Minecraft RCON endpoint
-- Redis
+- one reachable Minecraft RCON endpoint
 
-### Included Stack
+Mcraftr brings its own app container, Redis, and SQLite storage.
 
-The repo ships with:
+### Fastest Setup: Quick Connect
 
-- `mcraftr` app container
-- `mcraftr-redis` Redis container
-- SQLite data persisted under `./data`
+This is the best path for most people getting started.
 
-### Docker Compose
+1. Clone the repo.
+2. Generate a local `.env` file with random secrets:
 
-`docker-compose.yml` publishes Mcraftr on `127.0.0.1:3054` and expects an external Docker network named `code_default`.
+```bash
+npm run setup:env
+```
 
-Copy `.env.example` to `.env` and fill in your own values before first boot.
+3. Open `.env` and change at least:
 
-Bring it up with:
+- `NEXTAUTH_URL`
+- `MCRAFTR_ADMIN_USER`
+- `MCRAFTR_ADMIN_PASS` if you want your own password instead of the generated one
+
+4. Start Mcraftr:
 
 ```bash
 docker compose up -d --build
 ```
 
+5. Open:
+
+```text
+http://localhost:3054
+```
+
+6. Log in with the admin account from `.env`.
+7. Add your Minecraft server in `Quick Connect` mode with:
+
+- server address
+- RCON port
+- RCON password
+- optional Minecraft version override
+
+That gets you a working Mcraftr install without Bridge or Beacon.
+
+### Full Mcraftr Stack
+
+Use this when you want the full designed experience:
+
+- `RCON` for core server access
+- `Bridge` for typed world and server operations
+- `Beacon` for catalogs, maps, previews, and filesystem-backed world context
+
+In the connect screen, choose `Full Mcraftr Stack` and fill in:
+
+- RCON connection
+- Bridge command prefix
+- Beacon URL
+- Beacon token if required
+- structure and entity preset roots if you use them
+
+### Docker Compose Details
+
+The included `docker-compose.yml` is self-contained and publishes Mcraftr on:
+
+```text
+127.0.0.1:3054 -> 3050
+```
+
+Persistent data is stored in:
+
+```text
+./data
+```
+
+Useful commands:
+
+```bash
+docker compose up -d --build
+docker compose logs -f mcraftr
+docker compose down
+```
+
+### Updating
+
+To update an existing Docker Compose install:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
 ### Dokploy
 
-This repo now includes Dokploy raw-compose templates in `deploy/dokploy/` and a deployment script:
+This repo includes Dokploy raw-compose templates in `deploy/dokploy/` and a deployment script:
 
 ```bash
 npm run dokploy:deploy
@@ -198,7 +269,7 @@ npm install
 npm run dev
 ```
 
-Local dev runs through Next.js.
+Local development runs through Next.js.
 
 ## Minecraft Server Requirements
 
@@ -253,6 +324,14 @@ ALLOW_REGISTRATION=false
 - The Docker image uses a multi-stage build and runs as a non-root user.
 - `better-sqlite3` is compiled in Alpine-compatible build stages for the final image.
 - The schedule runner is in-process inside the Mcraftr app.
+
+## License
+
+Mcraftr is `UNLICENSED` and distributed as proprietary software.
+
+- Copyright belongs to DeployFaith.
+- You do not have permission to copy, modify, redistribute, host, resell, or create derivative works without prior written permission.
+- Third-party dependencies remain under their own licenses.
 
 ## Features by Area
 
