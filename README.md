@@ -126,6 +126,20 @@ Each Mcraftr account can save multiple Minecraft servers.
 
 Mcraftr is easiest to install with Docker Compose.
 
+### Install Matrix
+
+Mcraftr does not require Dokploy.
+
+Supported deployment styles today:
+
+| Path | Best for | Status |
+| --- | --- | --- |
+| `docker compose` local build | Most users on a VPS or home server | Recommended default |
+| `docker compose` with a prebuilt image | Users who want to avoid local builds | Supported |
+| Dokploy | Users already running Dokploy | Supported |
+| Any platform that can run Docker images | Advanced users on other PaaS/container platforms | Supported with your platform's own wiring |
+| Plain Node runtime | Development only | Possible, but not the easiest install |
+
 ### What You Need
 
 - Docker
@@ -173,6 +187,19 @@ http://localhost:3054
 
 That gets you a working Mcraftr install without Bridge or Beacon.
 
+### Quick Connect With a Prebuilt Image
+
+If you publish or receive a prebuilt Mcraftr image, you can skip local Docker builds and run:
+
+```bash
+cp .env.example .env
+# edit .env
+export MCRAFTR_IMAGE=registry.example.com/mcraftr:latest
+docker compose -f deploy/compose/quick-connect.image.compose.yaml up -d
+```
+
+This uses the image-based compose template in `deploy/compose/quick-connect.image.compose.yaml`.
+
 ### Full Mcraftr Stack
 
 Use this when you want the full designed experience:
@@ -188,6 +215,21 @@ In the connect screen, choose `Full Mcraftr Stack` and fill in:
 - Beacon URL
 - Beacon token if required
 - structure and entity preset roots if you use them
+
+If you want to run the full stack from a prebuilt image, use:
+
+```bash
+cp .env.example .env
+# edit .env and set MCRAFTR_IMAGE plus MCRAFTR_MINECRAFT_DATA
+export MCRAFTR_IMAGE=registry.example.com/mcraftr:latest
+docker compose -f deploy/compose/full-stack.image.compose.yaml up -d
+```
+
+Important for the full-stack image template:
+
+- `MCRAFTR_MINECRAFT_DATA` must point at the host path containing your Minecraft server data directory
+- Beacon mounts that path read-only so it can scan worlds, schematics, and entity presets
+- your Minecraft server and Mcraftr must be on a network path where RCON is reachable
 
 ### Docker Compose Details
 
@@ -209,6 +251,12 @@ Useful commands:
 docker compose up -d --build
 docker compose logs -f mcraftr
 docker compose down
+```
+
+If you prefer image-based Compose instead of local builds:
+
+```bash
+docker compose -f deploy/compose/quick-connect.image.compose.yaml up -d
 ```
 
 ### Updating
@@ -261,6 +309,25 @@ export DOKPLOY_DEPLOY_MODE=build-context
 export MCRAFTR_BUILD_CONTEXT_URL=https://example.com/mcraftr.tar.gz
 npm run dokploy:deploy
 ```
+
+### Other Container Platforms
+
+Mcraftr can also run on platforms like Coolify, Portainer, Railway, Render, Fly.io, or Kubernetes if they can:
+
+- run the Mcraftr image
+- run Redis or connect to an existing Redis instance
+- persist `/app/data`
+- expose port `3050`
+- optionally run Beacon as a second process/container for the Full Mcraftr Stack
+
+The minimum runtime contract is:
+
+- one `mcraftr` container
+- one Redis connection
+- persistent storage for `/app/data`
+- env vars from `.env.example`
+
+If the platform cannot run multi-container apps directly, Mcraftr still works in `Quick Connect` mode as long as Redis is available.
 
 ### Development
 

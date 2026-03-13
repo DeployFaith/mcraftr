@@ -1,0 +1,40 @@
+services:
+  mcraftr:
+    image: ${MCRAFTR_IMAGE}
+    restart: unless-stopped
+    ports:
+      - ${MCRAFTR_BIND_HOST:-127.0.0.1}:${MCRAFTR_BIND_PORT:-3054}:3050
+    env_file: .env
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD}@mcraftr-redis:6379
+      PORT: 3050
+      HOSTNAME: 0.0.0.0
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - mcraftr-redis
+      - mcraftr-beacon
+
+  mcraftr-beacon:
+    image: ${MCRAFTR_IMAGE}
+    restart: unless-stopped
+    entrypoint:
+      - node
+      - sidecar/server.mjs
+    environment:
+      MCRAFTR_SIDECAR_HOST: 0.0.0.0
+      MCRAFTR_SIDECAR_PORT: 9419
+      MCRAFTR_SIDECAR_TOKEN: ${MCRAFTR_SIDECAR_TOKEN:-}
+      MCRAFTR_PLUGINS_DIR: /data/plugins
+      MCRAFTR_WORLDS_DIR: /data
+      MCRAFTR_SCHEMATICS_DIR: ${MCRAFTR_SCHEMATICS_DIR:-}
+      MCRAFTR_ENTITY_PRESET_DIR: ${MCRAFTR_ENTITY_PRESET_DIR:-}
+      MCRAFTR_BLUEMAP_URL: ${MCRAFTR_BLUEMAP_URL:-}
+      MCRAFTR_DYNMAP_URL: ${MCRAFTR_DYNMAP_URL:-}
+    volumes:
+      - ${MCRAFTR_MINECRAFT_DATA}:/data:ro
+
+  mcraftr-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no --requirepass ${REDIS_PASSWORD}
