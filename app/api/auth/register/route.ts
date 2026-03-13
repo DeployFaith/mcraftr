@@ -29,6 +29,10 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, error: 'Password must be 128 characters or fewer' }, { status: 400 })
     }
 
+    if (process.env.ALLOW_REGISTRATION !== 'true') {
+      return Response.json({ ok: false, error: 'Registration is not enabled' }, { status: 403 })
+    }
+
     const normalized = email.toLowerCase().trim()
     const db = getDb()
     const userCount = (db.prepare('SELECT COUNT(*) as n FROM users').get() as { n: number }).n
@@ -38,10 +42,6 @@ export async function POST(req: NextRequest) {
       db.prepare(`INSERT INTO users (id, email, password_hash, role) VALUES (?, ?, ?, 'admin')`)
         .run(crypto.randomUUID(), normalized, bcrypt.hashSync(password, 10))
       return Response.json({ ok: true, firstUser: true })
-    }
-
-    if (process.env.ALLOW_REGISTRATION !== 'true') {
-      return Response.json({ ok: false, error: 'Registration is not enabled' }, { status: 403 })
     }
 
     createUser(normalized, password)
