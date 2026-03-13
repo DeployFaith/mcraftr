@@ -126,6 +126,8 @@ Each Mcraftr account can save multiple Minecraft servers.
 
 Mcraftr is easiest to install with Docker Compose.
 
+For a step-by-step install walkthrough, see [`INSTALL.md`](INSTALL.md).
+
 ### Install Matrix
 
 Mcraftr does not require Dokploy.
@@ -328,6 +330,11 @@ The minimum runtime contract is:
 - env vars from `.env.example`
 
 If the platform cannot run multi-container apps directly, Mcraftr still works in `Quick Connect` mode as long as Redis is available.
+
+Platform-specific guides:
+
+- [Install on Coolify](docs/install-coolify.md)
+- [Install on Portainer](docs/install-portainer.md)
 
 ### Development
 
