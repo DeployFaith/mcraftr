@@ -4,6 +4,10 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { gunzipSync } from 'node:zlib'
 import { URL } from 'node:url'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+const nbt = require('prismarine-nbt')
 
 const PORT = parseInt(process.env.MCRAFTR_SIDECAR_PORT || '9419', 10)
 const HOST = process.env.MCRAFTR_SIDECAR_HOST || '0.0.0.0'
@@ -14,7 +18,7 @@ const SCHEMATICS_DIRS = resolveSchematicDirs(process.env.MCRAFTR_SCHEMATICS_DIR)
 const ENTITY_PRESET_DIRS = resolveEntityPresetDirs(process.env.MCRAFTR_ENTITY_PRESET_DIR)
 const BLUEMAP_BASE_URL = (process.env.MCRAFTR_BLUEMAP_URL || '').trim().replace(/\/+$/, '')
 const DYNMAP_BASE_URL = (process.env.MCRAFTR_DYNMAP_URL || '').trim().replace(/\/+$/, '')
-const CACHE_DIR = '/tmp/mcraftr-sidecar'
+const CACHE_DIR = '/tmp/mcraftr-beacon'
 
 const BUILTIN_CAPABILITIES = [
   'health',
@@ -473,6 +477,241 @@ function buildNativeStructureCatalog() {
   return nativeStructureCache
 }
 
+function stripBlockState(value) {
+  return String(value || '').replace(/^minecraft:/, '').replace(/\[.*$/, '').trim()
+}
+
+function isPreviewableBlock(value) {
+  const block = stripBlockState(value)
+  return !!block && !['air', 'cave_air', 'void_air', 'structure_void', 'barrier', 'water', 'lava'].includes(block)
+}
+
+function summarizeBlocks(names) {
+  const counts = new Map()
+  for (const name of names) {
+    const block = stripBlockState(name)
+    if (!isPreviewableBlock(block)) continue
+    counts.set(block, (counts.get(block) || 0) + 1)
+  }
+  return Array.from(counts.entries())
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, 6)
+    .map(([block]) => block)
+}
+
+function makePatternGrid(materials, size = 8) {
+  const palette = materials.length > 0 ? materials : ['stone_bricks']
+  const grid = []
+  for (let z = 0; z < size; z += 1) {
+    const row = []
+    for (let x = 0; x < size; x += 1) {
+      const border = z === 0 || x === 0 || z === size - 1 || x === size - 1
+      const diagonal = x === z || x + z === size - 1
+      row.push(border ? palette[0] : diagonal ? (palette[1] ?? palette[0]) : (palette[2] ?? palette[0]))
+    }
+    grid.push(row)
+  }
+  return grid
+}
+
+function buildTopDownCells(dimensions, positionedBlocks) {
+  if (!dimensions?.width || !dimensions?.length || positionedBlocks.length === 0) return null
+  const width = Math.max(1, Number(dimensions.width) || 1)
+  const length = Math.max(1, Number(dimensions.length) || 1)
+  const target = 8
+  const stepX = Math.max(1, Math.ceil(width / target))
+  const stepZ = Math.max(1, Math.ceil(length / target))
+  const cellsWide = Math.max(1, Math.ceil(width / stepX))
+  const cellsLong = Math.max(1, Math.ceil(length / stepZ))
+  const grid = Array.from({ length: cellsLong }, () => Array.from({ length: cellsWide }, () => 'air'))
+
+  for (let cellZ = 0; cellZ < cellsLong; cellZ += 1) {
+    const zStart = cellZ * stepZ
+    const zEnd = Math.min(length, zStart + stepZ)
+    for (let cellX = 0; cellX < cellsWide; cellX += 1) {
+      const xStart = cellX * stepX
+      const xEnd = Math.min(width, xStart + stepX)
+      let best = null
+      for (const block of positionedBlocks) {
+        if (!isPreviewableBlock(block.name)) continue
+        if (block.x < xStart || block.x >= xEnd || block.z < zStart || block.z >= zEnd) continue
+        if (!best || block.y > best.y) {
+          best = block
+        }
+      }
+      grid[cellZ][cellX] = best ? stripBlockState(best.name) : 'air'
+    }
+  }
+
+  return grid
+}
+
+function readVarIntArray(buffer) {
+  const values = []
+  let current = 0
+  let shift = 0
+  for (const byte of buffer) {
+    current |= (byte & 0x7f) << shift
+    if ((byte & 0x80) === 0) {
+      values.push(current >>> 0)
+      current = 0
+      shift = 0
+      continue
+    }
+    shift += 7
+  }
+  if (shift !== 0) values.push(current >>> 0)
+  return values
+}
+
+function worldgenPreviewBlocks(resourceKey) {
+  const lower = resourceKey.toLowerCase()
+  if (lower.includes('bastion')) return ['polished_blackstone_bricks', 'gilded_blackstone', 'magma_block']
+  if (lower.includes('ancient_city')) return ['deepslate_tiles', 'soul_lantern', 'sculk']
+  if (lower.includes('trial_chamber')) return ['copper_bulb', 'tuff_bricks', 'chiseled_tuff']
+  if (lower.includes('stronghold')) return ['stone_bricks', 'mossy_stone_bricks', 'cracked_stone_bricks']
+  if (lower.includes('desert_pyramid')) return ['sandstone', 'cut_sandstone', 'orange_terracotta']
+  if (lower.includes('jungle_temple')) return ['cobblestone', 'mossy_cobblestone', 'stone_bricks']
+  if (lower.includes('igloo')) return ['snow_block', 'spruce_planks', 'red_carpet']
+  if (lower.includes('mansion')) return ['dark_oak_planks', 'cobblestone', 'white_wool']
+  if (lower.includes('monument')) return ['prismarine', 'sea_lantern', 'dark_prismarine']
+  if (lower.includes('ocean_ruin')) return ['stone_bricks', 'mossy_stone_bricks', 'suspicious_gravel']
+  if (lower.includes('shipwreck')) return ['oak_planks', 'spruce_planks', 'oak_log']
+  if (lower.includes('outpost')) return ['dark_oak_log', 'cobblestone', 'white_wool']
+  if (lower.includes('trail_ruins')) return ['terracotta', 'packed_mud', 'mud_bricks']
+  if (lower.includes('ruined_portal')) return ['obsidian', 'crying_obsidian', 'netherrack']
+  if (lower.includes('village')) return ['oak_planks', 'cobblestone', 'hay_block']
+  if (lower.includes('fortress')) return ['nether_bricks', 'soul_sand', 'lava']
+  if (lower.includes('mineshaft')) return ['oak_planks', 'oak_log', 'rail']
+  if (lower.includes('end_city')) return ['purpur_block', 'end_stone_bricks', 'end_rod']
+  return ['stone_bricks', 'oak_planks', 'lantern']
+}
+
+function worldgenPreview(resourceKey) {
+  const blocks = worldgenPreviewBlocks(resourceKey)
+  return {
+    blocks,
+    dimensions: null,
+    cells: makePatternGrid(blocks, 8),
+  }
+}
+
+async function parseNbtBuffer(raw) {
+  const parsed = await nbt.parse(raw)
+  return nbt.simplify(parsed.parsed)
+}
+
+async function readNativeStructurePreview(resourceKey) {
+  const native = buildNativeStructureCatalog()
+  if (!native.jarPath) return worldgenPreview(resourceKey)
+  const entryName = `data/minecraft/structure/${resourceKey}.nbt`
+  const raw = execFileSync('unzip', ['-p', native.jarPath, entryName], { encoding: 'buffer', maxBuffer: 64 * 1024 * 1024 })
+  const data = await parseNbtBuffer(raw)
+  const palette = Array.isArray(data.palette) ? data.palette : []
+  const blocks = Array.isArray(data.blocks) ? data.blocks : []
+  const dimensions = Array.isArray(data.size) && data.size.length >= 3
+    ? { width: data.size[0] ?? null, height: data.size[1] ?? null, length: data.size[2] ?? null }
+    : null
+  const names = blocks.map(block => palette[block.state]?.Name).filter(Boolean)
+  const sample = summarizeBlocks(names.length > 0 ? names : palette.map(entry => entry?.Name).filter(Boolean))
+  const positionedBlocks = blocks.map(block => ({
+    x: Array.isArray(block.pos) ? Number(block.pos[0]) || 0 : 0,
+    y: Array.isArray(block.pos) ? Number(block.pos[1]) || 0 : 0,
+    z: Array.isArray(block.pos) ? Number(block.pos[2]) || 0 : 0,
+    name: palette[block.state]?.Name,
+  })).filter(block => block.name)
+  return {
+    blocks: sample.length > 0 ? sample : worldgenPreviewBlocks(resourceKey),
+    dimensions,
+    cells: buildTopDownCells(dimensions, positionedBlocks),
+  }
+}
+
+function resolveStructureFile(req, relativePath) {
+  const baseRoots = SCHEMATICS_DIRS.map(fullPath => ({ fullPath, rootKind: 'default' }))
+  const linkedRoots = resolveLinkedRoots(req, 'x-mcraftr-structure-roots')
+  const roots = mergeRoots(baseRoots, linkedRoots)
+  for (const root of roots) {
+    const candidate = safeJoin(root.fullPath, relativePath)
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+      return candidate
+    }
+  }
+  return null
+}
+
+async function readFileStructurePreview(req, relativePath, formatHint) {
+  const fullPath = resolveStructureFile(req, relativePath)
+  if (!fullPath) {
+    throw new Error('Structure file not found')
+  }
+  const raw = fs.readFileSync(fullPath)
+  const data = await parseNbtBuffer(raw)
+
+  const widthValue = data.Width ?? data.width ?? null
+  const heightValue = data.Height ?? data.height ?? null
+  const lengthValue = data.Length ?? data.length ?? null
+  const width = Number(widthValue)
+  const height = Number(heightValue)
+  const length = Number(lengthValue)
+  const safeWidth = Number.isFinite(width) && width > 0 ? width : 1
+  const safeLength = Number.isFinite(length) && length > 0 ? length : 1
+  const dimensions = Number.isFinite(width) && Number.isFinite(height) && Number.isFinite(length)
+    ? { width, height, length }
+    : (Array.isArray(data.size) && data.size.length >= 3
+      ? { width: data.size[0] ?? null, height: data.size[1] ?? null, length: data.size[2] ?? null }
+      : null)
+
+  if (data.Palette && typeof data.Palette === 'object' && !Array.isArray(data.Palette)) {
+    const paletteByIndex = new Map()
+    for (const [name, index] of Object.entries(data.Palette)) {
+      paletteByIndex.set(Number(index), name)
+    }
+    const blockData = data.BlockData && typeof data.BlockData === 'object' && 'length' in data.BlockData
+      ? readVarIntArray(Buffer.from(data.BlockData))
+      : []
+    const names = blockData.map(index => paletteByIndex.get(index)).filter(Boolean)
+    const positionedBlocks = blockData.map((index, linear) => ({
+      x: linear % safeWidth,
+      y: Math.floor(linear / (safeWidth * safeLength)),
+      z: Math.floor(linear / safeWidth) % safeLength,
+      name: paletteByIndex.get(index),
+    })).filter(block => block.name)
+    const sample = summarizeBlocks(names.length > 0 ? names : Array.from(paletteByIndex.values()))
+    return {
+      blocks: sample,
+      dimensions,
+      cells: buildTopDownCells(dimensions, positionedBlocks),
+    }
+  }
+
+  if (Array.isArray(data.palette)) {
+    const paletteNames = data.palette.map(entry => entry?.Name).filter(Boolean)
+    const blockNames = Array.isArray(data.blocks)
+      ? data.blocks.map(block => data.palette?.[block.state]?.Name).filter(Boolean)
+      : []
+    const positionedBlocks = Array.isArray(data.blocks)
+      ? data.blocks.map(block => ({
+          x: Array.isArray(block.pos) ? Number(block.pos[0]) || 0 : 0,
+          y: Array.isArray(block.pos) ? Number(block.pos[1]) || 0 : 0,
+          z: Array.isArray(block.pos) ? Number(block.pos[2]) || 0 : 0,
+          name: data.palette?.[block.state]?.Name,
+        })).filter(block => block.name)
+      : []
+    return {
+      blocks: summarizeBlocks(blockNames.length > 0 ? blockNames : paletteNames),
+      dimensions,
+      cells: buildTopDownCells(dimensions, positionedBlocks),
+    }
+  }
+
+  return {
+    blocks: formatHint === 'schematic' ? ['stone_bricks', 'oak_planks', 'glass'] : ['cobblestone', 'oak_planks', 'lantern'],
+    dimensions,
+    cells: makePatternGrid(formatHint === 'schematic' ? ['stone_bricks', 'oak_planks', 'glass'] : ['cobblestone', 'oak_planks', 'lantern'], 8),
+  }
+}
+
 function readNbtString(buffer, offset) {
   const length = buffer.readUInt16BE(offset)
   const nextOffset = offset + 2
@@ -834,6 +1073,33 @@ const server = http.createServer(async (req, res) => {
       return
     }
 
+    if (req.method === 'GET' && pathname === '/structures/preview') {
+      const placementKind = url.searchParams.get('placementKind')?.trim() || ''
+      const resourceKey = url.searchParams.get('resourceKey')?.trim() || ''
+      const relativePath = url.searchParams.get('relativePath')?.trim() || ''
+      const format = url.searchParams.get('format')?.trim() || ''
+
+      let preview = null
+      if (placementKind === 'native-template' && resourceKey) {
+        preview = await readNativeStructurePreview(resourceKey)
+      } else if (placementKind === 'native-worldgen' && resourceKey) {
+        preview = {
+          blocks: worldgenPreviewBlocks(resourceKey),
+          dimensions: null,
+        }
+      } else if (relativePath) {
+        preview = await readFileStructurePreview(req, relativePath, format)
+      }
+
+      if (!preview) {
+        sendJson(res, 400, { ok: false, error: 'Structure preview data is unavailable for this entry' })
+        return
+      }
+
+      sendJson(res, 200, { ok: true, preview })
+      return
+    }
+
     if (req.method === 'POST' && pathname === '/structures/upload') {
       const body = await readBody(req)
       const destination = await saveUploadedStructure(body.name, body.dataBase64)
@@ -892,5 +1158,5 @@ const server = http.createServer(async (req, res) => {
 })
 
 server.listen(PORT, HOST, () => {
-  console.log(`[mcraftr-sidecar] listening on http://${HOST}:${PORT}`)
+  console.log(`[mcraftr-beacon] listening on http://${HOST}:${PORT}`)
 })

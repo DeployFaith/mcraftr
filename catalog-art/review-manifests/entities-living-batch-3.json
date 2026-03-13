@@ -1,0 +1,162 @@
+[
+  {
+    "subject": "entity",
+    "subjectId": "armadillo",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/armadillo.png",
+    "cropBox": { "x": 0, "y": 0, "width": 26, "height": 24 },
+    "notes": "Focus on the armadillo face and shell front instead of the full sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "axolotl",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/axolotl/axolotl_wild.png",
+    "cropBox": { "x": 0, "y": 2, "width": 22, "height": 22 },
+    "notes": "Use a compact axolotl head portrait from the wild variant texture."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "bat",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/bat.png",
+    "cropBox": { "x": 0, "y": 0, "width": 16, "height": 14 },
+    "notes": "Crop toward the bat face instead of the full wing sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "bee",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/bee/bee.png",
+    "cropBox": { "x": 0, "y": 0, "width": 24, "height": 18 },
+    "notes": "Use the bee face/body center as the portrait."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "cat",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/cat/tabby.png",
+    "cropBox": { "x": 0, "y": 0, "width": 22, "height": 18 },
+    "notes": "Pin cat to a real cat texture instead of the ocelot fallback and focus on the face."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "chicken",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/chicken/temperate_chicken.png",
+    "cropBox": { "x": 0, "y": 0, "width": 22, "height": 18 },
+    "notes": "Use the chicken head/body cluster instead of the full sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "dolphin",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/dolphin.png",
+    "cropBox": { "x": 0, "y": 0, "width": 34, "height": 20 },
+    "notes": "Focus on the dolphin head and front body."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "fox",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/fox/fox.png",
+    "cropBox": { "x": 0, "y": 0, "width": 24, "height": 18 },
+    "notes": "Use the fox face and shoulder profile instead of the whole sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "goat",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/goat/goat.png",
+    "cropBox": { "x": 0, "y": 2, "width": 28, "height": 24 },
+    "notes": "Focus on the goat head and horns."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "horse",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/horse/horse_brown.png",
+    "cropBox": { "x": 0, "y": 13, "width": 26, "height": 30 },
+    "notes": "Use the brown horse texture and focus on the horse head profile."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "mooshroom",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/cow/red_mooshroom.png",
+    "cropBox": { "x": 0, "y": 0, "width": 30, "height": 22 },
+    "notes": "Pin mooshroom to the red mooshroom texture and focus on the face profile."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "rabbit",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/rabbit/brown.png",
+    "cropBox": { "x": 0, "y": 0, "width": 24, "height": 18 },
+    "notes": "Use the brown rabbit texture and focus on the head/ears cluster."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "shulker",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/shulker/shulker.png",
+    "cropBox": { "x": 0, "y": 0, "width": 26, "height": 22 },
+    "notes": "Crop the shulker shell opening instead of the full sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "slime",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/slime/slime.png",
+    "cropBox": { "x": 0, "y": 0, "width": 22, "height": 18 },
+    "notes": "Use the slime face cube rather than the entire sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "strider",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/strider/strider.png",
+    "cropBox": { "x": 0, "y": 0, "width": 30, "height": 30 },
+    "notes": "Focus on the strider face and top body rather than the full vertical sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "turtle",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/turtle/big_sea_turtle.png",
+    "cropBox": { "x": 0, "y": 0, "width": 36, "height": 24 },
+    "notes": "Use the turtle head and shell front as the portrait."
+  }
+]

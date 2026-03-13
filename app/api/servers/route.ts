@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server'
-import { createUserServer, getUserById, listUserServers, updateServerBridgeHealth } from '@/lib/users'
+import { createUserServer, getUserById, listUserServers, updateServerBridgeHealth, updateServerMinecraftVersion, updateServerSidecarHealth } from '@/lib/users'
+import { normalizeMinecraftVersion } from '@/lib/minecraft-version'
 import { getSessionUserId } from '@/lib/rcon'
-import { testBridgeConnection } from '@/lib/server-bridge'
+import { testBeaconConnection, testBridgeConnection } from '@/lib/server-bridge'
+import { getServerStackDescription, getServerStackLabel } from '@/lib/server-stack'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -38,6 +40,44 @@ function parseStringArray(raw: unknown): string[] {
   return []
 }
 
+function mapSavedServer(server: ReturnType<typeof listUserServers>[number]) {
+  return {
+    id: server.id,
+    label: server.label,
+    host: server.host,
+    port: server.port,
+    stackMode: server.stackMode,
+    stackLabel: getServerStackLabel(server.stackMode),
+    stackDescription: getServerStackDescription(server.stackMode),
+    minecraftVersion: {
+      override: server.minecraftVersion.override,
+      resolved: server.minecraftVersion.resolved,
+      source: server.minecraftVersion.source,
+      detectedAt: server.minecraftVersion.detectedAt,
+    },
+    bridge: {
+      enabled: server.bridge.enabled,
+      commandPrefix: server.bridge.commandPrefix,
+      providerId: server.bridge.providerId,
+      providerLabel: server.bridge.providerLabel,
+      protocolVersion: server.bridge.protocolVersion,
+      lastSeen: server.bridge.lastSeen,
+      lastError: server.bridge.lastError,
+      capabilities: server.bridge.capabilities,
+    },
+    sidecar: {
+      enabled: server.sidecar.enabled,
+      url: server.sidecar.url,
+      lastSeen: server.sidecar.lastSeen,
+      capabilities: server.sidecar.capabilities,
+      structureRoots: server.sidecar.structureRoots,
+      entityPresetRoots: server.sidecar.entityPresetRoots,
+    },
+    createdAt: server.createdAt,
+    updatedAt: server.updatedAt,
+  }
+}
+
 export async function GET(req: NextRequest) {
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Not authenticated' }, { status: 401 })
@@ -46,32 +86,7 @@ export async function GET(req: NextRequest) {
   return Response.json({
     ok: true,
     activeServerId: user.activeServerId,
-    servers: listUserServers(userId).map(server => ({
-      id: server.id,
-      label: server.label,
-      host: server.host,
-      port: server.port,
-      bridge: {
-        enabled: server.bridge.enabled,
-        commandPrefix: server.bridge.commandPrefix,
-        providerId: server.bridge.providerId,
-        providerLabel: server.bridge.providerLabel,
-        protocolVersion: server.bridge.protocolVersion,
-        lastSeen: server.bridge.lastSeen,
-        lastError: server.bridge.lastError,
-        capabilities: server.bridge.capabilities,
-      },
-      sidecar: {
-        enabled: server.sidecar.enabled,
-        url: server.sidecar.url,
-        lastSeen: server.sidecar.lastSeen,
-        capabilities: server.sidecar.capabilities,
-        structureRoots: server.sidecar.structureRoots,
-        entityPresetRoots: server.sidecar.entityPresetRoots,
-      },
-      createdAt: server.createdAt,
-      updatedAt: server.updatedAt,
-    })),
+    servers: listUserServers(userId).map(mapSavedServer),
   })
 }
 
@@ -91,6 +106,7 @@ export async function POST(req: NextRequest) {
       sidecarToken,
       sidecarStructureRoots,
       sidecarEntityPresetRoots,
+      minecraftVersionOverride,
     } = await req.json()
     if (!host || typeof host !== 'string' || !password || typeof password !== 'string') {
       return Response.json({ ok: false, error: 'Host and password are required' }, { status: 400 })
@@ -104,6 +120,9 @@ export async function POST(req: NextRequest) {
         enabled: parseFlag(bridgeEnabled),
         commandPrefix: typeof bridgeCommandPrefix === 'string' ? bridgeCommandPrefix.trim() : 'mcraftr',
       },
+      minecraftVersion: {
+        override: normalizeMinecraftVersion(minecraftVersionOverride),
+      },
       sidecar: {
         enabled: parseFlag(sidecarEnabled),
         url: typeof sidecarUrl === 'string' ? sidecarUrl.trim() : null,
@@ -112,6 +131,7 @@ export async function POST(req: NextRequest) {
         entityPresetRoots: parseStringArray(sidecarEntityPresetRoots),
       },
     })
+    const warnings: string[] = []
     if (created.bridge.enabled) {
       const bridge = await testBridgeConnection(created.host, created.port, password, created.bridge.commandPrefix)
       updateServerBridgeHealth(userId, created.id, {
@@ -122,38 +142,56 @@ export async function POST(req: NextRequest) {
         providerLabel: bridge.ok ? (bridge.providerLabel ?? null) : undefined,
         protocolVersion: bridge.ok ? (bridge.protocolVersion ?? null) : undefined,
       })
+      if (created.minecraftVersion.override) {
+        updateServerMinecraftVersion(userId, created.id, {
+          override: created.minecraftVersion.override,
+          detectedAt: Math.floor(Date.now() / 1000),
+        })
+      } else if (bridge.ok && bridge.serverVersion) {
+        updateServerMinecraftVersion(userId, created.id, {
+          override: null,
+          resolved: bridge.serverVersion,
+          source: 'bridge',
+          detectedAt: Math.floor(Date.now() / 1000),
+        })
+      } else {
+        updateServerMinecraftVersion(userId, created.id, {
+          override: null,
+          resolved: null,
+          source: null,
+          detectedAt: null,
+        })
+      }
+      if (!bridge.ok) warnings.push(bridge.error || 'Bridge test failed')
     } else {
       updateServerBridgeHealth(userId, created.id, { lastSeen: null, lastError: null, capabilities: [] })
+      updateServerMinecraftVersion(userId, created.id, created.minecraftVersion.override
+        ? {
+            override: created.minecraftVersion.override,
+            detectedAt: Math.floor(Date.now() / 1000),
+          }
+        : {
+            override: null,
+            resolved: null,
+            source: null,
+            detectedAt: null,
+          })
+    }
+    if (created.sidecar.enabled && created.sidecar.url) {
+      const beacon = await testBeaconConnection(created.sidecar.url, created.sidecar.token)
+      updateServerSidecarHealth(userId, created.id, {
+        lastSeen: beacon.ok ? Math.floor(Date.now() / 1000) : null,
+        capabilities: beacon.ok ? (beacon.capabilities ?? []) : [],
+      })
+      if (!beacon.ok) warnings.push(beacon.error || 'Beacon test failed')
+    } else {
+      updateServerSidecarHealth(userId, created.id, { lastSeen: null, capabilities: [] })
     }
     const server = listUserServers(userId).find(entry => entry.id === created.id) ?? created
     return Response.json({
       ok: true,
-      server: {
-        id: server.id,
-        label: server.label,
-        host: server.host,
-        port: server.port,
-        bridge: {
-          enabled: server.bridge.enabled,
-          commandPrefix: server.bridge.commandPrefix,
-          providerId: server.bridge.providerId,
-          providerLabel: server.bridge.providerLabel,
-          protocolVersion: server.bridge.protocolVersion,
-          lastSeen: server.bridge.lastSeen,
-          lastError: server.bridge.lastError,
-          capabilities: server.bridge.capabilities,
-        },
-        sidecar: {
-          enabled: server.sidecar.enabled,
-          url: server.sidecar.url,
-          lastSeen: server.sidecar.lastSeen,
-          capabilities: server.sidecar.capabilities,
-          structureRoots: server.sidecar.structureRoots,
-          entityPresetRoots: server.sidecar.entityPresetRoots,
-        },
-        createdAt: server.createdAt,
-        updatedAt: server.updatedAt,
-      },
+      warnings,
+      server: mapSavedServer(server),
     })
   } catch (e: unknown) {
     return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Failed to save server' }, { status: 500 })

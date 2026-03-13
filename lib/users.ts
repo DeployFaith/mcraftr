@@ -5,6 +5,8 @@ import bcrypt from 'bcryptjs'
 import Database from 'better-sqlite3'
 import { getDb } from './db'
 import { DEFAULT_FEATURES, FEATURE_KEYS, type FeatureKey } from './features'
+import { buildStoredMinecraftVersion, normalizeMinecraftVersion, resolveMinecraftVersion, type MinecraftVersionSource, type MinecraftVersionState } from './minecraft-version'
+import { getServerStackMode, type ServerStackMode } from './server-stack'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,6 +41,8 @@ export type SavedServer = ServerConfig & {
   id: string
   userId: string
   label: string | null
+  stackMode: ServerStackMode
+  minecraftVersion: MinecraftVersionState
   bridge: BridgeConfig
   sidecar: SidecarConfig
   createdAt: number
@@ -347,6 +351,10 @@ type SavedServerRow = {
   bridge_provider_id?: string | null
   bridge_provider_label?: string | null
   bridge_protocol_version?: string | null
+  minecraft_version_override?: string | null
+  minecraft_version_resolved?: string | null
+  minecraft_version_source?: string | null
+  minecraft_version_detected_at?: number | null
   bridge_last_seen?: number | null
   bridge_last_error?: string | null
   bridge_capabilities_json?: string | null
@@ -398,6 +406,13 @@ function rowToSavedServer(row: SavedServerRow): SavedServer {
     host: row.host,
     port: row.port,
     password: decryptPassword(row.password_enc),
+    stackMode: getServerStackMode({ bridgeEnabled: !!row.bridge_enabled, sidecarEnabled: !!row.sidecar_enabled }),
+    minecraftVersion: resolveMinecraftVersion({
+      override: row.minecraft_version_override,
+      resolved: row.minecraft_version_resolved,
+      source: row.minecraft_version_source,
+      detectedAt: row.minecraft_version_detected_at,
+    }),
     bridge: {
       enabled: !!row.bridge_enabled,
       commandPrefix: normalizeBridgeCommandPrefix(row.bridge_command_prefix),
@@ -483,6 +498,7 @@ export function createUserServer(
   userId: string,
   server: ServerConfig & {
     label?: string | null
+    minecraftVersion?: Partial<Pick<MinecraftVersionState, 'override' | 'resolved' | 'source' | 'detectedAt'>>
     bridge?: Partial<Pick<BridgeConfig, 'enabled' | 'commandPrefix' | 'providerId' | 'providerLabel' | 'protocolVersion' | 'lastSeen' | 'lastError' | 'capabilities'>>
     sidecar?: Partial<Pick<SidecarConfig, 'enabled' | 'url' | 'token' | 'lastSeen' | 'capabilities' | 'structureRoots' | 'entityPresetRoots'>>
   },
@@ -498,6 +514,7 @@ export function createUserServer(
   const bridgeProviderId = server.bridge?.providerId?.trim() || null
   const bridgeProviderLabel = server.bridge?.providerLabel?.trim() || null
   const bridgeProtocolVersion = server.bridge?.protocolVersion?.trim() || null
+  const storedMinecraftVersion = buildStoredMinecraftVersion(server.minecraftVersion ?? {})
   const bridgeLastSeen = server.bridge?.lastSeen ?? null
   const bridgeLastError = server.bridge?.lastError?.trim() || null
   const bridgeCapabilitiesJson = server.bridge?.capabilities?.length ? JSON.stringify(server.bridge.capabilities) : null
@@ -512,11 +529,12 @@ export function createUserServer(
     INSERT INTO saved_servers (
       id, user_id, label, host, port, password_enc,
       bridge_enabled, bridge_command_prefix, bridge_provider_id, bridge_provider_label, bridge_protocol_version, bridge_last_seen, bridge_last_error, bridge_capabilities_json,
+      minecraft_version_override, minecraft_version_resolved, minecraft_version_source, minecraft_version_detected_at,
       sidecar_enabled, sidecar_url, sidecar_token_enc, sidecar_last_seen, sidecar_capabilities_json,
       sidecar_structure_roots_json, sidecar_entity_roots_json,
       created_at, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), unixepoch())
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), unixepoch())
   `).run(
     serverId,
     userId,
@@ -532,6 +550,10 @@ export function createUserServer(
     bridgeLastSeen,
     bridgeLastError,
     bridgeCapabilitiesJson,
+    storedMinecraftVersion.override,
+    storedMinecraftVersion.resolved,
+    storedMinecraftVersion.source,
+    storedMinecraftVersion.detectedAt,
     sidecarEnabled,
     sidecarUrl,
     sidecarTokenEnc,
@@ -554,6 +576,7 @@ export function updateUserServer(
   server: ServerConfig & {
     label?: string | null
     serverId?: string | null
+    minecraftVersion?: Partial<Pick<MinecraftVersionState, 'override'>>
     bridge?: Partial<Pick<BridgeConfig, 'enabled' | 'commandPrefix' | 'providerId' | 'providerLabel' | 'protocolVersion' | 'lastSeen' | 'lastError' | 'capabilities'>>
     sidecar?: Partial<Pick<SidecarConfig, 'enabled' | 'url' | 'token' | 'lastSeen' | 'capabilities' | 'structureRoots' | 'entityPresetRoots'>>
   },
@@ -570,6 +593,9 @@ export function updateUserServer(
       ? encryptSecret(server.sidecar.token.trim())
       : existing.sidecar_token_enc ?? null
     const nextBridgeCommandPrefix = normalizeBridgeCommandPrefix(server.bridge?.commandPrefix ?? existing.bridge_command_prefix)
+    const nextMinecraftVersionOverride = Object.prototype.hasOwnProperty.call(server.minecraftVersion ?? {}, 'override')
+      ? normalizeMinecraftVersion(server.minecraftVersion?.override ?? null)
+      : (existing.minecraft_version_override ?? null)
     const nextStructureRootsJson = server.sidecar?.structureRoots
       ? JSON.stringify(Array.from(new Set(server.sidecar.structureRoots.map(entry => entry.trim()).filter(Boolean))))
       : existing.sidecar_structure_roots_json ?? null
@@ -588,6 +614,7 @@ export function updateUserServer(
         bridge_provider_id = ?,
         bridge_provider_label = ?,
         bridge_protocol_version = ?,
+        minecraft_version_override = ?,
         bridge_last_seen = ?,
         bridge_last_error = ?,
         bridge_capabilities_json = ?,
@@ -610,6 +637,7 @@ export function updateUserServer(
       (server.bridge?.providerId?.trim() || existing.bridge_provider_id) ?? null,
       (server.bridge?.providerLabel?.trim() || existing.bridge_provider_label) ?? null,
       (server.bridge?.protocolVersion?.trim() || existing.bridge_protocol_version) ?? null,
+      nextMinecraftVersionOverride,
       server.bridge?.lastSeen ?? existing.bridge_last_seen ?? null,
       server.bridge?.lastError?.trim() ?? existing.bridge_last_error ?? null,
       server.bridge?.capabilities?.length ? JSON.stringify(server.bridge.capabilities) : existing.bridge_capabilities_json ?? null,
@@ -690,6 +718,56 @@ export function updateServerSidecarHealth(
   `).run(
     next.lastSeen ?? null,
     next.capabilities ? JSON.stringify(next.capabilities) : null,
+    serverId,
+    userId,
+  )
+}
+
+export function updateServerMinecraftVersion(
+  userId: string,
+  serverId: string,
+  next: {
+    override?: string | null
+    resolved?: string | null
+    source?: MinecraftVersionSource | null
+    detectedAt?: number | null
+  },
+): void {
+  const db = initDb()
+  const existing = db.prepare(`
+    SELECT minecraft_version_override, minecraft_version_resolved, minecraft_version_source, minecraft_version_detected_at
+    FROM saved_servers
+    WHERE id = ? AND user_id = ?
+  `).get(serverId, userId) as {
+    minecraft_version_override?: string | null
+    minecraft_version_resolved?: string | null
+    minecraft_version_source?: string | null
+    minecraft_version_detected_at?: number | null
+  } | undefined
+  if (!existing) return
+
+  const has = (key: string) => Object.prototype.hasOwnProperty.call(next, key)
+  const persisted = buildStoredMinecraftVersion({
+    override: has('override') ? (next.override ?? null) : (existing.minecraft_version_override ?? null),
+    resolved: has('resolved') ? (next.resolved ?? null) : (existing.minecraft_version_resolved ?? null),
+    source: has('source') ? (next.source ?? null) : (existing.minecraft_version_source ?? null),
+    detectedAt: has('detectedAt') ? (next.detectedAt ?? null) : (existing.minecraft_version_detected_at ?? null),
+  })
+
+  db.prepare(`
+    UPDATE saved_servers
+    SET
+      minecraft_version_override = ?,
+      minecraft_version_resolved = ?,
+      minecraft_version_source = ?,
+      minecraft_version_detected_at = ?,
+      updated_at = updated_at
+    WHERE id = ? AND user_id = ?
+  `).run(
+    persisted.override,
+    persisted.resolved,
+    persisted.source,
+    persisted.detectedAt,
     serverId,
     userId,
   )

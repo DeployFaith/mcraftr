@@ -1,0 +1,202 @@
+[
+  {
+    "subject": "entity",
+    "subjectId": "trader_llama",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/equipment/llama_body/trader_llama.png",
+    "cropBox": { "x": 0, "y": 14, "width": 28, "height": 22 },
+    "notes": "Use the trader llama body texture and focus on the head profile."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "cave_spider",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/spider/cave_spider.png",
+    "cropBox": { "x": 0, "y": 0, "width": 28, "height": 16 },
+    "notes": "Focus on the cave spider face cluster instead of the full body sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "drowned",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/zombie/drowned.png",
+    "cropBox": { "x": 0, "y": 0, "width": 24, "height": 26 },
+    "notes": "Use the drowned face and shoulders rather than the whole sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "evoker",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/illager/evoker.png",
+    "cropBox": { "x": 0, "y": 0, "width": 26, "height": 28 },
+    "notes": "Pin the evoker portrait to the head/hat area."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "guardian",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/guardian.png",
+    "cropBox": { "x": 0, "y": 0, "width": 26, "height": 22 },
+    "notes": "Use the guardian eye/body center rather than the whole sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "hoglin",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/hoglin/hoglin.png",
+    "cropBox": { "x": 0, "y": 2, "width": 44, "height": 24 },
+    "notes": "Focus on the hoglin head and tusk profile."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "husk",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/zombie/husk.png",
+    "cropBox": { "x": 0, "y": 0, "width": 24, "height": 24 },
+    "notes": "Use the husk face/shoulders as the portrait."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "illusioner",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/illager/illusioner.png",
+    "cropBox": { "x": 0, "y": 0, "width": 26, "height": 28 },
+    "notes": "Pin illusioner art to the face/head region."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "magma_cube",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/slime/magmacube.png",
+    "cropBox": { "x": 0, "y": 0, "width": 22, "height": 18 },
+    "notes": "Use the magma cube face block rather than the whole sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "phantom",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/phantom.png",
+    "cropBox": { "x": 0, "y": 0, "width": 28, "height": 18 },
+    "notes": "Focus on the phantom face and front wing roots."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "pillager",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/illager/pillager.png",
+    "cropBox": { "x": 0, "y": 0, "width": 26, "height": 28 },
+    "notes": "Use the pillager head and shoulders as the portrait."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "silverfish",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/silverfish.png",
+    "cropBox": { "x": 0, "y": 0, "width": 20, "height": 14 },
+    "notes": "Use the silverfish face/body front instead of the entire sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "spider",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/spider/spider.png",
+    "cropBox": { "x": 0, "y": 0, "width": 28, "height": 16 },
+    "notes": "Focus on the spider face and front leg cluster."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "stray",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/skeleton/stray.png",
+    "cropBox": { "x": 0, "y": 0, "width": 22, "height": 24 },
+    "notes": "Use the stray skull area as the portrait."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "vex",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/illager/vex.png",
+    "cropBox": { "x": 0, "y": 0, "width": 16, "height": 18 },
+    "notes": "Use a compact vex face/torso crop."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "vindicator",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/illager/vindicator.png",
+    "cropBox": { "x": 0, "y": 0, "width": 26, "height": 28 },
+    "notes": "Use the vindicator head and shoulders as the portrait."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "wither",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/wither/wither.png",
+    "cropBox": { "x": 0, "y": 0, "width": 34, "height": 26 },
+    "notes": "Focus on the central wither face cluster."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "wither_skeleton",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/skeleton/wither_skeleton.png",
+    "cropBox": { "x": 0, "y": 0, "width": 22, "height": 24 },
+    "notes": "Use the wither skeleton skull area as the portrait."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "zoglin",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/hoglin/zoglin.png",
+    "cropBox": { "x": 0, "y": 2, "width": 44, "height": 24 },
+    "notes": "Focus on the zoglin head and tusk profile."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "zombie_villager",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/zombie_villager/zombie_villager.png",
+    "cropBox": { "x": 0, "y": 0, "width": 26, "height": 28 },
+    "notes": "Use the canonical zombie villager texture instead of profession overlays."
+  }
+]

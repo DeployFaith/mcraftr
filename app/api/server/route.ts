@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server'
 import { createUserServer, deleteUserServer, getUserById, updateUserServer } from '@/lib/users'
+import { DEFAULT_MINECRAFT_VERSION, normalizeMinecraftVersion } from '@/lib/minecraft-version'
 import { testRconConnection, getSessionUserId } from '@/lib/rcon'
-import { testBridgeConnection } from '@/lib/server-bridge'
+import { testBeaconConnection, testBridgeConnection } from '@/lib/server-bridge'
+import { getServerStackDescription, getServerStackLabel } from '@/lib/server-stack'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -60,6 +62,7 @@ export async function GET(req: NextRequest) {
   if (!userId) return Response.json({ ok: false, error: 'Not authenticated' }, { status: 401 })
   const user = getUserById(userId)
   if (!user) return Response.json({ ok: false, error: 'User not found' }, { status: 404 })
+  const activeServer = user.servers.find(server => server.id === user.activeServerId) ?? null
   return Response.json({
     ok: true,
     configured: !!user.server,
@@ -67,6 +70,15 @@ export async function GET(req: NextRequest) {
     label: user.serverLabel,
     host: user.server?.host ?? null,
     port: user.server?.port ?? 25575,
+    stackMode: activeServer?.stackMode ?? 'quick',
+    stackLabel: getServerStackLabel(activeServer?.stackMode ?? 'quick'),
+    stackDescription: getServerStackDescription(activeServer?.stackMode ?? 'quick'),
+    minecraftVersion: activeServer?.minecraftVersion ?? {
+      override: null,
+      resolved: DEFAULT_MINECRAFT_VERSION,
+      source: 'fallback',
+      detectedAt: null,
+    },
   })
 }
 
@@ -88,7 +100,18 @@ export async function PUT(req: NextRequest) {
   if (!userId) return Response.json({ ok: false, error: 'Not authenticated' }, { status: 401 })
 
   try {
-    const { host, port, password, bridgeEnabled, bridgeCommandPrefix } = await req.json()
+    const {
+      host,
+      port,
+      password,
+      bridgeEnabled,
+      bridgeCommandPrefix,
+      sidecarEnabled,
+      sidecarUrl,
+      sidecarToken,
+      stackMode,
+      minecraftVersionOverride,
+    } = await req.json()
     if (!host || !password) {
       return Response.json({ ok: false, error: 'Host and password are required' }, { status: 400 })
     }
@@ -102,9 +125,20 @@ export async function PUT(req: NextRequest) {
     }
 
     const clean = (result.stdout || 'OK').replace(/§./g, '')
-    const bridgeRequested = bridgeEnabled === true || bridgeEnabled === 'true' || bridgeEnabled === 1
+    const fullStackRequested = stackMode === 'full'
+    const bridgeRequested = fullStackRequested || bridgeEnabled === true || bridgeEnabled === 'true' || bridgeEnabled === 1
     if (!bridgeRequested) {
-      return Response.json({ ok: true, message: `Connected! ${clean}` })
+      const override = normalizeMinecraftVersion(minecraftVersionOverride)
+      return Response.json({
+        ok: true,
+        message: `Connected! ${clean}`,
+        minecraftVersion: {
+          override,
+          resolved: override ?? DEFAULT_MINECRAFT_VERSION,
+          source: override ? 'manual' : 'fallback',
+          detectedAt: override ? Math.floor(Date.now() / 1000) : null,
+        },
+      })
     }
 
     const bridge = await testBridgeConnection(
@@ -121,10 +155,50 @@ export async function PUT(req: NextRequest) {
       })
     }
 
+    const beaconRequested = fullStackRequested || sidecarEnabled === true || sidecarEnabled === 'true' || sidecarEnabled === 1
+    if (!beaconRequested) {
+      const override = normalizeMinecraftVersion(minecraftVersionOverride)
+      return Response.json({
+        ok: true,
+        message: `Connected! ${clean} Bridge prefix "${typeof bridgeCommandPrefix === 'string' ? bridgeCommandPrefix.trim().replace(/^\/+/, '') || 'mcraftr' : 'mcraftr'}" responded successfully.`,
+        bridge,
+        minecraftVersion: {
+          override,
+          resolved: override ?? bridge.serverVersion ?? DEFAULT_MINECRAFT_VERSION,
+          source: override ? 'manual' : (bridge.serverVersion ? 'bridge' : 'fallback'),
+          detectedAt: override || bridge.serverVersion ? Math.floor(Date.now() / 1000) : null,
+        },
+      })
+    }
+
+    if (!sidecarUrl || typeof sidecarUrl !== 'string' || !sidecarUrl.trim()) {
+      return Response.json({ ok: false, error: 'Beacon URL is required for the Full Mcraftr Stack' }, { status: 400 })
+    }
+
+    const beacon = await testBeaconConnection(
+      sidecarUrl.trim(),
+      typeof sidecarToken === 'string' ? sidecarToken : null,
+    )
+    if (!beacon.ok) {
+      return Response.json({
+        ok: false,
+        error: `RCON and Bridge connected, but ${beacon.error || 'the Beacon test failed'}`,
+        bridge,
+        beacon,
+      })
+    }
+
     return Response.json({
       ok: true,
-      message: `Connected! ${clean} Bridge prefix "${typeof bridgeCommandPrefix === 'string' ? bridgeCommandPrefix.trim().replace(/^\/+/, '') || 'mcraftr' : 'mcraftr'}" responded successfully.`,
+      message: `Connected! ${clean} Full Mcraftr Stack responded successfully.`,
       bridge,
+      beacon,
+      minecraftVersion: {
+        override: normalizeMinecraftVersion(minecraftVersionOverride),
+        resolved: normalizeMinecraftVersion(minecraftVersionOverride) ?? bridge.serverVersion ?? DEFAULT_MINECRAFT_VERSION,
+        source: normalizeMinecraftVersion(minecraftVersionOverride) ? 'manual' : (bridge.serverVersion ? 'bridge' : 'fallback'),
+        detectedAt: normalizeMinecraftVersion(minecraftVersionOverride) || bridge.serverVersion ? Math.floor(Date.now() / 1000) : null,
+      },
     })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Test failed'

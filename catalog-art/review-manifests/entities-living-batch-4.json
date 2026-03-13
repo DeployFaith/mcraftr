@@ -1,0 +1,142 @@
+[
+  {
+    "subject": "entity",
+    "subjectId": "polar_bear",
+    "version": "*",
+    "reviewState": "approved",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/bear/polarbear.png",
+    "cropBox": { "x": 0, "y": 0, "width": 32, "height": 24 },
+    "notes": "Pin polar bear to the correct bear texture and keep the clean face profile."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "wandering_trader",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/wandering_trader.png",
+    "cropBox": { "x": 0, "y": 0, "width": 28, "height": 28 },
+    "notes": "Use the wandering trader head and hood area as the portrait."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "llama",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/llama/creamy.png",
+    "cropBox": { "x": 0, "y": 12, "width": 28, "height": 22 },
+    "notes": "Use a real llama texture instead of carpet/body overlays and focus on the head profile."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "donkey",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/horse/donkey.png",
+    "cropBox": { "x": 0, "y": 12, "width": 26, "height": 30 },
+    "notes": "Use the donkey head profile from the canonical donkey texture."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "mule",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/horse/mule.png",
+    "cropBox": { "x": 0, "y": 12, "width": 26, "height": 30 },
+    "notes": "Use the mule head profile from the canonical mule texture."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "parrot",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/parrot/parrot_red_blue.png",
+    "cropBox": { "x": 0, "y": 0, "width": 16, "height": 18 },
+    "notes": "Use the parrot face and chest area rather than the full sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "pufferfish",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/fish/pufferfish.png",
+    "cropBox": { "x": 0, "y": 0, "width": 16, "height": 16 },
+    "notes": "Use a compact pufferfish face/body crop."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "salmon",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/fish/salmon.png",
+    "cropBox": { "x": 0, "y": 0, "width": 18, "height": 12 },
+    "notes": "Use the salmon head/front body instead of the full fish sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "cod",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/fish/cod.png",
+    "cropBox": { "x": 0, "y": 0, "width": 18, "height": 12 },
+    "notes": "Use the cod head/front body instead of the full fish sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "tropical_fish",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/fish/tropical_a.png",
+    "cropBox": { "x": 0, "y": 0, "width": 18, "height": 12 },
+    "notes": "Use the tropical fish front body as the portrait."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "squid",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/squid/squid.png",
+    "cropBox": { "x": 0, "y": 0, "width": 24, "height": 18 },
+    "notes": "Use the squid head/body bulb instead of the entire sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "glow_squid",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/squid/glow_squid.png",
+    "cropBox": { "x": 0, "y": 0, "width": 24, "height": 18 },
+    "notes": "Use the glow squid head/body bulb instead of the entire sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "snow_golem",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/snow_golem.png",
+    "cropBox": { "x": 0, "y": 0, "width": 26, "height": 30 },
+    "notes": "Focus on the carved pumpkin head and upper torso."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "tadpole",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/tadpole/tadpole.png",
+    "cropBox": { "x": 0, "y": 0, "width": 10, "height": 8 },
+    "notes": "Use a tiny focused tadpole head/body crop."
+  }
+]

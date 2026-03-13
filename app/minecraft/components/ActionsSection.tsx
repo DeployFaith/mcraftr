@@ -8,7 +8,7 @@ import {
   type LucideProps,
 } from 'lucide-react'
 import { KITS } from '@/lib/kits'
-import { CATALOG, type CatalogItem } from '../items'
+import { CATALOG, hydrateCatalogWithArt, type CatalogItem } from '../items'
 import type { InvItem } from '../../api/minecraft/inventory/route'
 import { useToast } from './useToast'
 import Toasts from './Toasts'
@@ -19,6 +19,7 @@ import type { FeatureKey } from '@/lib/features'
 import PlayerPicker from './PlayerPicker'
 import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
 import KitIcon from './KitIcon'
+import CatalogArtwork from './CatalogArtwork'
 import {
   CUSTOM_KIT_CUSTOM_ICON_MAX_BYTES,
   CUSTOM_KIT_ICON_IDS,
@@ -36,6 +37,7 @@ type Props = {
   players: string[]
   selectedPlayer?: string
   onSelectedPlayerChange?: (player: string) => void
+  minecraftVersion?: string | null
 }
 
 type FeatureFlags = Record<FeatureKey, boolean>
@@ -144,6 +146,16 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   )
+}
+
+function itemCardPalette(item: CatalogItem, categoryLabel: string) {
+  return {
+    frame: 'var(--accent-mid)',
+    frameSoft: 'color-mix(in srgb, var(--accent) 12%, transparent)',
+    frameGlow: 'color-mix(in srgb, var(--accent) 18%, transparent)',
+    badge: 'color-mix(in srgb, var(--accent) 16%, transparent)',
+    badgeText: 'var(--accent)',
+  }
 }
 
 function Stepper({
@@ -281,8 +293,9 @@ function QuantityPicker({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function ActionsSection({ players, selectedPlayer: selectedPlayerProp, onSelectedPlayerChange }: Props) {
+export default function ActionsSection({ players, selectedPlayer: selectedPlayerProp, onSelectedPlayerChange, minecraftVersion }: Props) {
   const { toasts, addToast } = useToast()
+  const hydratedCatalog = useMemo(() => hydrateCatalogWithArt(minecraftVersion, CATALOG), [minecraftVersion])
   const [features, setFeatures] = useState<FeatureFlags | null>(null)
 
   useEffect(() => {
@@ -482,12 +495,12 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
   const kitsFeatureEnabled = features ? features.enable_kits : true
   const customKitsFeatureEnabled = features ? features.enable_custom_kits : true
 
-  const allItems = useMemo(() => CATALOG.flatMap(c => c.items), [])
+  const allItems = useMemo(() => hydratedCatalog.flatMap(c => c.items), [hydratedCatalog])
   const builtinKitMap = useMemo(() => new Map(KITS.map(kit => [kit.id, kit])), [])
   const customKitMap = useMemo(() => new Map(customKits.map(kit => [kit.id, kit])), [customKits])
   const selectedBuiltinKit = selectedKit ? builtinKitMap.get(selectedKit) ?? null : null
   const selectedCustomKit = !selectedBuiltinKit && selectedKit ? customKitMap.get(selectedKit) ?? null : null
-  const activeBuilderCat = CATALOG.find(c => c.id === builderCatCatId) ?? CATALOG[0]
+  const activeBuilderCat = hydratedCatalog.find(c => c.id === builderCatCatId) ?? hydratedCatalog[0]
   const builderFilteredItems = builderSearch.trim()
     ? allItems.filter(i => i.label.toLowerCase().includes(builderSearch.toLowerCase()) || i.id.toLowerCase().includes(builderSearch.toLowerCase()))
     : activeBuilderCat.items
@@ -717,12 +730,13 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
   const [catExtraQty, setCatExtraQty] = useState(1)
   const [catGiving,   setCatGiving]   = useState(false)
 
-  const activeCat  = CATALOG.find(c => c.id === catCatId) ?? CATALOG[0]
+  const activeCat  = hydratedCatalog.find(c => c.id === catCatId) ?? hydratedCatalog[0]
   const filtered   = catSearch.trim()
     ? allItems.filter(i => i.label.toLowerCase().includes(catSearch.toLowerCase()) || i.id.toLowerCase().includes(catSearch.toLowerCase()))
     : activeCat.items
   const totalPages = Math.ceil(filtered.length / CAT_PAGE_SIZE)
   const pageItems  = filtered.slice(catPage * CAT_PAGE_SIZE, (catPage + 1) * CAT_PAGE_SIZE)
+  const selectedCategoryLabel = catSearch.trim() ? 'Search Results' : activeCat.label
 
   const giveItem = async () => {
     const player = selectedPlayer.trim()
@@ -1319,7 +1333,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                   <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 space-y-3">
                     <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">ADD ITEMS</div>
                     <div className="flex gap-1.5 flex-wrap">
-                      {CATALOG.map(cat => (
+                      {hydratedCatalog.map(cat => (
                         <button
                           key={cat.id}
                           onClick={() => {
@@ -1520,7 +1534,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
         {selectedPlayer && (
           <>
             <div className="flex gap-1.5 flex-wrap">
-              {CATALOG.map(cat => (
+              {hydratedCatalog.map(cat => (
                 <button key={cat.id} onClick={() => { setCatCatId(cat.id); setCatPage(0); setCatSearch(''); setCatSelected(null) }}
                   className={`px-2 py-1 rounded text-[13px] font-mono transition-all border ${
                     catCatId === cat.id
@@ -1544,12 +1558,34 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                   setCatStacks(0)
                   setCatExtraQty(1)
                 }}
-                  className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-lg border transition-all ${
+                  className={`flex flex-col gap-2 rounded-[22px] border p-2.5 text-left transition-all ${
                     catSelected?.id === item.id
-                      ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]'
-                      : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]'
-                  }`}>
-                  <span className="text-[13px] font-mono leading-tight text-center line-clamp-2">{item.label}</span>
+                      ? 'text-[var(--accent)]'
+                      : 'text-[var(--text-dim)] hover:border-[var(--accent-mid)]'
+                  }`}
+                  style={catSelected?.id === item.id
+                    ? {
+                        borderColor: 'var(--accent)',
+                        background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--panel) 92%, transparent))',
+                      }
+                    : {
+                        borderColor: 'var(--border)',
+                        background: 'color-mix(in srgb, var(--panel) 84%, transparent)',
+                      }}>
+                  <div className="rounded-[18px] border p-2" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
+                    <CatalogArtwork
+                      kind="item"
+                      label={item.label}
+                      category={selectedCategoryLabel}
+                      imageUrl={item.imageUrl}
+                      art={item.art}
+                      className="h-24 w-full rounded-[14px] object-contain"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[12px] font-mono leading-tight line-clamp-2">{item.label}</div>
+                    <div className="mt-1 text-[10px] font-mono tracking-[0.18em] opacity-70">{item.maxStack === 1 ? 'UNSTACKABLE' : `STACK ${item.maxStack}`}</div>
+                  </div>
                 </button>
               ))}
             </div>
@@ -1566,11 +1602,46 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
 
             {catSelected && (
               <div className="space-y-3 pt-1">
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-[var(--panel)] border border-[var(--accent-mid)]">
-                  <span className="text-2xl">{activeCat.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-mono text-[var(--text)] truncate">{catSelected.label}</div>
-                    <div className="text-[13px] font-mono text-[var(--text-dim)]">minecraft:{catSelected.id}</div>
+                <div
+                  className="space-y-3 rounded-[28px] border p-4"
+                  style={{
+                    borderColor: itemCardPalette(catSelected, selectedCategoryLabel).frame,
+                    background: `linear-gradient(180deg, ${itemCardPalette(catSelected, selectedCategoryLabel).frameSoft}, rgba(8,11,16,0.94))`,
+                    boxShadow: `0 18px 42px ${itemCardPalette(catSelected, selectedCategoryLabel).frameGlow}`,
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[10px] font-mono tracking-[0.35em]" style={{ color: itemCardPalette(catSelected, selectedCategoryLabel).badgeText }}>ITEM CARD</div>
+                      <div className="mt-1 text-[18px] font-mono text-[var(--text)]">{catSelected.label}</div>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2 text-[10px] font-mono tracking-widest">
+                      <span className="rounded-full border px-2 py-1" style={{ borderColor: itemCardPalette(catSelected, selectedCategoryLabel).frame, background: itemCardPalette(catSelected, selectedCategoryLabel).badge, color: itemCardPalette(catSelected, selectedCategoryLabel).badgeText }}>{selectedCategoryLabel}</span>
+                      <span className="rounded-full border border-[var(--border)] px-2 py-1 text-[var(--text-dim)]">{minecraftVersion || 'fallback version'}</span>
+                    </div>
+                  </div>
+                  <div className="rounded-[24px] border p-2" style={{ borderColor: itemCardPalette(catSelected, selectedCategoryLabel).frame, background: 'rgba(0,0,0,0.18)' }}>
+                    <CatalogArtwork
+                      kind="item"
+                      label={catSelected.label}
+                      category={selectedCategoryLabel}
+                      imageUrl={catSelected.imageUrl}
+                      art={catSelected.art}
+                      className="h-52 w-full rounded-[18px] border border-white/10 object-contain"
+                    />
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                      {[
+                        ['Id', `minecraft:${catSelected.id}`],
+                        ['Category', selectedCategoryLabel],
+                        ['Per Stack', String(catSelected.maxStack)],
+                        ['Max Batch', String(catSelected.maxStack > 1 ? MAX_STACK_BATCHES * catSelected.maxStack : MAX_STACK_BATCHES)],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-2xl border px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
+                          <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">{label}</div>
+                          <div className="mt-1 text-[12px] font-mono text-[var(--text)] break-all">{value}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 {catSelected.maxStack > 1 ? (

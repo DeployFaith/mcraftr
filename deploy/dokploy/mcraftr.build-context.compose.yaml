@@ -1,0 +1,57 @@
+services:
+  mcraftr-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no --requirepass ${REDIS_PASSWORD}
+
+  mcraftr-beacon:
+    build:
+      context: ${MCRAFTR_BUILD_CONTEXT_URL}
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    entrypoint:
+      - node
+      - sidecar/server.mjs
+    environment:
+      MCRAFTR_SIDECAR_HOST: 0.0.0.0
+      MCRAFTR_SIDECAR_PORT: 9419
+      MCRAFTR_SIDECAR_TOKEN: ${MCRAFTR_SIDECAR_TOKEN:-}
+      MCRAFTR_PLUGINS_DIR: /data/plugins
+      MCRAFTR_WORLDS_DIR: /data
+      MCRAFTR_SCHEMATICS_DIR: ${MCRAFTR_SCHEMATICS_DIR:-}
+      MCRAFTR_ENTITY_PRESET_DIR: ${MCRAFTR_ENTITY_PRESET_DIR:-}
+      MCRAFTR_BLUEMAP_URL: ${MCRAFTR_BLUEMAP_URL:-}
+      MCRAFTR_DYNMAP_URL: ${MCRAFTR_DYNMAP_URL:-}
+    volumes:
+      - minecraft_data:/data:ro
+
+  mcraftr:
+    build:
+      context: ${MCRAFTR_BUILD_CONTEXT_URL}
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - mcraftr-redis
+      - mcraftr-beacon
+    ports:
+      - 127.0.0.1:${MCRAFTR_HOST_PORT}:3050
+    environment:
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      MCRAFTR_ADMIN_USER: ${MCRAFTR_ADMIN_USER}
+      MCRAFTR_ADMIN_PASS: ${MCRAFTR_ADMIN_PASS}
+      MCRAFTR_ENC_KEY: ${MCRAFTR_ENC_KEY}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_URL: ${REDIS_URL}
+      DATA_DIR: ${DATA_DIR}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION}
+      MCRAFTR_LEGACY_BRIDGE_PREFIX: ${MCRAFTR_LEGACY_BRIDGE_PREFIX}
+      PORT: 3050
+      HOSTNAME: 0.0.0.0
+    volumes:
+      - mcraftr_data:/app/data
+
+volumes:
+  mcraftr_data:
+  minecraft_data:
+    external: true

@@ -14,6 +14,8 @@ import SettingsSection from './components/SettingsSection'
 import AdminTerminalWorkspace from './components/AdminTerminalWorkspace'
 import type { FeatureKey } from '@/lib/features'
 import { playSound } from '@/app/components/soundfx'
+import type { ServerStackMode } from '@/lib/server-stack'
+import type { MinecraftVersionState } from '@/lib/minecraft-version'
 
 export type TabId = 'dashboard' | 'players' | 'actions' | 'worlds' | 'terminal' | 'admin' | 'chat' | 'settings'
 
@@ -42,7 +44,7 @@ function normalizeTab(raw: string | null | undefined): TabId {
   return VALID_TABS.includes(raw as TabId) ? (raw as TabId) : 'dashboard'
 }
 
-export default function MinecraftClientPage({ initialTab, initialRole }: { initialTab: TabId; initialRole?: string }) {
+export default function MinecraftClientPage({ initialTab, initialRole, initialStackMode }: { initialTab: TabId; initialRole?: string; initialStackMode: ServerStackMode }) {
   const { data: session } = useSession()
   const role = session?.role ?? initialRole
   const pathname = usePathname()
@@ -52,6 +54,8 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
   const [players, setPlayers] = useState<string[]>([])
   const [selectedPlayer, setSelectedPlayer] = useState('')
   const [features, setFeatures] = useState<FeatureFlags | null>(null)
+  const [stackMode, setStackMode] = useState<ServerStackMode>(initialStackMode)
+  const [minecraftVersion, setMinecraftVersion] = useState<MinecraftVersionState | null>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   const loadFeatures = useCallback(async () => {
@@ -70,6 +74,23 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
     window.addEventListener('mcraftr:features-updated', onFeatures)
     return () => window.removeEventListener('mcraftr:features-updated', onFeatures)
   }, [loadFeatures])
+
+  const loadActiveServer = useCallback(async () => {
+    try {
+      const response = await fetch('/api/servers/active', { cache: 'no-store' })
+      const payload = await response.json()
+      if (payload.ok && payload.activeServer?.stackMode) {
+        setStackMode(payload.activeServer.stackMode as ServerStackMode)
+        setMinecraftVersion(payload.activeServer.minecraftVersion ?? null)
+      }
+    } catch {
+      // keep previous mode until the server switch settles
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadActiveServer()
+  }, [loadActiveServer, session?.activeServerId])
 
   useEffect(() => {
     const syncFromUrl = () => {
@@ -106,6 +127,7 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
     if (t.id === 'players' && features && !features.enable_players_tab) return false
     if (t.id === 'actions' && features && !features.enable_actions_tab) return false
     if (t.id === 'worlds' && features && !features.enable_worlds_tab) return false
+    if (t.id === 'worlds' && stackMode === 'quick') return false
     if (t.id === 'chat' && features && !features.enable_chat) return false
     if (t.id === 'actions' && features) {
       const hasAnyAction = features.enable_world || features.enable_player_commands || features.enable_chat_write || features.enable_teleport || features.enable_kits || features.enable_item_catalog || features.enable_inventory
@@ -286,6 +308,7 @@ export default function MinecraftClientPage({ initialTab, initialRole }: { initi
               players={players}
               selectedPlayer={selectedPlayer}
               onSelectedPlayerChange={setSelectedPlayer}
+              minecraftVersion={minecraftVersion?.resolved ?? null}
             />
           </div>
         )}

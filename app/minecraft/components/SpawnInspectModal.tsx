@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from 'react'
 import { X } from 'lucide-react'
+import type { CatalogArtPayload } from '@/lib/catalog-art/types'
 import CatalogArtwork from './CatalogArtwork'
 
 export type LocationMode = 'player' | 'world-player' | 'coords'
@@ -16,6 +17,7 @@ export type StructureCatalogEntry = {
   resourceKey?: string | null
   relativePath?: string | null
   imageUrl?: string | null
+  art?: CatalogArtPayload | null
   summary?: string | null
   format?: string | null
   sizeBytes?: number | null
@@ -46,6 +48,7 @@ export type EntityCatalogEntry = {
   noGravity?: boolean
   advancedNbt?: string | null
   imageUrl?: string | null
+  art?: CatalogArtPayload | null
   summary?: string | null
 }
 
@@ -237,7 +240,10 @@ export default function SpawnInspectModal({
               category={target.category}
               sourceKind={structure?.sourceKind ?? null}
               imageUrl={target.imageUrl}
-              className="h-[220px] w-full rounded-[22px] border object-cover"
+              art={target.art}
+              className={structure
+                ? 'h-[260px] w-full rounded-[22px] border bg-[var(--bg2)] object-contain p-3'
+                : 'mx-auto h-[260px] w-full max-w-[22rem] rounded-[22px] border bg-[var(--bg2)] object-contain p-3'}
             />
             <div className="mt-4">
               <div className="font-mono text-[18px] tracking-[0.12em]" style={{ color: 'var(--text)' }}>
@@ -247,7 +253,7 @@ export default function SpawnInspectModal({
                 {target.category.toUpperCase()}
                 {structure ? ` · ${structure.sourceKind.toUpperCase()}${structure.placementKind ? ` · ${structure.placementKind.replace(/_/g, ' ').toUpperCase()}` : ''}` : ''}
                 {entity?.sourceKind ? ` · ${entity.sourceKind.toUpperCase()}` : ''}
-                {entity?.dangerous ? ' · DANGEROUS' : ''}
+                {entity?.dangerous ? ' · !' : ''}
               </div>
               {target.summary && (
                 <div className="mt-3 rounded-2xl border px-4 py-3 font-mono text-[12px]" style={{ borderColor: 'var(--border)', color: 'var(--text-dim)', background: 'color-mix(in srgb, var(--bg) 68%, transparent)' }}>

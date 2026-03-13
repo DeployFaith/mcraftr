@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
-import { getActiveServer } from '@/lib/users'
+import { getActiveServer, updateServerMinecraftVersion } from '@/lib/users'
+import { resolveMinecraftVersion } from '@/lib/minecraft-version'
 import { callSidecarForRequest, runBridgeJson } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
@@ -8,6 +9,7 @@ export const dynamic = 'force-dynamic'
 
 type BridgeStackResponse = {
   ok: boolean
+   protocolVersion?: string | null
   serverVersion: string | null
   plugins: Array<{
     key: string
@@ -49,6 +51,26 @@ export async function GET(req: NextRequest) {
     callSidecarForRequest<SidecarStackResponse>(req, '/plugin-stack'),
   ])
 
+  const effectiveMinecraftVersion = activeServer.minecraftVersion.override
+    ? activeServer.minecraftVersion
+    : bridge.ok && bridge.data.serverVersion
+      ? resolveMinecraftVersion({
+          override: null,
+          resolved: bridge.data.serverVersion,
+          source: 'bridge',
+          detectedAt: Math.floor(Date.now() / 1000),
+        })
+      : activeServer.minecraftVersion
+
+  if (!activeServer.minecraftVersion.override && bridge.ok && bridge.data.serverVersion) {
+    updateServerMinecraftVersion(userId, serverId, {
+      override: null,
+      resolved: bridge.data.serverVersion,
+      source: 'bridge',
+      detectedAt: Math.floor(Date.now() / 1000),
+    })
+  }
+
   return Response.json({
     ok: true,
     server: {
@@ -56,6 +78,7 @@ export async function GET(req: NextRequest) {
       label: activeServer.label,
       host: activeServer.host,
       port: activeServer.port,
+      minecraftVersion: effectiveMinecraftVersion,
     },
     bridge: bridge.ok ? bridge.data : { ok: false, error: bridge.error },
     sidecar: sidecar.ok

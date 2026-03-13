@@ -29,12 +29,19 @@ export type BridgeProbeResult = {
   providerId?: string | null
   providerLabel?: string | null
   protocolVersion?: string | null
+  serverVersion?: string | null
   capabilities?: string[]
 }
 
 export type SidecarResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: string; status?: number }
+
+export type BeaconProbeResult = {
+  ok: boolean
+  error?: string
+  capabilities?: string[]
+}
 
 export type ActiveBridgeContext = {
   userId: string
@@ -244,9 +251,8 @@ export async function testBridgeConnection(
       raw: result.stdout,
       providerId: typeof payload.providerId === 'string' ? payload.providerId : null,
       providerLabel: typeof payload.providerLabel === 'string' ? payload.providerLabel : null,
-      protocolVersion: typeof payload.protocolVersion === 'string'
-        ? payload.protocolVersion
-        : (typeof payload.serverVersion === 'string' ? payload.serverVersion : null),
+      protocolVersion: typeof payload.protocolVersion === 'string' ? payload.protocolVersion : null,
+      serverVersion: typeof payload.serverVersion === 'string' ? payload.serverVersion : null,
       capabilities: [],
     }
   } catch (error) {
@@ -255,6 +261,38 @@ export async function testBridgeConnection(
       error: error instanceof Error ? error.message : 'Failed to parse bridge JSON',
       code: 'bridge_json_parse_failed',
       raw: result.stdout,
+    }
+  }
+}
+
+export async function testBeaconConnection(url: string, token?: string | null): Promise<BeaconProbeResult> {
+  try {
+    const target = new URL('health', url.endsWith('/') ? url : `${url}/`)
+    const headers = new Headers({ Accept: 'application/json' })
+    if (token?.trim()) {
+      headers.set('Authorization', `Bearer ${token.trim()}`)
+    }
+    const response = await fetch(target, {
+      headers,
+      cache: 'no-store',
+    })
+    const payload = await response.json().catch(() => null) as { ok?: unknown; error?: unknown; capabilities?: unknown } | null
+    if (!response.ok || payload?.ok === false) {
+      return {
+        ok: false,
+        error: typeof payload?.error === 'string' ? payload.error : `Beacon request failed (${response.status})`,
+      }
+    }
+    return {
+      ok: true,
+      capabilities: Array.isArray(payload?.capabilities)
+        ? payload.capabilities.filter((entry): entry is string => typeof entry === 'string')
+        : [],
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Beacon request failed',
     }
   }
 }
@@ -272,7 +310,7 @@ export async function callSidecarForRequest<T>(
 
   const server = getActiveServer(userId)
   if (!server?.sidecar.enabled || !server.sidecar.url) {
-    return { ok: false, error: 'Sidecar is not configured for the active server', status: 400 }
+    return { ok: false, error: 'Beacon is not configured for the active server', status: 400 }
   }
 
   try {
@@ -297,11 +335,11 @@ export async function callSidecarForRequest<T>(
       headers,
       cache: 'no-store',
     })
-    const json = await response.json().catch(() => ({ ok: false, error: 'Invalid sidecar response' }))
+    const json = await response.json().catch(() => ({ ok: false, error: 'Invalid beacon response' }))
     if (!response.ok || json?.ok === false) {
       return {
         ok: false,
-        error: typeof json?.error === 'string' ? json.error : `Sidecar request failed (${response.status})`,
+        error: typeof json?.error === 'string' ? json.error : `Beacon request failed (${response.status})`,
         status: response.status,
       }
     }
@@ -314,7 +352,7 @@ export async function callSidecarForRequest<T>(
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'Sidecar request failed',
+      error: error instanceof Error ? error.message : 'Beacon request failed',
       status: 502,
     }
   }

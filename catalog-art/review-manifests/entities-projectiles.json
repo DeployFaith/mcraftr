@@ -1,0 +1,112 @@
+[
+  {
+    "subject": "entity",
+    "subjectId": "evoker_fangs",
+    "version": "*",
+    "reviewState": "warned",
+    "forceClass": "projectile-icon",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "icon:assets/minecraft/textures/entity/illager/evoker_fangs.png",
+    "notes": "Treat fangs as an object/icon presentation instead of a living portrait."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "experience_orb",
+    "version": "*",
+    "reviewState": "warned",
+    "forceClass": "projectile-icon",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "icon:assets/minecraft/textures/entity/experience_orb.png",
+    "notes": "Use the orb texture directly so the art reads as the orb itself."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "eye_of_ender",
+    "version": "*",
+    "reviewState": "warned",
+    "forceClass": "projectile-icon",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "item:ender_eye",
+    "notes": "Use the Ender Eye asset as the closest visible representation of the flying entity."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "small_fireball",
+    "version": "*",
+    "reviewState": "warned",
+    "forceClass": "projectile-icon",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "icon:assets/minecraft/textures/entity/enderdragon/dragon_fireball.png",
+    "notes": "Closest available official fireball visual until a dedicated renderer exists."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "breeze_wind_charge",
+    "version": "*",
+    "reviewState": "warned",
+    "forceClass": "projectile-icon",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "icon:assets/minecraft/textures/entity/projectiles/wind_charge.png",
+    "notes": "Share the wind charge projectile visual for Breeze charges."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "wither_skull",
+    "version": "*",
+    "reviewState": "warned",
+    "forceClass": "projectile-icon",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "symbol:☠",
+    "notes": "Use a clear skull symbol until a dedicated projectile texture path exists."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "llama_spit",
+    "version": "*",
+    "reviewState": "warned",
+    "forceClass": "projectile-icon",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "symbol:•",
+    "notes": "Small spit projectile should use a compact symbolic visual rather than fallback art."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "fishing_bobber",
+    "version": "*",
+    "reviewState": "approved",
+    "forceClass": "projectile-icon",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "icon:assets/minecraft/textures/entity/fishing_hook.png",
+    "notes": "Use the actual fishing hook texture as the bobber representation."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "arrow",
+    "version": "*",
+    "reviewState": "approved",
+    "forceClass": "projectile-icon",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "icon:assets/minecraft/textures/entity/projectiles/arrow.png",
+    "notes": "Use the projectile arrow texture, not an inventory ingredient view."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "spectral_arrow",
+    "version": "*",
+    "reviewState": "approved",
+    "forceClass": "projectile-icon",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "icon:assets/minecraft/textures/entity/projectiles/spectral_arrow.png",
+    "notes": "Use the projectile spectral arrow texture, not an inventory ingredient view."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "trident",
+    "version": "*",
+    "reviewState": "approved",
+    "forceClass": "projectile-icon",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "icon:assets/minecraft/textures/entity/trident.png",
+    "notes": "Use the flying trident visual rather than a generic item card."
+  }
+]

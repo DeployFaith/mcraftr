@@ -18,6 +18,7 @@ data/
 *.db
 *.sqlite
 test-results/
+playwright-report/
 
 # OS
 .DS_Store

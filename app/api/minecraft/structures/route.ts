@@ -1,6 +1,10 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getUserFeatureFlags } from '@/lib/rcon'
 import { callSidecarForRequest } from '@/lib/server-bridge'
+import { getSessionUserId } from '@/lib/rcon'
+import { getActiveServer } from '@/lib/users'
+import { resolveStructureArtDescriptor } from '@/lib/catalog-art/resolvers/structure'
+import { buildCatalogArtPayload, getReviewedCatalogArtDescriptor } from '@/lib/catalog-art/service'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -48,6 +52,10 @@ export async function GET(req: NextRequest) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
 
+  const userId = await getSessionUserId(req)
+  const activeServer = userId ? getActiveServer(userId) : null
+  const minecraftVersion = activeServer?.minecraftVersion.resolved ?? null
+
   const sidecar = await callSidecarForRequest<StructureResponse>(req, '/structures')
   if (!sidecar.ok) {
     return Response.json({ ok: false, error: sidecar.error }, { status: sidecar.status ?? 502 })
@@ -55,7 +63,35 @@ export async function GET(req: NextRequest) {
 
   return Response.json({
     ok: true,
-    structures: sidecar.data.structures ?? [],
+    structures: await Promise.all((sidecar.data.structures ?? []).map(async structure => {
+      const candidateUrl = structure.imageUrl ?? (minecraftVersion
+        ? `/api/minecraft/art/structure?${new URLSearchParams({
+            version: minecraftVersion,
+            placementKind: structure.placementKind,
+            ...(structure.resourceKey ? { resourceKey: structure.resourceKey } : {}),
+            ...(structure.relativePath ? { relativePath: structure.relativePath } : {}),
+            ...(structure.format ? { format: structure.format } : {}),
+            label: structure.label,
+          }).toString()}`
+        : null)
+      const descriptor = minecraftVersion
+        ? await getReviewedCatalogArtDescriptor(await resolveStructureArtDescriptor({
+            version: minecraftVersion,
+            label: structure.label,
+            placementKind: structure.placementKind,
+            resourceKey: structure.resourceKey ?? null,
+            relativePath: structure.relativePath ?? null,
+            format: structure.format ?? null,
+            preview: null,
+          }))
+        : null
+      const art = descriptor ? buildCatalogArtPayload(descriptor, candidateUrl) : null
+      return {
+        ...structure,
+        imageUrl: art?.url ?? candidateUrl,
+        art,
+      }
+    })),
     scan: sidecar.data.scan ?? null,
     sidecar: { ok: true, capabilities: sidecar.data.capabilities ?? [] },
   })

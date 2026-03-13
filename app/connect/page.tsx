@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import BrandLockup from '@/app/components/BrandLockup'
+import { getServerStackDescription, getServerStackLabel, type ServerStackMode } from '@/lib/server-stack'
 
 type TestState = 'idle' | 'testing' | 'success' | 'fail'
 
@@ -12,6 +13,15 @@ type SavedServer = {
   label: string | null
   host: string
   port: number
+  stackMode: ServerStackMode
+  stackLabel: string
+  stackDescription: string
+  minecraftVersion: {
+    override: string | null
+    resolved: string | null
+    source: 'manual' | 'bridge' | 'fallback'
+    detectedAt: number | null
+  }
   bridge?: {
     enabled: boolean
     commandPrefix: string
@@ -44,13 +54,15 @@ function ConnectForm() {
   const [host, setHost] = useState('')
   const [port, setPort] = useState('25575')
   const [password, setPassword] = useState('')
-  const [bridgeEnabled, setBridgeEnabled] = useState(false)
+  const [stackMode, setStackMode] = useState<ServerStackMode>('full')
+  const [bridgeEnabled, setBridgeEnabled] = useState(true)
   const [bridgeCommandPrefix, setBridgeCommandPrefix] = useState('mcraftr')
-  const [sidecarEnabled, setSidecarEnabled] = useState(false)
-  const [sidecarUrl, setSidecarUrl] = useState('')
+  const [sidecarEnabled, setSidecarEnabled] = useState(true)
+  const [sidecarUrl, setSidecarUrl] = useState('http://mcraftr-beacon:9419/')
   const [sidecarToken, setSidecarToken] = useState('')
   const [sidecarStructureRoots, setSidecarStructureRoots] = useState('')
   const [sidecarEntityPresetRoots, setSidecarEntityPresetRoots] = useState('')
+  const [minecraftVersionOverride, setMinecraftVersionOverride] = useState('')
   const [showHelp, setShowHelp] = useState(false)
   const [testState, setTestState] = useState<TestState>('idle')
   const [testMsg, setTestMsg] = useState('')
@@ -62,19 +74,35 @@ function ConnectForm() {
   const [activeServerId, setActiveServerId] = useState<string | null>(null)
   const [editingServerId, setEditingServerId] = useState<string | null>(null)
 
+  const applyStackMode = useCallback((mode: ServerStackMode) => {
+    setStackMode(mode)
+    setBridgeEnabled(mode === 'full')
+    setSidecarEnabled(mode === 'full')
+    if (mode === 'full') {
+      setBridgeCommandPrefix(current => current.trim() || 'mcraftr')
+      setSidecarUrl(current => current.trim() || 'http://mcraftr-beacon:9419/')
+    }
+    setTestState('idle')
+    setTestMsg('')
+    setError('')
+    setInfo('')
+  }, [])
+
   const resetForm = useCallback(() => {
     setEditingServerId(null)
     setLabel('')
     setHost('')
     setPort('25575')
     setPassword('')
-    setBridgeEnabled(false)
+    setStackMode('full')
+    setBridgeEnabled(true)
     setBridgeCommandPrefix('mcraftr')
-    setSidecarEnabled(false)
-    setSidecarUrl('')
+    setSidecarEnabled(true)
+    setSidecarUrl('http://mcraftr-beacon:9419/')
     setSidecarToken('')
     setSidecarStructureRoots('')
     setSidecarEntityPresetRoots('')
+    setMinecraftVersionOverride('')
     setTestState('idle')
     setTestMsg('')
     setError('')
@@ -99,13 +127,15 @@ function ConnectForm() {
           setHost(active.host)
           setPort(String(active.port ?? 25575))
           setPassword('')
+          setStackMode(active.stackMode ?? 'quick')
           setBridgeEnabled(!!active.bridge?.enabled)
           setBridgeCommandPrefix(active.bridge?.commandPrefix ?? 'mcraftr')
           setSidecarEnabled(!!active.sidecar?.enabled)
-          setSidecarUrl(active.sidecar?.url ?? '')
+          setSidecarUrl(active.sidecar?.url ?? 'http://mcraftr-beacon:9419/')
           setSidecarToken('')
           setSidecarStructureRoots((active.sidecar?.structureRoots ?? []).join('\n'))
           setSidecarEntityPresetRoots((active.sidecar?.entityPresetRoots ?? []).join('\n'))
+          setMinecraftVersionOverride(active.minecraftVersion?.override ?? '')
         }
       }
     } catch (e) {
@@ -136,13 +166,15 @@ function ConnectForm() {
     setHost(server.host)
     setPort(String(server.port ?? 25575))
     setPassword('')
+    setStackMode(server.stackMode ?? 'quick')
     setBridgeEnabled(!!server.bridge?.enabled)
     setBridgeCommandPrefix(server.bridge?.commandPrefix ?? 'mcraftr')
     setSidecarEnabled(!!server.sidecar?.enabled)
-    setSidecarUrl(server.sidecar?.url ?? '')
+    setSidecarUrl(server.sidecar?.url ?? 'http://mcraftr-beacon:9419/')
     setSidecarToken('')
     setSidecarStructureRoots((server.sidecar?.structureRoots ?? []).join('\n'))
     setSidecarEntityPresetRoots((server.sidecar?.entityPresetRoots ?? []).join('\n'))
+    setMinecraftVersionOverride(server.minecraftVersion?.override ?? '')
     setTestState('idle')
     setTestMsg('')
     setError('')
@@ -152,6 +184,11 @@ function ConnectForm() {
   const handleTest = async () => {
     if (!host || !password) {
       setTestMsg('Enter your server address and RCON password first')
+      setTestState('fail')
+      return
+    }
+    if (stackMode === 'full' && !sidecarUrl.trim()) {
+      setTestMsg('Beacon URL is required for the Full Mcraftr Stack')
       setTestState('fail')
       return
     }
@@ -165,8 +202,13 @@ function ConnectForm() {
           host,
           port: parseInt(port) || 25575,
           password,
-          bridgeEnabled,
+          stackMode,
+          bridgeEnabled: stackMode === 'full',
           bridgeCommandPrefix: bridgeCommandPrefix.trim() || 'mcraftr',
+          sidecarEnabled: stackMode === 'full',
+          sidecarUrl: sidecarUrl.trim() || null,
+          sidecarToken: sidecarToken.trim() || null,
+          minecraftVersionOverride: minecraftVersionOverride.trim() || null,
         }),
       })
       const data = await res.json()
@@ -188,6 +230,10 @@ function ConnectForm() {
       setError('Server address and RCON password are required')
       return
     }
+    if (stackMode === 'full' && !sidecarUrl.trim()) {
+      setError('Beacon URL is required for the Full Mcraftr Stack')
+      return
+    }
     setSaving(true)
     setError('')
     setInfo('')
@@ -197,13 +243,15 @@ function ConnectForm() {
         host,
         port: parseInt(port) || 25575,
         password,
-        bridgeEnabled,
+        stackMode,
+        bridgeEnabled: stackMode === 'full',
         bridgeCommandPrefix: bridgeCommandPrefix.trim() || 'mcraftr',
-        sidecarEnabled,
+        sidecarEnabled: stackMode === 'full',
         sidecarUrl: sidecarUrl.trim() || null,
         sidecarToken: sidecarToken.trim() || null,
         sidecarStructureRoots,
         sidecarEntityPresetRoots,
+        minecraftVersionOverride: minecraftVersionOverride.trim() || null,
       }
       const res = await fetch(editingServerId ? `/api/servers/${editingServerId}` : '/api/servers', {
         method: editingServerId ? 'PUT' : 'POST',
@@ -221,14 +269,15 @@ function ConnectForm() {
       await loadServers()
 
       const savedServer = data.server as SavedServer | undefined
-      const bridgeError = savedServer?.bridge?.enabled ? savedServer.bridge.lastError : null
+      const warnings = Array.isArray(data.warnings) ? data.warnings.filter((entry: unknown): entry is string => typeof entry === 'string' && entry.trim().length > 0) : []
+      const warningSuffix = warnings.length > 0 ? ` Warning: ${warnings.join(' ')}` : ''
       if (editingServerId) {
-        setInfo(bridgeError ? `Server updated. Bridge warning: ${bridgeError}` : 'Server updated')
+        setInfo(`Server updated as ${getServerStackLabel(savedServer?.stackMode ?? stackMode)}.${warningSuffix}`)
       } else if (servers.length === 0) {
         window.location.href = '/minecraft'
         return
       } else {
-        setInfo(bridgeError ? `Server added. Bridge warning: ${bridgeError}` : 'Server added')
+        setInfo(`Server added as ${getServerStackLabel(savedServer?.stackMode ?? stackMode)}.${warningSuffix}`)
       }
 
       resetForm()
@@ -272,6 +321,9 @@ function ConnectForm() {
   }
 
   const heading = servers.length > 0 ? 'manage your minecraft servers' : 'connect your minecraft server'
+  const stackModeLabel = getServerStackLabel(stackMode)
+  const stackModeDescription = getServerStackDescription(stackMode)
+  const fullStackSelected = stackMode === 'full'
 
   return (
     <div className="min-h-screen p-4 sm:p-6" style={{ background: 'var(--bg)' }}>
@@ -295,8 +347,54 @@ function ConnectForm() {
                 ? 'Update the selected saved server. Enter the password again when saving changes.'
                 : servers.length > 0
                   ? 'Add another server or edit an existing saved server connection.'
-                  : 'To get started, enter your Minecraft server address and RCON password.'}
+                  : 'Choose Quick Connect for a fast RCON-only setup, or use the Full Mcraftr Stack for the experience Mcraftr is designed around.'}
             </p>
+
+            <div className="space-y-3 rounded-[22px] border border-[var(--border)] bg-[var(--panel)] p-4">
+              <div>
+                <div className="text-[11px] font-mono tracking-widest" style={{ color: 'var(--text-dim)' }}>CONNECTION PROFILE</div>
+                <div className="mt-1 text-[12px] font-mono" style={{ color: 'var(--text-dim)' }}>
+                  Quick Connect works with any RCON server. Full Mcraftr Stack is the recommended path for Worlds, structures, entities, maps, and version-aware surfaces.
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {([
+                  {
+                    mode: 'quick',
+                    title: 'Quick Connect',
+                    description: 'RCON-only compatibility mode for chat, moderation, actions, kits, and terminal basics.',
+                  },
+                  {
+                    mode: 'full',
+                    title: 'Full Mcraftr Stack',
+                    description: 'RCON + Bridge + Beacon for Worlds, structures, entities, maps, catalog art, and the designed Mcraftr workflow.',
+                  },
+                ] as const).map(option => {
+                  const active = stackMode === option.mode
+                  return (
+                    <button
+                      key={option.mode}
+                      type="button"
+                      onClick={() => applyStackMode(option.mode)}
+                      className="rounded-[20px] border px-4 py-4 text-left transition-all"
+                      style={active
+                        ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)' }
+                        : { borderColor: 'var(--border)', background: 'var(--bg2)' }}
+                    >
+                      <div className="text-[13px] font-mono tracking-[0.14em]" style={{ color: active ? 'var(--accent)' : 'var(--text)' }}>
+                        {option.title.toUpperCase()}
+                      </div>
+                      <div className="mt-2 text-[12px] font-mono" style={{ color: 'var(--text-dim)' }}>
+                        {option.description}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="rounded-2xl border px-4 py-3 text-[12px] font-mono" style={{ borderColor: 'var(--border)', background: 'var(--bg2)', color: 'var(--text-dim)' }}>
+                <span style={{ color: 'var(--accent)' }}>{stackModeLabel}</span> — {stackModeDescription}
+              </div>
+            </div>
 
             <div>
               <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
@@ -375,114 +473,150 @@ function ConnectForm() {
               )}
             </div>
 
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[11px] font-mono tracking-widest" style={{ color: 'var(--text-dim)' }}>MCRAFTR BRIDGE</div>
-                  <div className="text-[12px] font-mono mt-1" style={{ color: 'var(--text-dim)' }}>
-                    Optional advanced integration for worlds, structures, entities, terminal catalog, and other extended server features.
-                  </div>
-                </div>
-                <label className="inline-flex items-center gap-2 text-[12px] font-mono" style={{ color: 'var(--text)' }}>
-                  <input type="checkbox" checked={bridgeEnabled} onChange={e => setBridgeEnabled(e.target.checked)} />
-                  ENABLED
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
-                  BRIDGE COMMAND PREFIX
-                </label>
-                <input
-                  type="text"
-                  value={bridgeCommandPrefix}
-                  onChange={e => setBridgeCommandPrefix(e.target.value)}
-                  placeholder="mcraftr"
-                  className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
-                  style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
-                />
-                <div className="mt-1 text-[10px] font-mono" style={{ color: 'var(--text-dim)' }}>
-                  Use <code>mcraftr</code> for the public bridge. Change this only if you intentionally run a custom adapter.
-                </div>
+            <div>
+              <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                MINECRAFT VERSION <span style={{ color: 'var(--text-dim)', fontWeight: 'normal' }}>{fullStackSelected ? '(optional override)' : '(recommended)'}</span>
+              </label>
+              <input
+                type="text"
+                value={minecraftVersionOverride}
+                onChange={e => setMinecraftVersionOverride(e.target.value)}
+                placeholder={fullStackSelected ? 'Leave blank to use Bridge detection' : '1.21.11'}
+                className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
+              />
+              <div className="mt-1 text-[10px] font-mono" style={{ color: 'var(--text-dim)' }}>
+                {fullStackSelected
+                  ? 'Override the detected Minecraft version only if Bridge reporting is unavailable or wrong. Version-aware art and compatibility will use this value first.'
+                  : 'Quick Connect cannot detect Minecraft version on its own. Set this so version-aware art and compatibility match the server you are connecting to.'}
               </div>
             </div>
 
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[11px] font-mono tracking-widest" style={{ color: 'var(--text-dim)' }}>SIDECAR</div>
-                  <div className="text-[12px] font-mono mt-1" style={{ color: 'var(--text-dim)' }}>
-                    Optional helper for map links, external catalogs, and filesystem-backed metadata discovery.
+            {fullStackSelected ? (
+              <>
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] font-mono tracking-widest" style={{ color: 'var(--text-dim)' }}>MCRAFTR BRIDGE</div>
+                      <div className="text-[12px] font-mono mt-1" style={{ color: 'var(--text-dim)' }}>
+                        Command and control layer for world operations, plugin stack data, typed server actions, and the deeper Mcraftr workflow.
+                      </div>
+                    </div>
+                    <div className="rounded border px-2 py-1 text-[10px] font-mono tracking-widest" style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}>
+                      ENABLED IN FULL STACK
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                      BRIDGE COMMAND PREFIX
+                    </label>
+                    <input
+                      type="text"
+                      value={bridgeCommandPrefix}
+                      onChange={e => setBridgeCommandPrefix(e.target.value)}
+                      placeholder="mcraftr"
+                      className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                      style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
+                    />
+                    <div className="mt-1 text-[10px] font-mono" style={{ color: 'var(--text-dim)' }}>
+                      Use <code>mcraftr</code> for the public bridge. Change this only if you intentionally run a custom adapter.
+                    </div>
                   </div>
                 </div>
-                <label className="inline-flex items-center gap-2 text-[12px] font-mono" style={{ color: 'var(--text)' }}>
-                  <input type="checkbox" checked={sidecarEnabled} onChange={e => setSidecarEnabled(e.target.checked)} />
-                  ENABLED
-                </label>
-              </div>
 
-              <div>
-                <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
-                  SIDECAR URL
-                </label>
-                <input
-                  type="text"
-                  value={sidecarUrl}
-                  onChange={e => setSidecarUrl(e.target.value)}
-                  placeholder="https://sidecar.example.com/"
-                  className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
-                  style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
-                />
-              </div>
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] font-mono tracking-widest" style={{ color: 'var(--text-dim)' }}>MCRAFTR BEACON</div>
+                      <div className="text-[12px] font-mono mt-1" style={{ color: 'var(--text-dim)' }}>
+                        Catalog and world-context service for structure discovery, preset scanning, map links, generated previews, and filesystem-backed metadata.
+                      </div>
+                    </div>
+                    <div className="rounded border px-2 py-1 text-[10px] font-mono tracking-widest" style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}>
+                      ENABLED IN FULL STACK
+                    </div>
+                  </div>
 
-              <div>
-                <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
-                  SIDECAR TOKEN <span style={{ color: 'var(--text-dim)', fontWeight: 'normal' }}>(optional on edit)</span>
-                </label>
-                <input
-                  type="password"
-                  value={sidecarToken}
-                  onChange={e => setSidecarToken(e.target.value)}
-                  placeholder={editingServerId ? 'Leave blank to keep current token' : 'Bearer token'}
-                  className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
-                  style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
-                />
-              </div>
+                  <div>
+                    <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                      BEACON URL
+                    </label>
+                    <input
+                      type="text"
+                      value={sidecarUrl}
+                      onChange={e => setSidecarUrl(e.target.value)}
+                      placeholder="http://mcraftr-beacon:9419/"
+                      className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                      style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
-                  STRUCTURE DIRECTORIES <span style={{ color: 'var(--text-dim)', fontWeight: 'normal' }}>(one relative path per line)</span>
-                </label>
-                <textarea
-                  value={sidecarStructureRoots}
-                  onChange={e => setSidecarStructureRoots(e.target.value)}
-                  rows={3}
-                  placeholder={'plugins/WorldEdit/schematics/custom\nmcraftr/structures'}
-                  className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
-                  style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
-                />
-                <div className="mt-1 text-[10px] font-mono" style={{ color: 'var(--text-dim)' }}>
-                  Paths are relative to the server data folder at <code>/data</code>.
+                  <div>
+                    <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                      BEACON TOKEN <span style={{ color: 'var(--text-dim)', fontWeight: 'normal' }}>(optional on edit)</span>
+                    </label>
+                    <input
+                      type="password"
+                      value={sidecarToken}
+                      onChange={e => setSidecarToken(e.target.value)}
+                      placeholder={editingServerId ? 'Leave blank to keep current token' : 'Shared beacon token'}
+                      className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                      style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                      STRUCTURE DIRECTORIES <span style={{ color: 'var(--text-dim)', fontWeight: 'normal' }}>(one relative path per line)</span>
+                    </label>
+                    <textarea
+                      value={sidecarStructureRoots}
+                      onChange={e => setSidecarStructureRoots(e.target.value)}
+                      rows={3}
+                      placeholder={'plugins/WorldEdit/schematics/custom\nmcraftr/structures'}
+                      className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                      style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
+                    />
+                    <div className="mt-1 text-[10px] font-mono" style={{ color: 'var(--text-dim)' }}>
+                      Paths are relative to the server data folder at <code>/data</code>.
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                      ENTITY PRESET DIRECTORIES <span style={{ color: 'var(--text-dim)', fontWeight: 'normal' }}>(one relative path per line)</span>
+                    </label>
+                    <textarea
+                      value={sidecarEntityPresetRoots}
+                      onChange={e => setSidecarEntityPresetRoots(e.target.value)}
+                      rows={3}
+                      placeholder={'mcraftr/entity-presets\nplugins/FancyNpcs/presets'}
+                      className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                      style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
+                    />
+                    <div className="mt-1 text-[10px] font-mono" style={{ color: 'var(--text-dim)' }}>
+                      These folders are scanned for custom JSON entity presets.
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
-                  ENTITY PRESET DIRECTORIES <span style={{ color: 'var(--text-dim)', fontWeight: 'normal' }}>(one relative path per line)</span>
-                </label>
-                <textarea
-                  value={sidecarEntityPresetRoots}
-                  onChange={e => setSidecarEntityPresetRoots(e.target.value)}
-                  rows={3}
-                  placeholder={'mcraftr/entity-presets\nplugins/FancyNpcs/presets'}
-                  className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
-                  style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
-                />
-                <div className="mt-1 text-[10px] font-mono" style={{ color: 'var(--text-dim)' }}>
-                  These folders are scanned for custom JSON entity presets.
+              </>
+            ) : (
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 space-y-3">
+                <div className="text-[11px] font-mono tracking-widest" style={{ color: 'var(--text-dim)' }}>QUICK CONNECT ACTIVE</div>
+                <div className="text-[12px] font-mono" style={{ color: 'var(--text-dim)' }}>
+                  This server will run in RCON-only compatibility mode. Worlds, structures, entities, maps, and the designed Mcraftr workflow stay hidden until you switch this server to the Full Mcraftr Stack.
                 </div>
+                <button
+                  type="button"
+                  onClick={() => applyStackMode('full')}
+                  className="rounded-xl border px-3 py-2 text-[11px] font-mono tracking-[0.12em]"
+                  style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}
+                >
+                  SWITCH TO FULL MCRAFTR STACK
+                </button>
               </div>
-            </div>
+            )}
 
             {testState !== 'idle' && (
               <div
@@ -517,7 +651,7 @@ function ConnectForm() {
                 className="flex-1 min-w-[160px] py-3 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-50"
                 style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)' }}
               >
-                {testState === 'testing' ? 'Testing…' : 'Test Connection'}
+                {testState === 'testing' ? 'Testing…' : fullStackSelected ? 'Test Full Stack' : 'Test Quick Connect'}
               </button>
 
               <button
@@ -527,7 +661,7 @@ function ConnectForm() {
                 className="flex-1 min-w-[160px] py-3 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-50"
                 style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}
               >
-                {saving ? 'Saving…' : editingServerId ? 'Save Changes' : servers.length > 0 ? 'Add Server' : 'Save & Continue →'}
+                {saving ? 'Saving…' : editingServerId ? `Save ${stackModeLabel}` : servers.length > 0 ? `Add ${stackModeLabel}` : `Save ${stackModeLabel} →`}
               </button>
 
               {(editingServerId || servers.length > 0) && (
@@ -568,6 +702,16 @@ function ConnectForm() {
                         <div className="min-w-0">
                           <div className="text-[13px] font-mono text-[var(--text)] truncate">{labelText}</div>
                           <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1 break-all">{server.host}:{server.port}</div>
+                          <div className="mt-2 inline-flex rounded-full border px-2 py-1 text-[10px] font-mono tracking-[0.14em]" style={server.stackMode === 'full'
+                            ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
+                            : { borderColor: 'var(--border)', background: 'var(--bg2)', color: 'var(--text-dim)' }}>
+                            {server.stackLabel.toUpperCase()}
+                          </div>
+                          <div className="text-[10px] font-mono text-[var(--text-dim)] mt-2 break-words">{server.stackDescription}</div>
+                          <div className="text-[10px] font-mono text-[var(--text-dim)] mt-2 break-all">
+                            minecraft {server.minecraftVersion?.resolved || 'unknown'} · {server.minecraftVersion?.source || 'fallback'}
+                            {server.minecraftVersion?.override ? ' · override set' : ''}
+                          </div>
                           {server.bridge?.enabled && (
                             <div className="text-[10px] font-mono text-[var(--text-dim)] mt-1 break-all">
                               bridge · {server.bridge.commandPrefix}{server.bridge.providerLabel ? ` · ${server.bridge.providerLabel}` : ''}{server.bridge.lastSeen ? ` · seen ${new Date(server.bridge.lastSeen * 1000).toLocaleString()}` : ''}
@@ -580,7 +724,7 @@ function ConnectForm() {
                           )}
                           {server.sidecar?.enabled && (
                             <div className="text-[10px] font-mono text-[var(--text-dim)] mt-1 break-all">
-                              sidecar · {server.sidecar.url || 'configured'}{server.sidecar.lastSeen ? ` · seen ${new Date(server.sidecar.lastSeen * 1000).toLocaleString()}` : ''}
+                              beacon · {server.sidecar.url || 'configured'}{server.sidecar.lastSeen ? ` · seen ${new Date(server.sidecar.lastSeen * 1000).toLocaleString()}` : ''}
                             </div>
                           )}
                           {((server.sidecar?.structureRoots?.length ?? 0) > 0 || (server.sidecar?.entityPresetRoots?.length ?? 0) > 0) && (

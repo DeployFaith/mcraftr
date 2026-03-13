@@ -1,0 +1,142 @@
+[
+  {
+    "subject": "entity",
+    "subjectId": "blaze",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/blaze.png",
+    "cropBox": { "x": 0, "y": 0, "width": 20, "height": 20 },
+    "notes": "Focus on the blaze head core instead of the full rod-heavy sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "bogged",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/skeleton/bogged.png",
+    "cropBox": { "x": 0, "y": 0, "width": 24, "height": 24 },
+    "notes": "Use the bogged head area instead of the full skeleton sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "breeze",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/breeze/breeze.png",
+    "cropBox": { "x": 0, "y": 0, "width": 20, "height": 20 },
+    "notes": "Crop toward the breeze face and torso swirl."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "cow",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/cow/temperate_cow.png",
+    "cropBox": { "x": 0, "y": 0, "width": 30, "height": 22 },
+    "notes": "Pin cow to the temperate texture and crop to the face/front profile."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "creeper",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/creeper/creeper.png",
+    "cropBox": { "x": 0, "y": 0, "width": 24, "height": 24 },
+    "notes": "Use the real creeper face texture instead of banner-adjacent matches."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "enderman",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/enderman/enderman.png",
+    "cropBox": { "x": 0, "y": 0, "width": 22, "height": 30 },
+    "notes": "Bias the portrait toward the enderman head and glowing eyes."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "iron_golem",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/iron_golem/iron_golem.png",
+    "cropBox": { "x": 0, "y": 0, "width": 36, "height": 44 },
+    "notes": "Focus on the iron golem head and upper chest."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "pig",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/pig/temperate_pig.png",
+    "cropBox": { "x": 0, "y": 0, "width": 28, "height": 20 },
+    "notes": "Pin pig to the temperate texture and crop to the face profile."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "sheep",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/sheep/sheep.png",
+    "cropBox": { "x": 0, "y": 0, "width": 28, "height": 22 },
+    "notes": "Use the sheep face and front wool mass as the portrait."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "skeleton",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/skeleton/skeleton.png",
+    "cropBox": { "x": 0, "y": 0, "width": 22, "height": 24 },
+    "notes": "Keep the skeleton portrait centered on the skull."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "zombie",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/zombie/zombie.png",
+    "cropBox": { "x": 0, "y": 0, "width": 24, "height": 24 },
+    "notes": "Pin zombie to the canonical zombie texture instead of nautilus/horse variants."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "piglin",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/piglin/piglin.png",
+    "cropBox": { "x": 0, "y": 0, "width": 26, "height": 28 },
+    "notes": "Use the piglin face/head area instead of banner-adjacent assets."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "piglin_brute",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/piglin/piglin_brute.png",
+    "cropBox": { "x": 0, "y": 0, "width": 26, "height": 28 },
+    "notes": "Use the piglin brute face/head area as the portrait."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "zombified_piglin",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/piglin/zombified_piglin.png",
+    "cropBox": { "x": 0, "y": 0, "width": 26, "height": 28 },
+    "notes": "Use the zombified piglin face/head area as the portrait."
+  }
+]

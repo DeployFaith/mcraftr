@@ -1,3 +1,6 @@
+import { buildCatalogArtPayload } from '@/lib/catalog-art/payload'
+import type { CatalogArtPayload } from '@/lib/catalog-art/types'
+
 // Minecraft 1.21 item catalog
 // label = display name, id = minecraft item ID (no namespace prefix)
 // maxStack = max stack size for that item
@@ -6,6 +9,8 @@ export type CatalogItem = {
   id: string
   label: string
   maxStack: number
+  imageUrl?: string | null
+  art?: CatalogArtPayload | null
 }
 
 export type CatalogCategory = {
@@ -1000,3 +1005,33 @@ export const CATALOG: CatalogCategory[] = [
     ],
   },
 ]
+
+export function hydrateCatalogWithArt(version: string | null | undefined, catalog: CatalogCategory[] = CATALOG): CatalogCategory[] {
+  if (!version) {
+    return catalog.map(category => ({
+      ...category,
+      items: category.items.map(item => ({
+        ...item,
+        imageUrl: null,
+        art: null,
+      })),
+    }))
+  }
+
+  return catalog.map(category => ({
+    ...category,
+    items: category.items.map(item => {
+      const imageUrl = `/api/minecraft/art/item/${encodeURIComponent(version)}/${encodeURIComponent(item.id)}`
+      const artClass = item.id.includes('potion') || item.id.endsWith('_arrow') ? 'layered-icon' : item.id.includes('block') ? 'block-face' : 'flat-icon'
+      return {
+        ...item,
+        imageUrl,
+        art: buildCatalogArtPayload({
+          url: imageUrl,
+          artClass,
+          strategy: 'item-layer-stack',
+        }),
+      }
+    }),
+  }))
+}

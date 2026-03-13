@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server'
-import { deleteUserServer, getUserById, listUserServers, updateServerBridgeHealth, updateUserServer } from '@/lib/users'
+import { deleteUserServer, getUserById, listUserServers, updateServerBridgeHealth, updateServerMinecraftVersion, updateServerSidecarHealth, updateUserServer } from '@/lib/users'
+import { normalizeMinecraftVersion } from '@/lib/minecraft-version'
 import { getSessionUserId } from '@/lib/rcon'
-import { testBridgeConnection } from '@/lib/server-bridge'
+import { testBeaconConnection, testBridgeConnection } from '@/lib/server-bridge'
+import { getServerStackDescription, getServerStackLabel } from '@/lib/server-stack'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -38,6 +40,14 @@ function parseStringArray(raw: unknown): string[] {
   return []
 }
 
+function mapSavedServer(server: ReturnType<typeof listUserServers>[number]) {
+  return {
+    ...server,
+    stackLabel: getServerStackLabel(server.stackMode),
+    stackDescription: getServerStackDescription(server.stackMode),
+  }
+}
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -58,6 +68,7 @@ export async function PUT(
       sidecarToken,
       sidecarStructureRoots,
       sidecarEntityPresetRoots,
+      minecraftVersionOverride,
     } = await req.json()
     if (!host || typeof host !== 'string' || !password || typeof password !== 'string') {
       return Response.json({ ok: false, error: 'Host and password are required' }, { status: 400 })
@@ -68,6 +79,9 @@ export async function PUT(
       host: host.trim(),
       port: parsePort(port),
       password,
+      minecraftVersion: {
+        override: normalizeMinecraftVersion(minecraftVersionOverride),
+      },
       bridge: {
         enabled: parseFlag(bridgeEnabled),
         commandPrefix: typeof bridgeCommandPrefix === 'string' ? bridgeCommandPrefix.trim() : 'mcraftr',
@@ -81,6 +95,7 @@ export async function PUT(
       },
     })
     const updated = user.servers.find(entry => entry.id === id)
+    const warnings: string[] = []
     if (updated?.bridge.enabled) {
       const bridge = await testBridgeConnection(updated.host, updated.port, password, updated.bridge.commandPrefix)
       updateServerBridgeHealth(userId, id, {
@@ -91,11 +106,64 @@ export async function PUT(
         providerLabel: bridge.ok ? (bridge.providerLabel ?? null) : undefined,
         protocolVersion: bridge.ok ? (bridge.protocolVersion ?? null) : undefined,
       })
+      if (updated.minecraftVersion.override) {
+        updateServerMinecraftVersion(userId, id, {
+          override: updated.minecraftVersion.override,
+          detectedAt: Math.floor(Date.now() / 1000),
+        })
+      } else if (bridge.ok && bridge.serverVersion) {
+        updateServerMinecraftVersion(userId, id, {
+          override: null,
+          resolved: bridge.serverVersion,
+          source: 'bridge',
+          detectedAt: Math.floor(Date.now() / 1000),
+        })
+      } else if (updated.minecraftVersion.source !== 'fallback' && updated.minecraftVersion.resolved) {
+        updateServerMinecraftVersion(userId, id, {
+          override: null,
+          resolved: updated.minecraftVersion.resolved,
+          source: updated.minecraftVersion.source,
+          detectedAt: updated.minecraftVersion.detectedAt,
+        })
+      } else {
+        updateServerMinecraftVersion(userId, id, {
+          override: null,
+          resolved: null,
+          source: null,
+          detectedAt: null,
+        })
+      }
+      if (!bridge.ok) warnings.push(bridge.error || 'Bridge test failed')
     } else {
       updateServerBridgeHealth(userId, id, { lastSeen: null, lastError: null, capabilities: [] })
+      updateServerMinecraftVersion(userId, id, updated?.minecraftVersion.override
+        ? {
+            override: updated.minecraftVersion.override,
+            detectedAt: Math.floor(Date.now() / 1000),
+          }
+        : {
+            override: null,
+            resolved: null,
+            source: null,
+            detectedAt: null,
+          })
+    }
+    if (updated?.sidecar.enabled && updated.sidecar.url) {
+      const beacon = await testBeaconConnection(updated.sidecar.url, updated.sidecar.token)
+      updateServerSidecarHealth(userId, id, {
+        lastSeen: beacon.ok ? Math.floor(Date.now() / 1000) : null,
+        capabilities: beacon.ok ? (beacon.capabilities ?? []) : [],
+      })
+      if (!beacon.ok) warnings.push(beacon.error || 'Beacon test failed')
+    } else {
+      updateServerSidecarHealth(userId, id, { lastSeen: null, capabilities: [] })
     }
     const server = listUserServers(userId).find(entry => entry.id === id) ?? updated ?? null
-    return Response.json({ ok: true, server })
+    return Response.json({
+      ok: true,
+      warnings,
+      server: server ? mapSavedServer(server) : null,
+    })
   } catch (e: unknown) {
     return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Failed to update server' }, { status: 500 })
   }
@@ -126,5 +194,8 @@ export async function GET(
   const user = getUserById(userId)
   const server = user?.servers.find(entry => entry.id === id)
   if (!server) return Response.json({ ok: false, error: 'Server not found' }, { status: 404 })
-  return Response.json({ ok: true, server })
+  return Response.json({
+    ok: true,
+    server: mapSavedServer(server),
+  })
 }

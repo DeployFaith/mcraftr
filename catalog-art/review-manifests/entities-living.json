@@ -1,0 +1,132 @@
+[
+  {
+    "subject": "entity",
+    "subjectId": "villager",
+    "version": "*",
+    "reviewState": "approved",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/villager/villager.png",
+    "cropBox": { "x": 0, "y": 0, "width": 28, "height": 28 },
+    "notes": "Pin villager to the canonical villager texture instead of GUI-adjacent fuzzy matches."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "ravager",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/illager/ravager.png",
+    "cropBox": { "x": 0, "y": 0, "width": 48, "height": 32 },
+    "notes": "Focus on the ravager head rather than the full texture sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "warden",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/warden/warden.png",
+    "cropBox": { "x": 0, "y": 0, "width": 44, "height": 38 },
+    "notes": "Crop the warden around its face and chest cavity area."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "ghast",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/ghast/ghast.png",
+    "cropBox": { "x": 0, "y": 0, "width": 48, "height": 40 },
+    "notes": "Show the ghast face/body block instead of the full sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "elder_guardian",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/guardian_elder.png",
+    "cropBox": { "x": 0, "y": 0, "width": 28, "height": 24 },
+    "notes": "Focus on the elder guardian face/body center."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "ender_dragon",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/enderdragon/dragon.png",
+    "cropBox": { "x": 0, "y": 0, "width": 64, "height": 48 },
+    "notes": "Bias toward the dragon head area instead of the whole giant sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "witch",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/witch.png",
+    "cropBox": { "x": 0, "y": 0, "width": 28, "height": 32 },
+    "notes": "Crop toward the witch head and hat instead of the full sheet."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "camel",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/camel/camel.png",
+    "cropBox": { "x": 0, "y": 0, "width": 52, "height": 32 },
+    "notes": "Focus on the camel head and neck profile."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "sniffer",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/sniffer/sniffer.png",
+    "cropBox": { "x": 0, "y": 0, "width": 72, "height": 48 },
+    "notes": "Focus on the sniffer head and front body."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "panda",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/panda/panda.png",
+    "cropBox": { "x": 0, "y": 0, "width": 28, "height": 24 },
+    "notes": "Use a tighter panda face crop."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "wolf",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/wolf/wolf.png",
+    "cropBox": { "x": 0, "y": 0, "width": 24, "height": 20 },
+    "notes": "Use the wolf head texture area as the portrait."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "frog",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/frog/temperate_frog.png",
+    "cropBox": { "x": 0, "y": 0, "width": 22, "height": 18 },
+    "notes": "Use a compact frog face crop."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "allay",
+    "version": "*",
+    "reviewState": "warned",
+    "forceStrategy": "entity-sheet-crop",
+    "sourceAsset": "assets/minecraft/textures/entity/allay/allay.png",
+    "cropBox": { "x": 0, "y": 0, "width": 14, "height": 18 },
+    "notes": "Use the allay face/torso area instead of the whole sheet."
+  }
+]

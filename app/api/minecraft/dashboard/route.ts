@@ -5,6 +5,7 @@ import { getAuditLog } from '@/lib/audit'
 import { getDb } from '@/lib/db'
 import { ensureScheduleRunnerStarted } from '@/lib/schedules'
 import { callSidecarForRequest, runBridgeCommand, runBridgeJson } from '@/lib/server-bridge'
+import { getServerStackDescription, getServerStackLabel } from '@/lib/server-stack'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -94,6 +95,7 @@ export async function GET(req: NextRequest) {
   const user = getUserById(userId)
   const server = getActiveServer(userId)
   if (!user || !server) return Response.json({ ok: false, error: 'No active server configured' }, { status: 400 })
+  const fullStackMode = server.stackMode === 'full'
 
   const [listRes, versionRes, tpsRes, weatherRes, timeRes, difficultyRes, keepInventoryRes, mobGriefingRes, pvpRes, whitelistRes] = await Promise.all([
     rconForRequest(req, 'list'),
@@ -102,9 +104,9 @@ export async function GET(req: NextRequest) {
     rconForRequest(req, 'weather'),
     rconForRequest(req, 'time query daytime'),
     rconForRequest(req, 'difficulty'),
-    runBridgeCommand(req, 'gamerule get keepInventory'),
-    runBridgeCommand(req, 'gamerule get mobGriefing'),
-    runBridgeCommand(req, 'gamerule get pvp'),
+    fullStackMode ? runBridgeCommand(req, 'gamerule get keepInventory') : Promise.resolve({ ok: false, stdout: '', error: null }),
+    fullStackMode ? runBridgeCommand(req, 'gamerule get mobGriefing') : Promise.resolve({ ok: false, stdout: '', error: null }),
+    fullStackMode ? runBridgeCommand(req, 'gamerule get pvp') : Promise.resolve({ ok: false, stdout: '', error: null }),
     rconForRequest(req, 'whitelist list'),
   ])
 
@@ -122,10 +124,15 @@ export async function GET(req: NextRequest) {
     ? getAuditLog(6, serverId)
     : []
 
-  const [stackBridge, sidecarMaps] = await Promise.all([
-    runBridgeJson<{ ok: boolean; worlds?: unknown[] }>(req, 'worlds list'),
-    callSidecarForRequest<{ ok: boolean; maps?: unknown[] }>(req, '/maps'),
-  ])
+  const [stackBridge, sidecarMaps] = fullStackMode
+    ? await Promise.all([
+        runBridgeJson<{ ok: boolean; worlds?: unknown[] }>(req, 'worlds list'),
+        callSidecarForRequest<{ ok: boolean; maps?: unknown[] }>(req, '/maps'),
+      ])
+    : [
+        { ok: false as const, error: 'Upgrade this server to the Full Mcraftr Stack to unlock Worlds.' },
+        { ok: false as const, error: 'Upgrade this server to the Full Mcraftr Stack to unlock Beacon-backed surfaces.' },
+      ]
 
   return Response.json({
     ok: true,
@@ -134,6 +141,8 @@ export async function GET(req: NextRequest) {
       label: user.serverLabel,
       host: server.host,
       port: server.port,
+      stackMode: server.stackMode,
+      stackLabel: getServerStackLabel(server.stackMode),
     },
     overview: {
       online,
@@ -150,13 +159,19 @@ export async function GET(req: NextRequest) {
       mobGriefing: mobGriefingRes.ok ? parseRuleValue(mobGriefingRes.stdout) : null,
       pvp: pvpRes.ok ? parseRuleValue(pvpRes.stdout) : null,
       whitelistCount: whitelistRes.ok ? parseWhitelistCount(whitelistRes.stdout) : null,
-      bridgeError: (!keepInventoryRes.ok ? keepInventoryRes.error : null)
+      bridgeError: fullStackMode
+        ? ((!keepInventoryRes.ok ? keepInventoryRes.error : null)
         || (!mobGriefingRes.ok ? mobGriefingRes.error : null)
-        || (!pvpRes.ok ? pvpRes.error : null),
+        || (!pvpRes.ok ? pvpRes.error : null))
+        : null,
     },
     recentChat,
     recentAudit,
     stack: {
+      mode: server.stackMode,
+      modeLabel: getServerStackLabel(server.stackMode),
+      modeDescription: getServerStackDescription(server.stackMode),
+      upgradeRecommended: !fullStackMode,
       bridgeOk: stackBridge.ok,
       bridgeError: stackBridge.ok ? null : stackBridge.error,
       sidecarOk: sidecarMaps.ok,

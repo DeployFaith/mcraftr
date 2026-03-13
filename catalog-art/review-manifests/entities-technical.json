@@ -1,0 +1,92 @@
+[
+  {
+    "subject": "entity",
+    "subjectId": "lightning_bolt",
+    "version": "*",
+    "reviewState": "warned",
+    "forceClass": "display-tech",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "symbol:⚡",
+    "notes": "No stable dedicated texture; use a clear symbolic representation."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "marker",
+    "version": "*",
+    "reviewState": "warned",
+    "forceClass": "display-tech",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "icon:assets/minecraft/textures/map/decorations/blue_marker.png",
+    "notes": "Marker entities should render like markers, not living mobs."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "area_effect_cloud",
+    "version": "*",
+    "reviewState": "warned",
+    "forceClass": "display-tech",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "symbol:☁",
+    "notes": "Use a symbolic cloud representation until a better dynamic renderer exists."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "interaction",
+    "version": "*",
+    "reviewState": "warned",
+    "forceClass": "display-tech",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "symbol:◎",
+    "notes": "Interaction entities are invisible/technical and should look intentionally technical."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "block_display",
+    "version": "*",
+    "reviewState": "warned",
+    "forceClass": "display-tech",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "symbol:▣",
+    "notes": "Use a technical display glyph until block-aware display rendering lands."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "item_display",
+    "version": "*",
+    "reviewState": "warned",
+    "forceClass": "display-tech",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "symbol:◫",
+    "notes": "Use a technical display glyph until item-aware display rendering lands."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "text_display",
+    "version": "*",
+    "reviewState": "warned",
+    "forceClass": "display-tech",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "symbol:T",
+    "notes": "Use a technical text glyph until text display rendering lands."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "painting",
+    "version": "*",
+    "reviewState": "warned",
+    "forceClass": "display-tech",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "icon:assets/minecraft/textures/painting/aztec.png",
+    "notes": "Use a concrete painting texture instead of generic fallback visuals."
+  },
+  {
+    "subject": "entity",
+    "subjectId": "end_crystal",
+    "version": "*",
+    "reviewState": "approved",
+    "forceClass": "display-tech",
+    "forceStrategy": "entity-item-derived",
+    "sourceAsset": "icon:assets/minecraft/textures/entity/end_crystal/end_crystal.png",
+    "notes": "Use the actual end crystal art rather than a fallback proxy."
+  }
+]

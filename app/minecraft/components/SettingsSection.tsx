@@ -1148,7 +1148,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
         )}
         {activeServer?.sidecar?.enabled && (
           <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-3">
-            <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">ACTIVE SIDECAR</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">ACTIVE BEACON</div>
             <div className="text-[13px] font-mono text-[var(--text)] break-all">
               {activeServer.sidecar.url || 'Configured'}
             </div>
@@ -1184,7 +1184,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
                     )}
                     {server.sidecar?.enabled && (
                       <div className="text-[10px] font-mono text-[var(--text-dim)] truncate mt-1">
-                        sidecar · {server.sidecar.url || 'configured'}{server.sidecar.lastSeen ? ` · seen ${new Date(server.sidecar.lastSeen * 1000).toLocaleString()}` : ''}
+                        beacon · {server.sidecar.url || 'configured'}{server.sidecar.lastSeen ? ` · seen ${new Date(server.sidecar.lastSeen * 1000).toLocaleString()}` : ''}
                       </div>
                     )}
                   </div>

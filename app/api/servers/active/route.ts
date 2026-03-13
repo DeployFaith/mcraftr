@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getUserById, setActiveUserServer } from '@/lib/users'
 import { getSessionUserId } from '@/lib/rcon'
+import { getServerStackDescription, getServerStackLabel } from '@/lib/server-stack'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,6 +19,23 @@ export async function POST(req: NextRequest) {
       ok: true,
       activeServerId: user.activeServerId,
       activeServerLabel: user.serverLabel,
+      activeServer: user.activeServerId
+        ? (() => {
+            const server = user.servers.find(entry => entry.id === user.activeServerId)
+            return server
+              ? {
+                  id: server.id,
+                  label: server.label,
+                  host: server.host,
+                  port: server.port,
+                  stackMode: server.stackMode,
+                  stackLabel: getServerStackLabel(server.stackMode),
+                  stackDescription: getServerStackDescription(server.stackMode),
+                  minecraftVersion: server.minecraftVersion,
+                }
+              : null
+          })()
+        : null,
       hasServer: user.servers.length > 0,
     })
   } catch (e: unknown) {
@@ -30,5 +48,24 @@ export async function GET(req: NextRequest) {
   if (!userId) return Response.json({ ok: false, error: 'Not authenticated' }, { status: 401 })
   const user = getUserById(userId)
   if (!user) return Response.json({ ok: false, error: 'User not found' }, { status: 404 })
-  return Response.json({ ok: true, activeServerId: user.activeServerId, activeServerLabel: user.serverLabel })
+  const activeServer = user.activeServerId
+    ? user.servers.find(entry => entry.id === user.activeServerId) ?? null
+    : null
+  return Response.json({
+    ok: true,
+    activeServerId: user.activeServerId,
+    activeServerLabel: user.serverLabel,
+    activeServer: activeServer
+      ? {
+          id: activeServer.id,
+          label: activeServer.label,
+          host: activeServer.host,
+          port: activeServer.port,
+          stackMode: activeServer.stackMode,
+          stackLabel: getServerStackLabel(activeServer.stackMode),
+          stackDescription: getServerStackDescription(activeServer.stackMode),
+          minecraftVersion: activeServer.minecraftVersion,
+        }
+      : null,
+  })
 }

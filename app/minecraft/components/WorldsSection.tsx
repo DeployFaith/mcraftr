@@ -7,6 +7,7 @@ import SpawnInspectModal, { type EntityCatalogEntry, type LocationMode, type Str
 import CatalogArtwork from './CatalogArtwork'
 import EntityPresetEditorModal from './EntityPresetEditorModal'
 import { playSound } from '@/app/components/soundfx'
+import type { CatalogArtPayload } from '@/lib/catalog-art/types'
 import type { FeatureKey } from '@/lib/features'
 import { FALLBACK_ENTITY_CATALOG } from '@/lib/entity-catalog'
 
@@ -187,6 +188,16 @@ function normalizeStructureEntries(raw: unknown): StructureCatalogEntry[] {
       sizeBytes: typeof row.sizeBytes === 'number' ? row.sizeBytes : null,
       updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : null,
       imageUrl: typeof row.imageUrl === 'string' && row.imageUrl.trim() ? row.imageUrl.trim() : null,
+      art: row.art && typeof row.art === 'object'
+        ? {
+            url: typeof (row.art as Record<string, unknown>).url === 'string' ? (row.art as Record<string, string>).url : null,
+            class: typeof (row.art as Record<string, unknown>).class === 'string' ? (row.art as Record<string, CatalogArtPayload['class']>).class : 'structure-topdown',
+            strategy: typeof (row.art as Record<string, unknown>).strategy === 'string' ? (row.art as Record<string, CatalogArtPayload['strategy']>).strategy : 'structure-grid',
+            placeholder: (row.art as Record<string, unknown>).placeholder === true,
+            reviewState: typeof (row.art as Record<string, unknown>).reviewState === 'string' ? (row.art as Record<string, CatalogArtPayload['reviewState']>).reviewState : 'auto',
+            fallbackReason: typeof (row.art as Record<string, unknown>).fallbackReason === 'string' ? (row.art as Record<string, string>).fallbackReason : null,
+          }
+        : null,
       summary: typeof row.summary === 'string' && row.summary.trim() ? row.summary.trim() : null,
       dimensions: row.dimensions && typeof row.dimensions === 'object'
         ? {
@@ -231,11 +242,23 @@ function normalizeEntityEntries(raw: unknown): EntityCatalogEntry[] {
       noGravity: row.noGravity === true,
       advancedNbt: typeof row.advancedNbt === 'string' && row.advancedNbt.trim() ? row.advancedNbt.trim() : null,
       imageUrl: typeof row.imageUrl === 'string' && row.imageUrl.trim() ? row.imageUrl.trim() : null,
+      art: row.art && typeof row.art === 'object'
+        ? {
+            url: typeof (row.art as Record<string, unknown>).url === 'string' ? (row.art as Record<string, string>).url : null,
+            class: typeof (row.art as Record<string, unknown>).class === 'string' ? (row.art as Record<string, CatalogArtPayload['class']>).class : 'living-portrait',
+            strategy: typeof (row.art as Record<string, unknown>).strategy === 'string' ? (row.art as Record<string, CatalogArtPayload['strategy']>).strategy : 'entity-sheet-crop',
+            placeholder: (row.art as Record<string, unknown>).placeholder === true,
+            reviewState: typeof (row.art as Record<string, unknown>).reviewState === 'string' ? (row.art as Record<string, CatalogArtPayload['reviewState']>).reviewState : 'auto',
+            fallbackReason: typeof (row.art as Record<string, unknown>).fallbackReason === 'string' ? (row.art as Record<string, string>).fallbackReason : null,
+          }
+        : null,
       summary: typeof row.summary === 'string' && row.summary.trim() ? row.summary.trim() : null,
     })
   }
   return entries
 }
+
+const DEFAULT_ENTITY_CATALOG = normalizeEntityEntries(FALLBACK_ENTITY_CATALOG)
 
 function normalizeStructureScan(raw: unknown): StructureScanData | null {
   if (!raw || typeof raw !== 'object') return null
@@ -301,10 +324,53 @@ function formatBytes(value: number | null | undefined): string {
 }
 
 function inferSummary(entry: StructureCatalogEntry | EntityCatalogEntry) {
-  if ('sourceKind' in entry) {
+  if ('bridgeRef' in entry) {
     return entry.summary || `${entry.category} structure from ${entry.sourceKind}.`
   }
-  return entry.summary || `${entry.category} entity ready for spawning.`
+  return entry.summary || `${entry.category} entity from ${entry.sourceKind ?? 'native'} ready for spawning.`
+}
+
+function entityCatalogGroup(entry: EntityCatalogEntry) {
+  return entry.sourceKind === 'native' ? 'native' : 'custom'
+}
+
+function entitySourceLabel(sourceKind: string | undefined) {
+  switch (sourceKind) {
+    case 'native':
+      return 'Built-in Catalog'
+    case 'upload':
+      return 'Uploaded Preset'
+    case 'server':
+      return 'Server Preset'
+    case 'linked':
+      return 'Linked Preset'
+    default:
+      return sourceKind ? titleCase(sourceKind) : 'Custom Preset'
+  }
+}
+
+function structureArtworkClass(entry: StructureCatalogEntry) {
+  if (entry.art?.class === 'structure-materials') {
+    return 'h-64 w-full rounded-[18px] border border-white/10 bg-[var(--bg2)] object-contain p-4'
+  }
+  return 'h-72 w-full rounded-[18px] border border-white/10 bg-[var(--bg2)] object-contain p-3'
+}
+
+function entityArtworkClass(entry: EntityCatalogEntry) {
+  switch (entry.art?.class) {
+    case 'projectile-icon':
+    case 'vehicle-icon':
+    case 'display-tech':
+    case 'spawn-egg':
+      return 'mx-auto h-56 w-full max-w-[16rem] rounded-[18px] border border-white/10 bg-[var(--bg2)] object-contain p-4'
+    case 'living-portrait':
+    default:
+      return 'mx-auto h-64 w-full max-w-[20rem] rounded-[18px] border border-white/10 bg-[var(--bg2)] object-contain p-3'
+  }
+}
+
+function isCustomEntityPreset(entry: EntityCatalogEntry) {
+  return entityCatalogGroup(entry) === 'custom'
 }
 
 function categoryPage<T>(entries: T[], page: number, pageSize: number) {
@@ -321,6 +387,49 @@ function pillStyle(enabled: boolean | null) {
     : { borderColor: 'var(--border)', background: 'var(--panel)', color: enabled === null ? 'var(--text-dim)' : 'var(--text)' }
 }
 
+type CatalogCardPalette = {
+  frame: string
+  frameSoft: string
+  frameGlow: string
+  badge: string
+  badgeText: string
+}
+
+function accentCardPalette(): CatalogCardPalette {
+  return {
+    frame: 'var(--accent-mid)',
+    frameSoft: 'color-mix(in srgb, var(--accent) 12%, transparent)',
+    frameGlow: 'color-mix(in srgb, var(--accent) 18%, transparent)',
+    badge: 'color-mix(in srgb, var(--accent) 16%, transparent)',
+    badgeText: 'var(--accent)',
+  }
+}
+
+function structureCardPalette(_entry: StructureCatalogEntry): CatalogCardPalette {
+  return accentCardPalette()
+}
+
+function entityCardPalette(entry: EntityCatalogEntry): CatalogCardPalette {
+  return accentCardPalette()
+}
+
+function dangerIcon() {
+  return (
+    <span
+      title="Dangerous"
+      aria-label="Dangerous"
+      className="inline-flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-mono leading-none"
+      style={{
+        borderColor: 'color-mix(in srgb, var(--red) 40%, var(--accent-mid))',
+        background: 'color-mix(in srgb, var(--red) 12%, transparent)',
+        color: 'var(--red)',
+      }}
+    >
+      !
+    </span>
+  )
+}
+
 export default function WorldsSection({
   players,
   selectedPlayer,
@@ -334,7 +443,7 @@ export default function WorldsSection({
   const [pluginStack, setPluginStack] = useState<PluginStackData | null>(null)
   const [worldsData, setWorldsData] = useState<WorldsData | null>(null)
   const [structures, setStructures] = useState<StructureCatalogEntry[]>([])
-  const [entities, setEntities] = useState<EntityCatalogEntry[]>([])
+  const [entities, setEntities] = useState<EntityCatalogEntry[]>(DEFAULT_ENTITY_CATALOG)
   const [placements, setPlacements] = useState<PlacementEntry[]>([])
   const [worldDetails, setWorldDetails] = useState<Record<string, WorldSettingsEntry>>({})
   const [liveEntities, setLiveEntities] = useState<LiveEntityEntry[]>([])
@@ -372,6 +481,7 @@ export default function WorldsSection({
 
   const [entitySearch, setEntitySearch] = useState('')
   const [entityCategory, setEntityCategory] = useState('all')
+  const [entitySourceFilter, setEntitySourceFilter] = useState<'all' | 'native' | 'custom'>('all')
   const [selectedEntity, setSelectedEntity] = useState<EntityCatalogEntry | null>(null)
   const [entityMode, setEntityMode] = useState<LocationMode>('player')
   const [entityWorld, setEntityWorld] = useState('')
@@ -480,17 +590,17 @@ export default function WorldsSection({
         const data = await res.json()
         if (!data.ok) {
           setEntityLoadError(data.error || 'Failed to load entity catalog')
-          setEntities(FALLBACK_ENTITY_CATALOG)
+          setEntities(DEFAULT_ENTITY_CATALOG)
           setEntityScan(null)
         } else {
           const nextEntities = normalizeEntityEntries(data.entities)
-          setEntities(nextEntities.length > 0 ? nextEntities : FALLBACK_ENTITY_CATALOG)
+          setEntities(nextEntities.length > 0 ? nextEntities : DEFAULT_ENTITY_CATALOG)
           setEntityScan(normalizeEntityScan(data.scan))
           setEntityLoadError(data.warning || (nextEntities.length === 0 ? 'Using built-in entity catalog fallback.' : null))
         }
       } catch (nextError) {
         setEntityLoadError(nextError instanceof Error ? nextError.message : 'Failed to load entity catalog')
-        setEntities(FALLBACK_ENTITY_CATALOG)
+        setEntities(DEFAULT_ENTITY_CATALOG)
         setEntityScan(null)
       }
     }
@@ -581,7 +691,15 @@ export default function WorldsSection({
 
   useEffect(() => {
     setEntityCategoryPage(0)
-  }, [entityCategory, entitySearch])
+  }, [entityCategory, entitySearch, entitySourceFilter])
+
+  const entitySourceCounts = useMemo(() => {
+    const counts = { native: 0, custom: 0 }
+    for (const entry of entities) {
+      counts[entityCatalogGroup(entry)] += 1
+    }
+    return counts
+  }, [entities])
 
   const filteredStructures = useMemo(() => {
     const needle = structureSearch.trim().toLowerCase()
@@ -605,21 +723,32 @@ export default function WorldsSection({
   const filteredEntities = useMemo(() => {
     const needle = entitySearch.trim().toLowerCase()
     return entities.filter(entry => {
+      if (entitySourceFilter !== 'all' && entityCatalogGroup(entry) !== entitySourceFilter) return false
       if (entityCategory !== 'all' && entry.category !== entityCategory) return false
       if (!needle) return true
-      return entry.label.toLowerCase().includes(needle) || entry.id.toLowerCase().includes(needle)
+      return entry.label.toLowerCase().includes(needle) || entry.id.toLowerCase().includes(needle) || (entry.entityId ?? '').toLowerCase().includes(needle)
     })
-  }, [entities, entityCategory, entitySearch])
+  }, [entities, entityCategory, entitySearch, entitySourceFilter])
 
-  const groupedEntities = useMemo(() => {
+  const filteredCustomEntities = useMemo(
+    () => filteredEntities.filter(isCustomEntityPreset),
+    [filteredEntities],
+  )
+
+  const filteredNativeEntities = useMemo(
+    () => filteredEntities.filter(entry => !isCustomEntityPreset(entry)),
+    [filteredEntities],
+  )
+
+  const groupedNativeEntities = useMemo(() => {
     const groups = new Map<string, EntityCatalogEntry[]>()
-    for (const entry of filteredEntities) {
+    for (const entry of filteredNativeEntities) {
       const bucket = groups.get(entry.category)
       if (bucket) bucket.push(entry)
       else groups.set(entry.category, [entry])
     }
     return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-  }, [filteredEntities])
+  }, [filteredNativeEntities])
 
   const visiblePlacements = useMemo(() => {
     return placements.filter(entry => !placementWorldFilter || entry.world === placementWorldFilter)
@@ -630,9 +759,10 @@ export default function WorldsSection({
   }, [liveEntities, liveEntityWorldFilter])
 
   const structureCategoryPageCount = Math.max(1, Math.ceil(groupedStructures.length / WORLD_CATEGORY_PAGE_SIZE))
-  const entityCategoryPageCount = Math.max(1, Math.ceil(groupedEntities.length / WORLD_CATEGORY_PAGE_SIZE))
+  const entityCategoryPageCount = Math.max(1, Math.ceil(groupedNativeEntities.length / WORLD_CATEGORY_PAGE_SIZE))
   const pagedStructureGroups = categoryPage(groupedStructures, clampPage(structureCategoryPage, structureCategoryPageCount), WORLD_CATEGORY_PAGE_SIZE)
-  const pagedEntityGroups = categoryPage(groupedEntities, clampPage(entityCategoryPage, entityCategoryPageCount), WORLD_CATEGORY_PAGE_SIZE)
+  const pagedNativeEntityGroups = categoryPage(groupedNativeEntities, clampPage(entityCategoryPage, entityCategoryPageCount), WORLD_CATEGORY_PAGE_SIZE)
+  const forceOpenEntityGroups = entitySearch.trim().length > 0 || entityCategory !== 'all'
 
   useEffect(() => {
     setStructureCategoryPage(current => clampPage(current, structureCategoryPageCount))
@@ -667,13 +797,13 @@ export default function WorldsSection({
     return data as { ok: true; world: string; location: { x: number; y: number; z: number } }
   }, [])
 
-  const handleWorldSettingChange = useCallback(async (worldName: string, key: string, value: string | boolean) => {
+  const handleWorldSettingChange = useCallback(async (worldName: string, key: string, value: string | boolean, kind: 'setting' | 'gamerule' = 'setting') => {
     try {
       setWorldActionBusy(`${worldName}:${key}`)
       const res = await fetch(`/api/minecraft/worlds/${encodeURIComponent(worldName)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value }),
+        body: JSON.stringify({ key, value, kind }),
       })
       const data = await res.json()
       if (!data.ok) throw new Error(data.error || 'Failed to update world setting')
@@ -970,6 +1100,162 @@ export default function WorldsSection({
   const worldNames = useMemo(() => worldsData?.worlds.map(entry => entry.name) ?? [], [worldsData])
   const collapseAllLabel = collapseAllActive ? 'Expand All' : 'Collapse All'
 
+  const renderStructureCatalogCard = (entry: StructureCatalogEntry) => {
+    const palette = structureCardPalette(entry)
+    const metaStats = [
+      ['Category', entry.category],
+      ['Format', entry.format ?? entry.placementKind ?? 'native'],
+      ['Size', formatBytes(entry.sizeBytes)],
+      ['Updated', entry.updatedAt ? new Date(entry.updatedAt * 1000).toLocaleDateString() : '—'],
+    ]
+
+    return (
+      <div
+        className="space-y-3 rounded-[28px] border p-4"
+        style={{
+          borderColor: palette.frame,
+          background: `linear-gradient(180deg, ${palette.frameSoft}, rgba(8,11,16,0.92))`,
+          boxShadow: `0 18px 42px ${palette.frameGlow}`,
+        }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-mono tracking-[0.35em]" style={{ color: palette.badgeText }}>BUILD CARD</div>
+            <div className="mt-1 text-[18px] font-mono text-[var(--text)]">{entry.label}</div>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2 text-[10px] font-mono tracking-widest">
+            <span className="rounded-full border px-2 py-1" style={{ borderColor: palette.frame, background: palette.badge, color: palette.badgeText }}>{entry.sourceKind}</span>
+            <span className="rounded-full border px-2 py-1" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{entry.placementKind}</span>
+          </div>
+        </div>
+
+        <div className="rounded-[24px] border p-2" style={{ borderColor: palette.frame, background: 'rgba(0,0,0,0.18)' }}>
+          <CatalogArtwork kind="structure" label={entry.label} category={entry.category} sourceKind={entry.sourceKind} imageUrl={entry.imageUrl} art={entry.art} className={structureArtworkClass(entry)} />
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {metaStats.map(([label, value]) => (
+              <div key={label} className="rounded-2xl border px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
+                <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">{label}</div>
+                <div className="mt-1 text-[12px] font-mono text-[var(--text)]">{value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {entry.summary && (
+          <div className="rounded-[22px] border px-4 py-3 text-[12px] font-mono" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>
+            {entry.summary}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setStructureModalMode('place')
+              setPlacementToRemove(null)
+              setSelectedStructure({ ...entry, summary: inferSummary(entry) })
+            }}
+            className="rounded-xl border px-3 py-2 text-[11px] font-mono"
+            style={{ borderColor: palette.frame, background: palette.badge, color: palette.badgeText }}
+          >
+            Open Placement Target
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const renderEntityCatalogCard = (entry: EntityCatalogEntry) => {
+    const palette = entityCardPalette(entry)
+    const metaStats = [
+      ['Category', entry.category],
+      ['Source', entitySourceLabel(entry.sourceKind)],
+      ['Default Count', String(entry.defaultCount ?? 1)],
+      ['Entity Id', entry.entityId ?? entry.id],
+    ]
+
+    return (
+      <div
+        className="space-y-3 rounded-[28px] border p-4"
+        style={{
+          borderColor: palette.frame,
+          background: `linear-gradient(180deg, ${palette.frameSoft}, rgba(8,11,16,0.92))`,
+          boxShadow: `0 18px 42px ${palette.frameGlow}`,
+        }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-mono tracking-[0.35em]" style={{ color: palette.badgeText }}>FIELD CARD</div>
+            <div className="mt-1 text-[18px] font-mono text-[var(--text)]">{entry.label}</div>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2 text-[10px] font-mono tracking-widest">
+            <span className="rounded-full border px-2 py-1" style={{ borderColor: palette.frame, background: palette.badge, color: palette.badgeText }}>{entitySourceLabel(entry.sourceKind)}</span>
+            {entry.dangerous && dangerIcon()}
+          </div>
+        </div>
+
+        <div className="rounded-[24px] border p-2" style={{ borderColor: palette.frame, background: 'rgba(0,0,0,0.18)' }}>
+          <CatalogArtwork kind="entity" label={entry.label} category={entry.category} sourceKind={entry.sourceKind} imageUrl={entry.imageUrl} art={entry.art} className={entityArtworkClass(entry)} />
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {metaStats.map(([label, value]) => (
+              <div key={label} className="rounded-2xl border px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
+                <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">{label}</div>
+                <div className="mt-1 text-[12px] font-mono text-[var(--text)]">{value}</div>
+              </div>
+            ))}
+            {entry.presetId && (
+              <div className="rounded-2xl border px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
+                <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">Preset Id</div>
+                <div className="mt-1 text-[12px] font-mono text-[var(--text)]">{entry.presetId}</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {entry.summary && (
+          <div className="rounded-[22px] border px-4 py-3 text-[12px] font-mono" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>
+            {entry.summary}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setEntityCount(String(entry.defaultCount ?? 1))
+              setSelectedEntity({ ...entry, summary: inferSummary(entry) })
+            }}
+            className="rounded-xl border px-3 py-2 text-[11px] font-mono"
+            style={{ borderColor: palette.frame, background: palette.badge, color: palette.badgeText }}
+          >
+            Open Placement Target
+          </button>
+          {entry.editable && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingPreset(entry)
+                setPresetEditorOpen(true)
+              }}
+              className="rounded-xl border border-[var(--border)] px-3 py-2 text-[11px] font-mono text-[var(--text-dim)]"
+            >
+              Edit
+            </button>
+          )}
+          {entry.editable && entry.relativePath && (
+            <button
+              type="button"
+              onClick={() => void handleDeletePreset(entry)}
+              className="rounded-xl border border-red-900 px-3 py-2 text-[11px] font-mono text-red-400"
+            >
+              Delete
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4 pb-6">
       <div className="flex items-center justify-between gap-3">
@@ -1028,12 +1314,12 @@ export default function WorldsSection({
               </div>
             </div>
             <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4">
-              <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">SIDECAR STATUS</div>
+              <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">BEACON STATUS</div>
               <div className="mt-2 text-[13px] font-mono text-[var(--text)]">
                 {pluginStack.sidecar?.ok === false ? pluginStack.sidecar.error : 'Connected'}
               </div>
               <div className="mt-1 text-[12px] font-mono text-[var(--text-dim)]">
-                {(pluginStack.sidecar?.capabilities ?? []).length > 0 ? (pluginStack.sidecar?.capabilities ?? []).join(', ') : 'No sidecar capabilities reported'}
+                {(pluginStack.sidecar?.capabilities ?? []).length > 0 ? (pluginStack.sidecar?.capabilities ?? []).join(', ') : 'No beacon capabilities reported'}
               </div>
             </div>
           </div>
@@ -1100,7 +1386,7 @@ export default function WorldsSection({
                             key={settingKey}
                             type="button"
                             disabled={busy || currentValue === null}
-                            onClick={() => void handleWorldSettingChange(world.name, settingKey, !currentValue)}
+                            onClick={() => void handleWorldSettingChange(world.name, settingKey, !currentValue, 'setting')}
                             className="rounded border px-3 py-2 text-[11px] font-mono tracking-widest disabled:opacity-40"
                             style={pillStyle(currentValue)}
                           >
@@ -1119,7 +1405,7 @@ export default function WorldsSection({
                           key={level}
                           type="button"
                           disabled={worldActionBusy === `${world.name}:difficulty`}
-                          onClick={() => void handleWorldSettingChange(world.name, 'difficulty', level)}
+                          onClick={() => void handleWorldSettingChange(world.name, 'difficulty', level, 'setting')}
                           className="rounded border px-3 py-2 text-[11px] font-mono tracking-widest disabled:opacity-40"
                           style={detail.difficulty === level
                             ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
@@ -1143,7 +1429,7 @@ export default function WorldsSection({
                               key={rule}
                               type="button"
                               disabled={busy || currentValue === null}
-                              onClick={() => void handleWorldSettingChange(world.name, rule, !currentValue)}
+                              onClick={() => void handleWorldSettingChange(world.name, rule, !currentValue, 'gamerule')}
                               className="flex items-center justify-between rounded-xl border px-3 py-3 text-left font-mono text-[11px] disabled:opacity-40"
                               style={currentValue
                                 ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
@@ -1345,28 +1631,7 @@ export default function WorldsSection({
                     className="border border-[var(--border)] bg-[var(--panel)]"
                     groupKey={WORLDS_COLLAPSIBLE_GROUP}
                   >
-                    <CatalogArtwork kind="structure" label={entry.label} category={entry.category} sourceKind={entry.sourceKind} imageUrl={entry.imageUrl} className="h-32 w-full rounded-2xl border object-cover" />
-                    <div className="grid gap-2 text-[12px] font-mono text-[var(--text-dim)] sm:grid-cols-2">
-                      <div>Category: <span className="text-[var(--text)]">{entry.category}</span></div>
-                      <div>Format: <span className="text-[var(--text)]">{entry.format ?? entry.placementKind ?? 'native'}</span></div>
-                      <div>Size: <span className="text-[var(--text)]">{formatBytes(entry.sizeBytes)}</span></div>
-                      <div>Updated: <span className="text-[var(--text)]">{entry.updatedAt ? new Date(entry.updatedAt * 1000).toLocaleString() : '—'}</span></div>
-                    </div>
-                    {entry.summary && <div className="rounded-xl border border-[var(--border)] bg-[var(--bg2)] px-4 py-3 text-[12px] font-mono text-[var(--text-dim)]">{entry.summary}</div>}
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setStructureModalMode('place')
-                          setPlacementToRemove(null)
-                          setSelectedStructure({ ...entry, summary: inferSummary(entry) })
-                        }}
-                        className="rounded-lg border border-[var(--accent-mid)] px-3 py-2 text-[11px] font-mono text-[var(--accent)]"
-                        style={{ background: 'var(--accent-dim)' }}
-                      >
-                        Open Placement Target
-                      </button>
-                    </div>
+                    {renderStructureCatalogCard(entry)}
                   </CollapsibleCard>
                 ))}
               </CollapsibleCard>
@@ -1377,7 +1642,7 @@ export default function WorldsSection({
               {structureLoadError
                 ? structureLoadError
                 : structures.length === 0
-                  ? 'No structures found. Check the sidecar schematics path or upload a schematic first.'
+                  ? 'No structures found. Check the beacon schematics path or upload a schematic first.'
                   : `No structures match "${structureSearch.trim()}".`}
             </div>
           )}
@@ -1459,7 +1724,8 @@ export default function WorldsSection({
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-[12px] font-mono text-[var(--text-dim)]">
-              {entities.length} entity entries{entityScan ? ` · ${entityScan.totalPresets} custom presets` : ''}
+              {entities.length} entity entries · {entitySourceCounts.native} native · {entitySourceCounts.custom} presets
+              {entityScan ? ` · ${entityScan.totalPresets} saved preset files` : ''}
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -1482,6 +1748,35 @@ export default function WorldsSection({
                 Upload JSON
               </button>
             </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {[
+              { key: 'all', label: 'All Entries', count: entities.length, hint: 'Built-in catalog plus presets' },
+              { key: 'native', label: 'Native Catalog', count: entitySourceCounts.native, hint: 'Bridge/fallback spawnable entities' },
+              { key: 'custom', label: 'Custom Presets', count: entitySourceCounts.custom, hint: 'Saved JSON presets with extra config' },
+            ].map(option => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setEntitySourceFilter(option.key as 'all' | 'native' | 'custom')}
+                className="rounded-2xl border px-4 py-3 text-left transition-all"
+                style={entitySourceFilter === option.key
+                  ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)' }
+                  : { borderColor: 'var(--border)', background: 'var(--panel)' }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[12px] font-mono tracking-widest" style={{ color: entitySourceFilter === option.key ? 'var(--accent)' : 'var(--text)' }}>
+                    {option.label}
+                  </div>
+                  <div className="text-[18px] font-mono" style={{ color: entitySourceFilter === option.key ? 'var(--accent)' : 'var(--text)' }}>
+                    {option.count}
+                  </div>
+                </div>
+                <div className="mt-1 text-[11px] font-mono" style={{ color: 'var(--text-dim)' }}>
+                  {option.hint}
+                </div>
+              </button>
+            ))}
           </div>
           <div className="flex gap-1.5 flex-wrap">
             {entityCategories.map(category => (
@@ -1515,9 +1810,9 @@ export default function WorldsSection({
               {entityLoadError}
             </div>
           )}
-          {entityCategory === 'all' && groupedEntities.length > WORLD_CATEGORY_PAGE_SIZE && (
+          {entitySourceFilter !== 'custom' && entityCategory === 'all' && groupedNativeEntities.length > WORLD_CATEGORY_PAGE_SIZE && (
             <div className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[11px] font-mono text-[var(--text-dim)]">
-              <span>Category page {clampPage(entityCategoryPage, entityCategoryPageCount) + 1} / {entityCategoryPageCount}</span>
+              <span>Native category page {clampPage(entityCategoryPage, entityCategoryPageCount) + 1} / {entityCategoryPageCount}</span>
               <div className="flex gap-2">
                 <button type="button" disabled={entityCategoryPage <= 0} onClick={() => setEntityCategoryPage(page => Math.max(0, page - 1))} className="rounded border border-[var(--border)] px-3 py-1 disabled:opacity-40">Prev</button>
                 <button type="button" disabled={entityCategoryPage >= entityCategoryPageCount - 1} onClick={() => setEntityCategoryPage(page => Math.min(entityCategoryPageCount - 1, page + 1))} className="rounded border border-[var(--border)] px-3 py-1 disabled:opacity-40">Next</button>
@@ -1525,12 +1820,45 @@ export default function WorldsSection({
             </div>
           )}
           <div className="space-y-3">
-            {pagedEntityGroups.map(([category, entries]) => (
+            {filteredCustomEntities.length > 0 && (
+              <CollapsibleCard
+                title={`CUSTOM PRESETS (${filteredCustomEntities.length})`}
+                storageKey="worlds:entities:custom-presets:v1"
+                defaultOpen={true}
+                open={entitySourceFilter === 'custom' || entitySearch.trim().length > 0 ? true : undefined}
+                bodyClassName="p-3 space-y-3"
+                groupKey={WORLDS_COLLAPSIBLE_GROUP}
+              >
+                {filteredCustomEntities.map(entry => (
+                  <CollapsibleCard
+                    key={entry.id}
+                    title={
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-[13px] font-mono text-[var(--text)]">{entry.label}</div>
+                        <div className="flex items-center gap-2 text-[10px] font-mono tracking-widest text-[var(--text-dim)]">
+                          <span>{entitySourceLabel(entry.sourceKind)}</span>
+                          {entry.dangerous && dangerIcon()}
+                        </div>
+                      </div>
+                    }
+                    storageKey={`worlds:entities:item:${entry.id}`}
+                    defaultOpen={false}
+                    bodyClassName="p-4 space-y-3"
+                    className="border border-[var(--border)] bg-[var(--panel)]"
+                    groupKey={WORLDS_COLLAPSIBLE_GROUP}
+                  >
+                    {renderEntityCatalogCard(entry)}
+                  </CollapsibleCard>
+                ))}
+              </CollapsibleCard>
+            )}
+            {pagedNativeEntityGroups.map(([category, entries]) => (
               <CollapsibleCard
                 key={category}
                 title={`${category.toUpperCase()} (${entries.length})`}
-                storageKey={`worlds:entities:category:${category}`}
-                defaultOpen={entityCategory !== 'all'}
+                storageKey={`worlds:entities:category:v3:${category}`}
+                defaultOpen={false}
+                open={forceOpenEntityGroups ? true : undefined}
                 bodyClassName="p-3 space-y-3"
                 groupKey={WORLDS_COLLAPSIBLE_GROUP}
               >
@@ -1541,8 +1869,8 @@ export default function WorldsSection({
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-[13px] font-mono text-[var(--text)]">{entry.label}</div>
                         <div className="flex items-center gap-2 text-[10px] font-mono tracking-widest text-[var(--text-dim)]">
-                          <span>{entry.sourceKind ?? 'native'}</span>
-                          {entry.dangerous && <span className="text-red-300">DANGER</span>}
+                          <span>{entitySourceLabel(entry.sourceKind)}</span>
+                          {entry.dangerous && dangerIcon()}
                         </div>
                       </div>
                     }
@@ -1552,48 +1880,7 @@ export default function WorldsSection({
                     className="border border-[var(--border)] bg-[var(--panel)]"
                     groupKey={WORLDS_COLLAPSIBLE_GROUP}
                   >
-                    <CatalogArtwork kind="entity" label={entry.label} category={entry.category} imageUrl={entry.imageUrl} className="h-32 w-full rounded-2xl border object-cover" />
-                    <div className="grid gap-2 text-[12px] font-mono text-[var(--text-dim)] sm:grid-cols-2">
-                      <div>Category: <span className="text-[var(--text)]">{entry.category}</span></div>
-                      <div>Source: <span className="text-[var(--text)]">{entry.sourceKind ?? 'native'}</span></div>
-                      <div>Default Count: <span className="text-[var(--text)]">{entry.defaultCount ?? 1}</span></div>
-                      <div>Entity Id: <span className="text-[var(--text)]">{entry.entityId ?? entry.id}</span></div>
-                    </div>
-                    {entry.summary && <div className="rounded-xl border border-[var(--border)] bg-[var(--bg2)] px-4 py-3 text-[12px] font-mono text-[var(--text-dim)]">{entry.summary}</div>}
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEntityCount(String(entry.defaultCount ?? 1))
-                          setSelectedEntity({ ...entry, summary: inferSummary(entry) })
-                        }}
-                        className="rounded-lg border border-[var(--accent-mid)] px-3 py-2 text-[11px] font-mono text-[var(--accent)]"
-                        style={{ background: 'var(--accent-dim)' }}
-                      >
-                        Open Placement Target
-                      </button>
-                      {entry.editable && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingPreset(entry)
-                            setPresetEditorOpen(true)
-                          }}
-                          className="rounded border border-[var(--border)] px-3 py-2 text-[11px] font-mono text-[var(--text-dim)]"
-                        >
-                          Edit
-                        </button>
-                      )}
-                      {entry.editable && entry.relativePath && (
-                        <button
-                          type="button"
-                          onClick={() => void handleDeletePreset(entry)}
-                          className="rounded border border-red-900 px-3 py-2 text-[11px] font-mono text-red-400"
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </div>
+                    {renderEntityCatalogCard(entry)}
                   </CollapsibleCard>
                 ))}
               </CollapsibleCard>

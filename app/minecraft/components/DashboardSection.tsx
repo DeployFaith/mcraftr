@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import type { AuditEntry } from '@/lib/audit'
 
 type DashboardData = {
@@ -10,6 +11,8 @@ type DashboardData = {
     label: string | null
     host: string
     port: number
+    stackMode: 'quick' | 'full'
+    stackLabel: string
   }
   overview: {
     online: number
@@ -31,6 +34,10 @@ type DashboardData = {
   recentChat: Array<{ id: number; type: string; player: string | null; message: string; ts: number }>
   recentAudit: AuditEntry[]
   stack?: {
+    mode: 'quick' | 'full'
+    modeLabel: string
+    modeDescription: string
+    upgradeRecommended: boolean
     bridgeOk: boolean
     bridgeError?: string | null
     sidecarOk: boolean
@@ -132,7 +139,7 @@ export default function DashboardSection({ onNavigate }: { onNavigate: (tab: 'pl
 
           <div className="glass-card p-4 space-y-3">
             <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">SAFE SERVER SETTINGS SNAPSHOT</div>
-            {data.rules.bridgeError && (
+            {data.server.stackMode === 'full' && data.rules.bridgeError && (
               <div className="rounded-lg border border-red-900 bg-red-950/30 px-3 py-2 text-[12px] font-mono text-red-300">
                 Bridge unavailable: {data.rules.bridgeError}
               </div>
@@ -173,7 +180,9 @@ export default function DashboardSection({ onNavigate }: { onNavigate: (tab: 'pl
                 <div className="grid gap-2 sm:grid-cols-2">
                   <button onClick={() => onNavigate('players')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Players</button>
                   <button onClick={() => onNavigate('actions')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Actions</button>
-                  <button onClick={() => onNavigate('worlds')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Worlds</button>
+                  {data.server.stackMode === 'full' && (
+                    <button onClick={() => onNavigate('worlds')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Worlds</button>
+                  )}
                   <button onClick={() => onNavigate('admin')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Admin</button>
                   <button onClick={() => onNavigate('settings')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Settings</button>
                 </div>
@@ -182,14 +191,32 @@ export default function DashboardSection({ onNavigate }: { onNavigate: (tab: 'pl
               {data.stack && (
                 <div className="glass-card p-4 space-y-3">
                   <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">SERVER SURFACE</div>
-                  {(data.stack.bridgeError || data.stack.sidecarError) && (
+                  {data.stack.upgradeRecommended && (
+                    <div className="rounded-2xl border px-4 py-4" style={{ borderColor: 'var(--accent-mid)', background: 'color-mix(in srgb, var(--accent) 10%, transparent)' }}>
+                      <div className="text-[12px] font-mono tracking-[0.16em] text-[var(--accent)]">QUICK CONNECT ACTIVE</div>
+                      <div className="mt-2 text-[12px] font-mono text-[var(--text-dim)]">
+                        {data.stack.modeDescription}
+                      </div>
+                      <div className="mt-2 text-[12px] font-mono text-[var(--text-dim)]">
+                        Upgrade this server to the Full Mcraftr Stack to unlock Worlds, structures, entities, maps, and version-aware catalog surfaces.
+                      </div>
+                      <Link
+                        href="/connect?edit=1"
+                        className="mt-3 inline-flex rounded-xl border px-3 py-2 text-[11px] font-mono tracking-[0.12em]"
+                        style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}
+                      >
+                        OPEN STACK SETUP
+                      </Link>
+                    </div>
+                  )}
+                  {!data.stack.upgradeRecommended && (data.stack.bridgeError || data.stack.sidecarError) && (
                     <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)]">
-                      {data.stack.bridgeError ? `Bridge: ${data.stack.bridgeError}` : `Sidecar: ${data.stack.sidecarError}`}
+                      {data.stack.bridgeError ? `Bridge: ${data.stack.bridgeError}` : `Beacon: ${data.stack.sidecarError}`}
                     </div>
                   )}
                   <div className="grid gap-2 sm:grid-cols-2">
                     <RulePill label="Bridge" value={data.stack.bridgeOk ? 'true' : 'false'} />
-                    <RulePill label="Sidecar" value={data.stack.sidecarOk ? 'true' : 'false'} />
+                    <RulePill label="Beacon" value={data.stack.sidecarOk ? 'true' : 'false'} />
                     <RulePill label="Worlds" value={data.stack.worldCount} />
                     <RulePill label="Maps" value={data.stack.mapCount} />
                   </div>

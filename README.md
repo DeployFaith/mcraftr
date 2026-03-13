@@ -2,6 +2,11 @@
 
 Mcraftr is a self-hosted Minecraft admin panel built for fast, opinionated server management over RCON. It gives you a polished web UI for moderation, player tools, server actions, chat, schedules, theming, and account management without turning into a full host-control panel.
 
+Mcraftr supports two connection profiles:
+
+- `Quick Connect` — RCON-only compatibility mode for broad server support
+- `Full Mcraftr Stack` — RCON + Bridge + Beacon for the experience Mcraftr is designed around
+
 It is designed around a simple model:
 
 - Mcraftr talks to Minecraft through RCON.
@@ -144,6 +149,48 @@ Bring it up with:
 docker compose up -d --build
 ```
 
+### Dokploy
+
+This repo now includes Dokploy raw-compose templates in `deploy/dokploy/` and a deployment script:
+
+```bash
+npm run dokploy:deploy
+```
+
+Required environment for the deploy script:
+
+- `DOKPLOY_BASE_URL`
+- `DOKPLOY_API_KEY`
+- `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL`
+- `MCRAFTR_ADMIN_USER`
+- `MCRAFTR_ADMIN_PASS`
+- `MCRAFTR_ENC_KEY`
+- `REDIS_PASSWORD`
+
+By default the script targets:
+
+- project `mcraftr`
+- environment `production`
+- compose stack `mcraftr-p9t6c`
+- host bind `127.0.0.1:3054 -> 3050` for local Caddy on `psalmbox`
+
+Image mode:
+
+```bash
+export DOKPLOY_DEPLOY_MODE=image
+export MCRAFTR_IMAGE=registry.example.com/mcraftr:latest
+npm run dokploy:deploy
+```
+
+Build-context mode:
+
+```bash
+export DOKPLOY_DEPLOY_MODE=build-context
+export MCRAFTR_BUILD_CONTEXT_URL=https://example.com/mcraftr.tar.gz
+npm run dokploy:deploy
+```
+
 ### Development
 
 ```bash
@@ -155,7 +202,7 @@ Local dev runs through Next.js.
 
 ## Minecraft Server Requirements
 
-Mcraftr requires RCON.
+Mcraftr always requires RCON.
 
 In `server.properties`:
 
@@ -165,7 +212,14 @@ rcon.port=25575
 rcon.password=your-secure-password
 ```
 
-Mcraftr only manages what the Minecraft server and installed integrations actually support. Advanced features can be provided through an optional Mcraftr bridge integration and/or sidecar.
+`Quick Connect` works with plain RCON and keeps Mcraftr broadly accessible.
+
+`Full Mcraftr Stack` is the recommended path and unlocks the designed Mcraftr workflow:
+
+- Bridge for typed world and server operations
+- Beacon for filesystem-backed catalogs, maps, previews, and world context
+
+Mcraftr only manages what the Minecraft server and installed integrations actually support.
 
 ## Environment Variables
 

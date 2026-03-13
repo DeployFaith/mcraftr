@@ -73,18 +73,30 @@ export async function PATCH(
   const { id } = await params
   const body = await req.json().catch(() => ({}))
   const key = typeof body.key === 'string' ? body.key.trim() : ''
+  const requestedKind = typeof body.kind === 'string' ? body.kind.trim().toLowerCase() : ''
   const value = body.value
 
   if (!key) {
     return Response.json({ ok: false, error: 'Setting key is required' }, { status: 400 })
   }
 
-  const isGamerule = WORLD_GAMERULES.has(key)
+  const isWorldSetting = WORLD_SETTINGS.has(key)
+  const isKnownGamerule = WORLD_GAMERULES.has(key)
+  const isGamerule = requestedKind === 'gamerule'
+    ? isKnownGamerule
+    : requestedKind === 'setting'
+      ? false
+      : !isWorldSetting && isKnownGamerule
+
+  if (!isWorldSetting && !isKnownGamerule) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin or unsupported setting' }, { status: 403 })
+  }
+
   if (isGamerule) {
     if (!checkFeatureAccess(features, 'enable_admin_rules')) {
       return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
     }
-  } else if (!WORLD_SETTINGS.has(key) || !checkFeatureAccess(features, 'enable_world_build_tools')) {
+  } else if (!checkFeatureAccess(features, 'enable_world_build_tools')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin or unsupported setting' }, { status: 403 })
   }
 

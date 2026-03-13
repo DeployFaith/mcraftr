@@ -185,6 +185,10 @@ export function getDb(): Database.Database {
       bridge_provider_id TEXT,
       bridge_provider_label TEXT,
       bridge_protocol_version TEXT,
+      minecraft_version_override TEXT,
+      minecraft_version_resolved TEXT,
+      minecraft_version_source TEXT,
+      minecraft_version_detected_at INTEGER,
       bridge_last_seen INTEGER,
       bridge_last_error TEXT,
       bridge_capabilities_json TEXT,
@@ -314,6 +318,10 @@ export function getDb(): Database.Database {
   ensureColumn(_db, 'saved_servers', 'bridge_provider_id', 'bridge_provider_id TEXT')
   ensureColumn(_db, 'saved_servers', 'bridge_provider_label', 'bridge_provider_label TEXT')
   ensureColumn(_db, 'saved_servers', 'bridge_protocol_version', 'bridge_protocol_version TEXT')
+  ensureColumn(_db, 'saved_servers', 'minecraft_version_override', 'minecraft_version_override TEXT')
+  ensureColumn(_db, 'saved_servers', 'minecraft_version_resolved', 'minecraft_version_resolved TEXT')
+  ensureColumn(_db, 'saved_servers', 'minecraft_version_source', 'minecraft_version_source TEXT')
+  ensureColumn(_db, 'saved_servers', 'minecraft_version_detected_at', 'minecraft_version_detected_at INTEGER')
   ensureColumn(_db, 'saved_servers', 'bridge_last_seen', 'bridge_last_seen INTEGER')
   ensureColumn(_db, 'saved_servers', 'bridge_last_error', 'bridge_last_error TEXT')
   ensureColumn(_db, 'saved_servers', 'bridge_capabilities_json', 'bridge_capabilities_json TEXT')

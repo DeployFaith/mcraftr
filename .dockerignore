@@ -3,3 +3,10 @@ data
 .next
 node_modules
 npm-debug.log
+.env
+.env.*
+!.env.example
+core
+playwright-report
+test-results
+tests
