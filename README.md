@@ -100,6 +100,42 @@ It is best when used as a focused Minecraft operations panel sitting in front of
 
 Most major sections are collapsible so long pages stay manageable.
 
+## Repository Screenshots
+
+The repository includes a curated desktop screenshot set in `docs/screenshots/highlights/`.
+
+![Login](docs/screenshots/highlights/01-login.png)
+![Connect](docs/screenshots/highlights/02-connect.png)
+![Dashboard](docs/screenshots/highlights/03-dashboard-overview.png)
+![Players](docs/screenshots/highlights/04-players-overview.png)
+![Actions](docs/screenshots/highlights/05-actions-overview.png)
+![Player Commands](docs/screenshots/highlights/06-actions-player-commands.png)
+![Item Catalog](docs/screenshots/highlights/07-actions-item-catalog.png)
+![Worlds](docs/screenshots/highlights/08-worlds-overview.png)
+![Structure Catalog](docs/screenshots/highlights/09-worlds-structure-catalog.png)
+![Structure Preview](docs/screenshots/highlights/10-worlds-structure-preview.png)
+![Placed Structures](docs/screenshots/highlights/11-worlds-placed-structures.png)
+![Entity Catalog](docs/screenshots/highlights/12-worlds-entity-catalog.png)
+
+To refresh these screenshots safely in a local demo environment:
+
+```bash
+PORT=3054 \
+NEXTAUTH_URL=http://127.0.0.1:3054 \
+NEXTAUTH_SECRET=demo-nextauth-secret \
+MCRAFTR_ENC_KEY=demo-encryption-secret \
+MCRAFTR_ADMIN_USER=demo@mcraftr.local \
+MCRAFTR_ADMIN_PASS=demo-password \
+DATA_DIR=.demo-data \
+REDIS_URL=redis://127.0.0.1:6379 \
+npm run dev
+
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:3054 \
+PLAYWRIGHT_ADMIN_EMAIL=demo@mcraftr.local \
+PLAYWRIGHT_ADMIN_PASSWORD=demo-password \
+npm run pw:screenshots
+```
+
 ## Multi-Account and Multi-Server Model
 
 ### Accounts
