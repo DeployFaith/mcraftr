@@ -2,8 +2,6 @@
 
 Mcraftr is a self-hosted Minecraft admin panel built for fast, opinionated server management over RCON. It gives you a polished web UI for moderation, player tools, server actions, chat, schedules, theming, and account management without turning into a full host-control panel.
 
-Mcraftr is proprietary software owned by DeployFaith. The source is not offered under an open-source license.
-
 Mcraftr supports two connection profiles:
 
 - `Quick Connect` — RCON-only compatibility mode for broad server support
@@ -398,14 +396,6 @@ ALLOW_REGISTRATION=false
 - The Docker image uses a multi-stage build and runs as a non-root user.
 - `better-sqlite3` is compiled in Alpine-compatible build stages for the final image.
 - The schedule runner is in-process inside the Mcraftr app.
-
-## License
-
-Mcraftr is `UNLICENSED` and distributed as proprietary software.
-
-- Copyright belongs to DeployFaith.
-- You do not have permission to copy, modify, redistribute, host, resell, or create derivative works without prior written permission.
-- Third-party dependencies remain under their own licenses.
 
 ## Features by Area
 
