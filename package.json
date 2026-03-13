@@ -18,6 +18,7 @@
     "pw:entity-audit": "playwright test tests/playwright/entity-art.spec.ts --project=desktop-chromium",
     "pw:screenshots": "playwright test tests/playwright/repo-screenshots.spec.ts --project=desktop-chromium",
     "pw:screenshots:live-sections": "node scripts/capture-live-sections.mjs",
+    "pw:screenshots:highlights": "node scripts/capture-repo-highlights.mjs",
     "pw:audit": "playwright test",
     "pw:audit:headed": "playwright test --headed"
   },

@@ -106,16 +106,12 @@ The repository includes a curated desktop screenshot set in `docs/screenshots/hi
 
 ![Login](docs/screenshots/highlights/01-login.png)
 ![Connect](docs/screenshots/highlights/02-connect.png)
-![Dashboard](docs/screenshots/highlights/03-dashboard-overview.png)
-![Players](docs/screenshots/highlights/04-players-overview.png)
-![Actions](docs/screenshots/highlights/05-actions-overview.png)
-![Player Commands](docs/screenshots/highlights/06-actions-player-commands.png)
-![Item Catalog](docs/screenshots/highlights/07-actions-item-catalog.png)
-![Worlds](docs/screenshots/highlights/08-worlds-overview.png)
-![Structure Catalog](docs/screenshots/highlights/09-worlds-structure-catalog.png)
-![Structure Preview](docs/screenshots/highlights/10-worlds-structure-preview.png)
-![Placed Structures](docs/screenshots/highlights/11-worlds-placed-structures.png)
-![Entity Catalog](docs/screenshots/highlights/12-worlds-entity-catalog.png)
+![Dashboard](docs/screenshots/highlights/03-dashboard.png)
+![Players](docs/screenshots/highlights/04-players.png)
+![Actions](docs/screenshots/highlights/05-actions.png)
+![Worlds](docs/screenshots/highlights/06-worlds.png)
+![Terminal](docs/screenshots/highlights/07-terminal.png)
+![Admin](docs/screenshots/highlights/08-admin.png)
 
 To refresh these screenshots safely in a local demo environment:
 
@@ -133,7 +129,7 @@ npm run dev
 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3054 \
 PLAYWRIGHT_ADMIN_EMAIL=demo@mcraftr.local \
 PLAYWRIGHT_ADMIN_PASSWORD=demo-password \
-npm run pw:screenshots
+npm run pw:screenshots:highlights
 ```
 
 ## Multi-Account and Multi-Server Model
