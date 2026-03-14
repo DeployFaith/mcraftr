@@ -19,6 +19,7 @@
     "pw:screenshots": "playwright test tests/playwright/repo-screenshots.spec.ts --project=desktop-chromium",
     "pw:screenshots:live-sections": "node scripts/capture-live-sections.mjs",
     "pw:screenshots:highlights": "node scripts/capture-repo-highlights.mjs",
+    "pw:screenshots:long-sections": "node scripts/capture-long-pages-sections.mjs",
     "pw:audit": "playwright test",
     "pw:audit:headed": "playwright test --headed"
   },
