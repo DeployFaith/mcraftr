@@ -6,16 +6,30 @@ It gives you a polished web UI for moderation, player tools, server actions, cha
 
 ## Repository Screenshots
 
-![Login](docs/screenshots/highlights/01-login.png)
-![Connect](docs/screenshots/highlights/02-connect.png)
-![Dashboard](docs/screenshots/highlights/03-dashboard.png)
-![Players](docs/screenshots/highlights/04-players.png)
-![Actions](docs/screenshots/highlights/05-actions.png)
-![Worlds](docs/screenshots/highlights/06-worlds.png)
-![Terminal](docs/screenshots/highlights/07-terminal.png)
-![Admin](docs/screenshots/highlights/08-admin.png)
-![Chat](docs/screenshots/highlights/09-chat.png)
-![Settings](docs/screenshots/highlights/10-settings.png)
+The full screenshot set lives in `docs/screenshots/highlights/`.
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/highlights/01-login.png" alt="Login" width="100%"></td>
+    <td><img src="docs/screenshots/highlights/02-connect.png" alt="Connect" width="100%"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/highlights/03-dashboard.png" alt="Dashboard" width="100%"></td>
+    <td><img src="docs/screenshots/highlights/04-players.png" alt="Players" width="100%"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/highlights/05-actions.png" alt="Actions" width="100%"></td>
+    <td><img src="docs/screenshots/highlights/06-worlds.png" alt="Worlds" width="100%"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/highlights/07-terminal.png" alt="Terminal" width="100%"></td>
+    <td><img src="docs/screenshots/highlights/08-admin.png" alt="Admin" width="100%"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/highlights/09-chat.png" alt="Chat" width="100%"></td>
+    <td><img src="docs/screenshots/highlights/10-settings.png" alt="Settings" width="100%"></td>
+  </tr>
+</table>
 
 ## Why Mcraftr
 
