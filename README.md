@@ -31,6 +31,21 @@ The full screenshot set lives in `docs/screenshots/highlights/`.
   </tr>
 </table>
 
+## Live Demo
+
+Try the public demo:
+
+- App: `https://demo.mcraftr.deployfaith.xyz/login`
+- Shared demo account: `demo@mcraftr.local`
+- Password: `L2TGLbw1zTbra6jeL0E`
+- Demo Minecraft server: `play.demo.mcraftr.deployfaith.xyz:25566`
+
+Notes:
+
+- The demo is a shared environment.
+- Demo state resets every 12 hours.
+- Expect occasional admin changes, test data churn, and other users online at the same time.
+
 ## Why Mcraftr
 
 Mcraftr is built for people who already have a Minecraft server and want a clean operations panel in front of it.
@@ -57,6 +72,13 @@ Use this if you want the fastest setup and already have a reachable RCON endpoin
 RCON + Bridge + Beacon for the full intended Mcraftr experience.
 
 Use this if you want richer world-aware operations, catalogs, previews, and filesystem-backed Minecraft context.
+
+What Full Stack adds over plain RCON:
+
+* structure catalogs and placement metadata
+* entity catalogs and preset-backed spawning
+* world-aware previews and inventory context
+* filesystem-backed access to Minecraft-side data through Beacon
 
 ## Core Model
 
@@ -195,6 +217,8 @@ Supported deployment styles include:
 For full installation and deployment guides, see:
 
 * [`INSTALL.md`](./INSTALL.md)
+* [`ROADMAP.md`](./ROADMAP.md)
+* [`CONTRIBUTING.md`](./CONTRIBUTING.md)
 
 ## Configuration
 
@@ -226,6 +250,20 @@ See `.env.example` for the full configuration surface.
 * authentication is session-based
 * saved device accounts use encrypted secure cookies
 * admin-only routes are enforced server-side
+
+## Testing
+
+Mcraftr currently uses Playwright for end-to-end coverage and screenshot/demo flows.
+
+Useful commands:
+
+* `npm run pw:audit`
+* `npm run pw:screenshots:highlights`
+* `npm run pw:screenshots:long-sections`
+
+## Contributing
+
+If you want to contribute, start with [`CONTRIBUTING.md`](./CONTRIBUTING.md) and check the near-term priorities in [`ROADMAP.md`](./ROADMAP.md).
 
 ## License
 
