@@ -14,6 +14,21 @@ It is designed around a simple model:
 - One Mcraftr account can manage multiple saved servers.
 - One browser can keep multiple Mcraftr accounts available for quick switching.
 
+## Repository Screenshots
+
+The repository includes a curated desktop screenshot set in `docs/screenshots/highlights/`.
+
+![Login](docs/screenshots/highlights/01-login.png)
+![Connect](docs/screenshots/highlights/02-connect.png)
+![Dashboard](docs/screenshots/highlights/03-dashboard.png)
+![Players](docs/screenshots/highlights/04-players.png)
+![Actions](docs/screenshots/highlights/05-actions.png)
+![Worlds](docs/screenshots/highlights/06-worlds.png)
+![Terminal](docs/screenshots/highlights/07-terminal.png)
+![Admin](docs/screenshots/highlights/08-admin.png)
+![Chat](docs/screenshots/highlights/09-chat.png)
+![Settings](docs/screenshots/highlights/10-settings.png)
+
 ## What Mcraftr Does Well
 
 ### Dashboard
@@ -100,22 +115,9 @@ It is best when used as a focused Minecraft operations panel sitting in front of
 
 Most major sections are collapsible so long pages stay manageable.
 
-## Repository Screenshots
+## Screenshot Capture (Maintainers)
 
-The repository includes a curated desktop screenshot set in `docs/screenshots/highlights/`.
-
-![Login](docs/screenshots/highlights/01-login.png)
-![Connect](docs/screenshots/highlights/02-connect.png)
-![Dashboard](docs/screenshots/highlights/03-dashboard.png)
-![Players](docs/screenshots/highlights/04-players.png)
-![Actions](docs/screenshots/highlights/05-actions.png)
-![Worlds](docs/screenshots/highlights/06-worlds.png)
-![Terminal](docs/screenshots/highlights/07-terminal.png)
-![Admin](docs/screenshots/highlights/08-admin.png)
-![Chat](docs/screenshots/highlights/09-chat.png)
-![Settings](docs/screenshots/highlights/10-settings.png)
-
-To refresh these screenshots safely in a local demo environment:
+To refresh repository screenshots safely in a local demo environment:
 
 ```bash
 PORT=3054 \
