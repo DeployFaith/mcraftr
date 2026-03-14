@@ -8,6 +8,8 @@ Curated Mcraftr highlight screenshots
 06-worlds.png
 07-terminal.png
 08-admin.png
+09-chat.png
+10-settings.png
 
 Generated with:
 - npm run pw:screenshots:highlights

@@ -112,6 +112,8 @@ The repository includes a curated desktop screenshot set in `docs/screenshots/hi
 ![Worlds](docs/screenshots/highlights/06-worlds.png)
 ![Terminal](docs/screenshots/highlights/07-terminal.png)
 ![Admin](docs/screenshots/highlights/08-admin.png)
+![Chat](docs/screenshots/highlights/09-chat.png)
+![Settings](docs/screenshots/highlights/10-settings.png)
 
 To refresh these screenshots safely in a local demo environment:
 

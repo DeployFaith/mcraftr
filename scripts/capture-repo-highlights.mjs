@@ -23,65 +23,61 @@ function loadEnvFiles() {
 async function settle(page) {
   await page.waitForLoadState('domcontentloaded')
   await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {})
-  await page.waitForTimeout(350)
+  await page.waitForTimeout(450)
 }
 
 async function removeNoisyUi(page) {
   await page.evaluate(() => {
-    for (const selector of ['[data-nextjs-toast]', '.nextjs-toast-errors', '#__next-build-watcher']) {
+    for (const selector of [
+      '[data-nextjs-toast]',
+      '.nextjs-toast-errors',
+      '#__next-build-watcher',
+      '#webpack-dev-server-client-overlay',
+      '#nextjs__container_errors_label',
+      '[data-nextjs-dialog-overlay]',
+      '[data-nextjs-dialog]',
+    ]) {
       for (const node of document.querySelectorAll(selector)) node.remove()
     }
   })
 }
 
-async function captureLocator(page, locator, fileName) {
-  const visible = await locator.first().isVisible().catch(() => false)
-  if (!visible) {
-    const fallbackMain = page.locator('main').first()
-    const fallback = (await fallbackMain.isVisible().catch(() => false)) ? fallbackMain : page.locator('body').first()
-    await fallback.screenshot({ path: path.join(OUT_DIR, fileName), animations: 'disabled' })
-    return
-  }
-  await locator.first().scrollIntoViewIfNeeded().catch(() => {})
-  await page.waitForTimeout(180)
-  await locator.first().screenshot({ path: path.join(OUT_DIR, fileName), animations: 'disabled' })
+async function sanitizeSensitiveText(page) {
+  await page.evaluate(() => {
+    const replacements = [
+      { pattern: /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, value: 'demo-user@example.com' },
+      { pattern: /\b\d{1,3}(?:\.\d{1,3}){3}\b/g, value: '203.0.113.10' },
+      { pattern: /\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}\b/gi, value: 'demo.mcraftr.local' },
+    ]
+
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+    const nodes = []
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node)
+
+    for (const node of nodes) {
+      let text = node.textContent ?? ''
+      if (!text.trim()) continue
+      for (const replacement of replacements) text = text.replace(replacement.pattern, replacement.value)
+      node.textContent = text
+    }
+  })
 }
 
-async function pickActivePlayer(page) {
-  const list = await page.request.get('/api/players', { timeout: 20000 })
-  if (!list.ok()) return null
-  const payload = await list.json()
-  const players = (typeof payload.players === 'string' ? payload.players : '')
-    .split(',')
-    .map(part => part.trim())
-    .filter(Boolean)
-  return players[0] ?? null
-}
-
-async function ensurePlayerSelected(page, playerName) {
-  if (!playerName) return
-  const activeCard = page.locator('main .glass-card').filter({ has: page.getByText(/^ACTIVE PLAYER$/) }).first()
-  if (!(await activeCard.isVisible().catch(() => false))) return
-
-  const expanded = await activeCard.locator('button[aria-expanded]').first().getAttribute('aria-expanded').catch(() => 'true')
-  if (expanded === 'false') {
-    await activeCard.locator('button[aria-expanded]').first().click().catch(() => {})
-    await page.waitForTimeout(180)
-  }
-
-  const candidate = activeCard.getByRole('button', { name: new RegExp(`^${playerName}$`, 'i') }).first()
-  if (await candidate.isVisible().catch(() => false)) {
-    await candidate.click().catch(() => {})
-    await page.waitForTimeout(150)
-    return
-  }
-
-  const input = activeCard.locator('input[placeholder*="player name" i]').first()
-  if (await input.isVisible().catch(() => false)) {
-    await input.fill(playerName)
-    await input.press('Enter').catch(() => {})
-    await page.waitForTimeout(150)
-  }
+async function captureFullPage(page, fileName) {
+  await page.addStyleTag({
+    content: [
+      '* { scroll-behavior: auto !important; }',
+      '* { caret-color: transparent !important; }',
+      'html, body { background: #0b0b0b !important; }',
+    ].join('\n'),
+  }).catch(() => {})
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.waitForTimeout(200)
+  await page.screenshot({
+    fullPage: true,
+    animations: 'disabled',
+    path: path.join(OUT_DIR, fileName),
+  })
 }
 
 async function main() {
@@ -95,12 +91,18 @@ async function main() {
   if (!adminEmail || !adminPassword) throw new Error('Missing screenshot credentials')
 
   const browser = await chromium.launch({ headless: true })
-  const page = await browser.newPage({ baseURL, viewport: { width: 1500, height: 1000 } })
+  const context = await browser.newContext({
+    baseURL,
+    viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 2,
+  })
+  const page = await context.newPage()
 
   await page.goto('/login', { waitUntil: 'domcontentloaded' })
   await settle(page)
   await removeNoisyUi(page)
-  await captureLocator(page, page.locator('form').first(), '01-login.png')
+  await sanitizeSensitiveText(page)
+  await captureFullPage(page, '01-login.png')
 
   await page.locator('input[autocomplete="username"]').fill(adminEmail)
   await page.locator('input[autocomplete="current-password"]').fill(adminPassword)
@@ -108,26 +110,27 @@ async function main() {
   await page.waitForURL(/\/(minecraft|connect)(\?|$)/, { timeout: 30000 })
   await settle(page)
 
-  const playerName = await pickActivePlayer(page)
-
   const views = [
-    { route: '/connect', file: '02-connect.png', selector: page.locator('main .glass-card').first() },
-    { route: '/minecraft?tab=dashboard', file: '03-dashboard.png', selector: page.locator('main').first() },
-    { route: '/minecraft?tab=players', file: '04-players.png', selector: page.locator('main').first() },
-    { route: '/minecraft?tab=actions', file: '05-actions.png', selector: page.locator('main .glass-card').filter({ has: page.getByText(/^PLAYER COMMANDS$/i) }).first() },
-    { route: '/minecraft?tab=worlds', file: '06-worlds.png', selector: page.locator('main .glass-card').filter({ has: page.getByText(/^STRUCTURE CATALOG$/i) }).first() },
-    { route: '/minecraft?tab=terminal', file: '07-terminal.png', selector: page.locator('main').first() },
-    { route: '/minecraft?tab=admin', file: '08-admin.png', selector: page.locator('main').first() },
+    { route: '/connect', file: '02-connect.png' },
+    { route: '/minecraft?tab=dashboard', file: '03-dashboard.png' },
+    { route: '/minecraft?tab=players', file: '04-players.png' },
+    { route: '/minecraft?tab=actions', file: '05-actions.png' },
+    { route: '/minecraft?tab=worlds', file: '06-worlds.png' },
+    { route: '/minecraft?tab=terminal', file: '07-terminal.png' },
+    { route: '/minecraft?tab=admin', file: '08-admin.png' },
+    { route: '/minecraft?tab=chat', file: '09-chat.png' },
+    { route: '/minecraft?tab=settings', file: '10-settings.png' },
   ]
 
   for (const view of views) {
     await page.goto(view.route, { waitUntil: 'domcontentloaded' })
     await settle(page)
     await removeNoisyUi(page)
-    await ensurePlayerSelected(page, playerName)
-    await captureLocator(page, view.selector, view.file)
+    await sanitizeSensitiveText(page)
+    await captureFullPage(page, view.file)
   }
 
+  await context.close()
   await browser.close()
 }
 
