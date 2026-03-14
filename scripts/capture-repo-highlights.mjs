@@ -42,37 +42,17 @@ async function removeNoisyUi(page) {
   })
 }
 
-async function removeErrorUi(page) {
-  await page.evaluate(() => {
-    const patterns = [
-      /bridge prefix .* not valid/i,
-      /feature disabled by admin/i,
-      /server unreachable/i,
-      /failed/i,
-      /error/i,
-      /unavailable/i,
-    ]
-
-    for (const selector of ['[role="alert"]', '.text-red-500', '.text-red-400', '.text-destructive']) {
-      for (const node of document.querySelectorAll(selector)) node.remove()
-    }
-
-    const candidates = Array.from(document.querySelectorAll('div, p, span, li'))
-    for (const node of candidates) {
-      const text = (node.textContent ?? '').trim()
-      if (!text) continue
-      if (!patterns.some(pattern => pattern.test(text))) continue
-
-      let target = node
-      for (let i = 0; i < 4; i++) {
-        const parent = target.parentElement
-        if (!parent) break
-        if (parent.tagName === 'MAIN' || parent.tagName === 'BODY') break
-        target = parent
-      }
-      target.remove()
-    }
-  })
+async function ensureRenderableContent(page) {
+  await page.waitForSelector('body', { state: 'visible', timeout: 20000 })
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const length = await page.evaluate(() => {
+      const main = document.querySelector('main')
+      const text = (main?.textContent ?? document.body.textContent ?? '').trim()
+      return text.length
+    })
+    if (length >= 120) return
+    await settle(page)
+  }
 }
 
 async function sanitizeSensitiveText(page) {
@@ -101,7 +81,6 @@ async function captureFullPage(page, fileName) {
     content: [
       '* { scroll-behavior: auto !important; }',
       '* { caret-color: transparent !important; }',
-      'html, body { background: #0b0b0b !important; }',
     ].join('\n'),
   }).catch(() => {})
   await page.evaluate(() => window.scrollTo(0, 0))
@@ -133,8 +112,8 @@ async function main() {
 
   await page.goto('/login', { waitUntil: 'domcontentloaded' })
   await settle(page)
+  await ensureRenderableContent(page)
   await removeNoisyUi(page)
-  await removeErrorUi(page)
   await sanitizeSensitiveText(page)
   await captureFullPage(page, '01-login.png')
 
@@ -159,8 +138,8 @@ async function main() {
   for (const view of views) {
     await page.goto(view.route, { waitUntil: 'domcontentloaded' })
     await settle(page)
+    await ensureRenderableContent(page)
     await removeNoisyUi(page)
-    await removeErrorUi(page)
     await sanitizeSensitiveText(page)
     await captureFullPage(page, view.file)
   }
