@@ -42,6 +42,39 @@ async function removeNoisyUi(page) {
   })
 }
 
+async function removeErrorUi(page) {
+  await page.evaluate(() => {
+    const patterns = [
+      /bridge prefix .* not valid/i,
+      /feature disabled by admin/i,
+      /server unreachable/i,
+      /failed/i,
+      /error/i,
+      /unavailable/i,
+    ]
+
+    for (const selector of ['[role="alert"]', '.text-red-500', '.text-red-400', '.text-destructive']) {
+      for (const node of document.querySelectorAll(selector)) node.remove()
+    }
+
+    const candidates = Array.from(document.querySelectorAll('div, p, span, li'))
+    for (const node of candidates) {
+      const text = (node.textContent ?? '').trim()
+      if (!text) continue
+      if (!patterns.some(pattern => pattern.test(text))) continue
+
+      let target = node
+      for (let i = 0; i < 4; i++) {
+        const parent = target.parentElement
+        if (!parent) break
+        if (parent.tagName === 'MAIN' || parent.tagName === 'BODY') break
+        target = parent
+      }
+      target.remove()
+    }
+  })
+}
+
 async function sanitizeSensitiveText(page) {
   await page.evaluate(() => {
     const replacements = [
@@ -101,6 +134,7 @@ async function main() {
   await page.goto('/login', { waitUntil: 'domcontentloaded' })
   await settle(page)
   await removeNoisyUi(page)
+  await removeErrorUi(page)
   await sanitizeSensitiveText(page)
   await captureFullPage(page, '01-login.png')
 
@@ -126,6 +160,7 @@ async function main() {
     await page.goto(view.route, { waitUntil: 'domcontentloaded' })
     await settle(page)
     await removeNoisyUi(page)
+    await removeErrorUi(page)
     await sanitizeSensitiveText(page)
     await captureFullPage(page, view.file)
   }
