@@ -44,6 +44,7 @@ Notes:
 
 - The demo is a shared environment.
 - Demo state resets every 12 hours.
+- The shared demo account cannot change its email, password, or delete itself.
 - Expect occasional admin changes, test data churn, and other users online at the same time.
 
 ## Why Mcraftr
@@ -231,6 +232,7 @@ Important runtime variables include:
 * `REDIS_URL`
 * `DATA_DIR`
 * `ALLOW_REGISTRATION`
+* `MCRAFTR_PROTECTED_ACCOUNTS`
 
 See `.env.example` for the full configuration surface.
 

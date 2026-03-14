@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { signOut } from '@/auth.node'
 import { getUserById, validatePassword, deleteUser } from '@/lib/users'
 import { checkRateLimit } from '@/lib/ratelimit'
+import { isProtectedAccountEmail } from '@/lib/protected-accounts'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -26,6 +27,9 @@ export async function DELETE(req: NextRequest) {
     const user = getUserById(session.user.id)
     if (!user) {
       return Response.json({ ok: false, error: 'User not found' }, { status: 404 })
+    }
+    if (isProtectedAccountEmail(user.email)) {
+      return Response.json({ ok: false, error: 'Demo account profile changes are disabled' }, { status: 403 })
     }
     if (!validatePassword(user, currentPassword)) {
       return Response.json({ ok: false, error: 'Password is incorrect' }, { status: 403 })
