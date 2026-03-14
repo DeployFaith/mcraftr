@@ -42,6 +42,37 @@ async function removeNoisyUi(page) {
   })
 }
 
+async function removeErrorBanners(page) {
+  await page.evaluate(() => {
+    const directSelectors = [
+      '[role="alert"]',
+      '[aria-live="assertive"]',
+      '.toast-error',
+      '.alert-error',
+      '.banner-error',
+      '.nextjs-toast-errors-parent',
+    ]
+    for (const selector of directSelectors) {
+      for (const node of document.querySelectorAll(selector)) node.remove()
+    }
+
+    const errorPattern = /(error|failed|unavailable|invalid|could not|cannot connect|connection refused)/i
+    const nodes = Array.from(document.querySelectorAll('div, section, aside'))
+    for (const node of nodes) {
+      const text = (node.textContent ?? '').trim()
+      if (!text || !errorPattern.test(text)) continue
+
+      const style = window.getComputedStyle(node)
+      const isOverlay = style.position === 'fixed' || style.position === 'sticky' || style.zIndex !== 'auto'
+      const isBanner = node.className.toString().toLowerCase().includes('toast')
+        || node.className.toString().toLowerCase().includes('alert')
+        || node.className.toString().toLowerCase().includes('banner')
+
+      if (isOverlay || isBanner) node.remove()
+    }
+  })
+}
+
 async function ensureRenderableContent(page) {
   await page.waitForSelector('body', { state: 'visible', timeout: 20000 })
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -114,6 +145,7 @@ async function main() {
   await settle(page)
   await ensureRenderableContent(page)
   await removeNoisyUi(page)
+  await removeErrorBanners(page)
   await sanitizeSensitiveText(page)
   await captureFullPage(page, '01-login.png')
 
@@ -140,6 +172,7 @@ async function main() {
     await settle(page)
     await ensureRenderableContent(page)
     await removeNoisyUi(page)
+    await removeErrorBanners(page)
     await sanitizeSensitiveText(page)
     await captureFullPage(page, view.file)
   }
