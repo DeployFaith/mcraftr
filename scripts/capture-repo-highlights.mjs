@@ -107,6 +107,51 @@ async function sanitizeSensitiveText(page) {
   })
 }
 
+async function getOnlinePlayer(page) {
+  const response = await page.request.get('/api/players', { timeout: 20000 })
+  if (!response.ok()) return null
+  const payload = await response.json()
+  const players = (typeof payload.players === 'string' ? payload.players : '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean)
+  return players[0] ?? null
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+async function selectActivePlayer(page, playerName) {
+  if (!playerName) return
+
+  const card = page.locator('main .glass-card').filter({ has: page.getByText(/^ACTIVE PLAYER$/i) }).first()
+  if (!(await card.isVisible().catch(() => false))) return
+
+  const toggle = card.locator('button[aria-expanded]').first()
+  if (await toggle.isVisible().catch(() => false)) {
+    const expanded = await toggle.getAttribute('aria-expanded').catch(() => 'true')
+    if (expanded === 'false') {
+      await toggle.click().catch(() => {})
+      await page.waitForTimeout(150)
+    }
+  }
+
+  const chip = card.getByRole('button', { name: new RegExp(`^${escapeRegExp(playerName)}$`, 'i') }).first()
+  if (await chip.isVisible().catch(() => false)) {
+    await chip.click().catch(() => {})
+    await page.waitForTimeout(150)
+    return
+  }
+
+  const input = card.locator('input[placeholder*="player" i]').first()
+  if (await input.isVisible().catch(() => false)) {
+    await input.fill(playerName)
+    await input.press('Enter').catch(() => {})
+    await page.waitForTimeout(150)
+  }
+}
+
 async function captureFullPage(page, fileName) {
   await page.addStyleTag({
     content: [
@@ -155,6 +200,8 @@ async function main() {
   await page.waitForURL(/\/(minecraft|connect)(\?|$)/, { timeout: 30000 })
   await settle(page)
 
+  const onlinePlayer = await getOnlinePlayer(page)
+
   const views = [
     { route: '/connect', file: '02-connect.png' },
     { route: '/minecraft?tab=dashboard', file: '03-dashboard.png' },
@@ -171,8 +218,10 @@ async function main() {
     await page.goto(view.route, { waitUntil: 'domcontentloaded' })
     await settle(page)
     await ensureRenderableContent(page)
+    await selectActivePlayer(page, onlinePlayer)
     await removeNoisyUi(page)
     await removeErrorBanners(page)
+    await selectActivePlayer(page, onlinePlayer)
     await sanitizeSensitiveText(page)
     await captureFullPage(page, view.file)
   }
