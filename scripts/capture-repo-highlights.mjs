@@ -108,6 +108,9 @@ async function sanitizeSensitiveText(page) {
 }
 
 async function getOnlinePlayer(page) {
+  const preferred = process.env.PLAYWRIGHT_ACTIVE_PLAYER?.trim()
+  if (preferred) return preferred
+
   const response = await page.request.get('/api/players', { timeout: 20000 })
   if (!response.ok()) return null
   const payload = await response.json()
@@ -214,7 +217,19 @@ async function main() {
     { route: '/minecraft?tab=settings', file: '10-settings.png' },
   ]
 
-  for (const view of views) {
+  const only = (process.env.PLAYWRIGHT_ONLY || '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+
+  const activeViews = only.length === 0
+    ? views
+    : views.filter((view) => {
+      const name = view.file.replace(/^\d+-/, '').replace(/\.png$/, '').toLowerCase()
+      return only.includes(name)
+    })
+
+  for (const view of activeViews) {
     await page.goto(view.route, { waitUntil: 'domcontentloaded' })
     await settle(page)
     await ensureRenderableContent(page)
