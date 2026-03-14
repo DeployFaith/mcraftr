@@ -236,7 +236,7 @@ Important runtime variables include:
 * `REDIS_URL`
 * `DATA_DIR`
 * `ALLOW_REGISTRATION`
-* `MCRAFTR_PROTECTED_ACCOUNTS`
+* `MCRAFTR_PROTECTED_ACCOUNTS` (optional, comma-separated)
 
 See `.env.example` for the full configuration surface.
 

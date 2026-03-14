@@ -37,7 +37,7 @@ export async function PUT(req: NextRequest) {
       return Response.json({ ok: false, error: 'User not found' }, { status: 404 })
     }
     if (isProtectedAccountEmail(user.email)) {
-      return Response.json({ ok: false, error: 'Demo account profile changes are disabled' }, { status: 403 })
+      return Response.json({ ok: false, error: 'Profile changes are disabled for this account' }, { status: 403 })
     }
     if (!validatePassword(user, currentPassword)) {
       return Response.json({ ok: false, error: 'Current password is incorrect' }, { status: 403 })
