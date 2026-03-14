@@ -51,6 +51,12 @@ Notes:
 - The shared demo account cannot change its email, password, or delete itself.
 - Expect occasional admin changes, test data churn, and other users online at the same time.
 
+What you can test there:
+
+* the web UI with the shared demo account
+* the demo Minecraft server with a real player connection
+* player-aware flows like Players, Actions, and Worlds when someone is online
+
 ## Why Mcraftr
 
 Mcraftr is built for people who already have a Minecraft server and want a clean operations panel in front of it.
@@ -84,6 +90,12 @@ What Full Stack adds over plain RCON:
 * entity catalogs and preset-backed spawning
 * world-aware previews and inventory context
 * filesystem-backed access to Minecraft-side data through Beacon
+
+What each piece does:
+
+* `RCON` handles normal command execution and server interaction
+* `Bridge` exposes extra Minecraft-side operations that plain RCON cannot model cleanly
+* `Beacon` gives Mcraftr read access to Minecraft-side data paths so the app can power richer world-aware features
 
 ## Core Model
 

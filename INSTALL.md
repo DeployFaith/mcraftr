@@ -7,6 +7,34 @@ This guide focuses on the easiest supported ways to run Mcraftr.
 - `Quick Connect` — fastest setup, RCON-only, no Bridge or Beacon required
 - `Full Mcraftr Stack` — RCON + Bridge + Beacon, recommended for the full product
 
+## Live Demo
+
+If you want to try Mcraftr before installing it:
+
+- App: `https://demo.mcraftr.deployfaith.xyz/login`
+- Shared demo account: `demo@mcraftr.local`
+- Password: `L2TGLbw1zTbra6jeL0E`
+- Demo Minecraft server: `play.demo.mcraftr.deployfaith.xyz:25566`
+
+Notes:
+
+- This is a shared demo environment.
+- Demo state resets every 12 hours.
+- The shared demo account cannot change its email, password, or delete itself.
+
+## Bridge And Beacon, Plainly
+
+`Quick Connect` only uses RCON.
+
+`Full Mcraftr Stack` adds two extra pieces:
+
+- `Bridge` — exposes richer Minecraft-side operations that go beyond plain RCON command flows
+- `Beacon` — gives Mcraftr access to Minecraft-side data paths for world-aware catalogs, previews, and filesystem-backed context
+
+Use `Quick Connect` if you just want to manage a server over RCON.
+
+Use `Full Mcraftr Stack` if you want the worlds, structures, entities, and richer Mcraftr-specific workflows.
+
 ## Option 1: Quick Connect With Docker Compose
 
 Best for most users on a VPS, home server, or local Docker host.
