@@ -269,16 +269,6 @@ See `.env.example` for the full configuration surface.
 * saved device accounts use encrypted secure cookies
 * admin-only routes are enforced server-side
 
-## Testing
-
-Mcraftr currently uses Playwright for end-to-end coverage and screenshot/demo flows.
-
-Useful commands:
-
-* `npm run pw:audit`
-* `npm run pw:screenshots:highlights`
-* `npm run pw:screenshots:long-sections`
-
 ## Contributing
 
 If you want to contribute, start with [`CONTRIBUTING.md`](./CONTRIBUTING.md) and check the near-term priorities in [`ROADMAP.md`](./ROADMAP.md).
