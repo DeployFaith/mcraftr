@@ -2,7 +2,7 @@
   "name": "mcraftr",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "scripts": {
     "setup:env": "node scripts/setup-env.mjs",
     "dev": "next dev --turbopack",
