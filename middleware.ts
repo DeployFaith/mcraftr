@@ -12,7 +12,7 @@ export default auth((req) => {
   }
 
   // Allow public routes through unconditionally
-  const publicPaths = ['/login', '/register', '/api/auth']
+  const publicPaths = ['/login', '/register', '/api/auth', '/']
   if (publicPaths.some(p => nextUrl.pathname.startsWith(p))) {
     return NextResponse.next()
   }
