@@ -419,7 +419,7 @@ export default function DocsPage() {
                     alt={shot.alt}
                     fill
                     sizes={index === 0 ? '(max-width: 1280px) 100vw, 66vw' : '(max-width: 1280px) 100vw, 33vw'}
-                    className="h-full w-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.02]"
+                    className="h-full w-full scale-[1.12] object-cover object-top transition-transform duration-300 group-hover:scale-[1.15]"
                   />
                 </div>
                 <div className="space-y-2 px-5 py-5">
