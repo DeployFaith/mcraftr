@@ -175,19 +175,6 @@ export default function DashboardSection({ onNavigate }: { onNavigate: (tab: 'pl
             </div>
 
             <div className="space-y-4">
-              <div className="glass-card p-4 space-y-3">
-                <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">QUICK JUMPS</div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <button onClick={() => onNavigate('players')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Players</button>
-                  <button onClick={() => onNavigate('actions')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Actions</button>
-                  {data.server.stackMode === 'full' && (
-                    <button onClick={() => onNavigate('worlds')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Worlds</button>
-                  )}
-                  <button onClick={() => onNavigate('admin')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Admin</button>
-                  <button onClick={() => onNavigate('settings')} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)]">Settings</button>
-                </div>
-              </div>
-
               {data.stack && (
                 <div className="glass-card p-4 space-y-3">
                   <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">SERVER SURFACE</div>

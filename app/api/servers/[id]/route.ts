@@ -4,6 +4,7 @@ import { normalizeMinecraftVersion } from '@/lib/minecraft-version'
 import { getSessionUserId } from '@/lib/rcon'
 import { testBeaconConnection, testBridgeConnection } from '@/lib/server-bridge'
 import { getServerStackDescription, getServerStackLabel } from '@/lib/server-stack'
+import { DEMO_RESTRICTED_SERVER_MESSAGE, isDemoRestrictedUser } from '@/lib/demo-policy'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -55,6 +56,12 @@ export async function PUT(
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Not authenticated' }, { status: 401 })
   try {
+    const currentUser = getUserById(userId)
+    if (!currentUser) return Response.json({ ok: false, error: 'User not found' }, { status: 404 })
+    if (isDemoRestrictedUser(currentUser)) {
+      return Response.json({ ok: false, error: DEMO_RESTRICTED_SERVER_MESSAGE }, { status: 403 })
+    }
+
     const { id } = await params
     const {
       label,
@@ -176,6 +183,12 @@ export async function DELETE(
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Not authenticated' }, { status: 401 })
   try {
+    const currentUser = getUserById(userId)
+    if (!currentUser) return Response.json({ ok: false, error: 'User not found' }, { status: 404 })
+    if (isDemoRestrictedUser(currentUser)) {
+      return Response.json({ ok: false, error: DEMO_RESTRICTED_SERVER_MESSAGE }, { status: 403 })
+    }
+
     const { id } = await params
     const user = deleteUserServer(userId, id)
     return Response.json({ ok: true, activeServerId: user.activeServerId, hasServer: user.servers.length > 0 })

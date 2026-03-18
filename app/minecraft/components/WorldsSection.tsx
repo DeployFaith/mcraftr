@@ -1,10 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CloudLightning, CloudSun, Moon, Sun } from 'lucide-react'
 import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
+import McraftrSwitch from './McraftrSwitch'
 import PlayerPicker from './PlayerPicker'
 import SpawnInspectModal, { type EntityCatalogEntry, type LocationMode, type StructureCatalogEntry } from './SpawnInspectModal'
-import CatalogArtwork from './CatalogArtwork'
+import CatalogArtwork, { isCatalogArtworkEnabled } from './CatalogArtwork'
 import EntityPresetEditorModal from './EntityPresetEditorModal'
 import { playSound } from '@/app/components/soundfx'
 import type { CatalogArtPayload } from '@/lib/catalog-art/types'
@@ -12,21 +14,6 @@ import type { FeatureKey } from '@/lib/features'
 import { FALLBACK_ENTITY_CATALOG } from '@/lib/entity-catalog'
 
 type FeatureFlags = Record<FeatureKey, boolean>
-
-type PluginStackData = {
-  ok: boolean
-  bridge: {
-    ok?: boolean
-    error?: string
-    serverVersion?: string | null
-    plugins?: Array<{ key: string; name: string; installed: boolean; enabled: boolean; version: string | null; source: string }>
-  }
-  sidecar: {
-    ok?: boolean
-    error?: string
-    capabilities?: string[]
-  }
-}
 
 type WorldEntry = {
   name: string
@@ -157,6 +144,12 @@ const WORLD_TOGGLE_SETTINGS = [
   ['autoload', 'Autoload'],
 ] as const
 const WORLD_DIFFICULTIES = ['peaceful', 'easy', 'normal', 'hard'] as const
+const WORLD_COMMANDS = [
+  { id: 'day', Icon: Sun, label: 'Day' },
+  { id: 'night', Icon: Moon, label: 'Night' },
+  { id: 'clear_weather', Icon: CloudSun, label: 'Clear Sky' },
+  { id: 'storm', Icon: CloudLightning, label: 'Storm' },
+] as const
 
 function titleCase(value: string): string {
   return value
@@ -440,7 +433,6 @@ export default function WorldsSection({
   onSelectedPlayerChange: (player: string) => void
 }) {
   const [features, setFeatures] = useState<FeatureFlags | null>(null)
-  const [pluginStack, setPluginStack] = useState<PluginStackData | null>(null)
   const [worldsData, setWorldsData] = useState<WorldsData | null>(null)
   const [structures, setStructures] = useState<StructureCatalogEntry[]>([])
   const [entities, setEntities] = useState<EntityCatalogEntry[]>(DEFAULT_ENTITY_CATALOG)
@@ -456,6 +448,8 @@ export default function WorldsSection({
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [collapseAllActive, setCollapseAllActive] = useState(false)
+  const [activeWorld, setActiveWorld] = useState('')
+  const [customTimeInput, setCustomTimeInput] = useState('6000')
 
   const [spawnWorld, setSpawnWorld] = useState('')
   const [spawnMode, setSpawnMode] = useState<LocationMode>('player')
@@ -465,6 +459,7 @@ export default function WorldsSection({
 
   const [structureSearch, setStructureSearch] = useState('')
   const [structureCategory, setStructureCategory] = useState('all')
+  const [structureSourceFilter, setStructureSourceFilter] = useState<'all' | 'templates' | 'worldgen'>('all')
   const [selectedStructure, setSelectedStructure] = useState<StructureCatalogEntry | null>(null)
   const [structureModalMode, setStructureModalMode] = useState<'place' | 'remove'>('place')
   const [placementToRemove, setPlacementToRemove] = useState<PlacementEntry | null>(null)
@@ -496,6 +491,7 @@ export default function WorldsSection({
   const [catalogBusy, setCatalogBusy] = useState(false)
   const [entityCategoryPage, setEntityCategoryPage] = useState(0)
   const [liveEntityWorldFilter, setLiveEntityWorldFilter] = useState('')
+  const [worldCommandBusy, setWorldCommandBusy] = useState<string | null>(null)
 
   const [placementWorldFilter, setPlacementWorldFilter] = useState('')
   const [placementMode, setPlacementMode] = useState<LocationMode>('coords')
@@ -505,11 +501,12 @@ export default function WorldsSection({
   const structureUploadRef = useRef<HTMLInputElement | null>(null)
   const entityUploadRef = useRef<HTMLInputElement | null>(null)
 
-  const canPluginStatus = features?.enable_plugin_stack_status ?? true
   const canWorldInventory = features?.enable_world_inventory ?? true
   const canSpawnTools = features?.enable_world_spawn_tools ?? true
   const canStructureCatalog = features?.enable_structure_catalog ?? true
   const canEntityCatalog = features?.enable_entity_catalog ?? true
+  const canWorldControls = features?.enable_world ?? true
+  const activeWorldEntry = worldsData?.worlds.find(world => world.name === activeWorld) ?? worldsData?.worlds[0] ?? null
 
   const loadFeatures = useCallback(async () => {
     try {
@@ -544,15 +541,6 @@ export default function WorldsSection({
     setStructureLoadError(null)
     setEntityLoadError(null)
     const nextErrors: string[] = []
-
-    if (canPluginStatus) {
-      try {
-        const res = await fetch('/api/minecraft/plugin-stack', { cache: 'no-store' })
-        setPluginStack(await res.json())
-      } catch (nextError) {
-        nextErrors.push(nextError instanceof Error ? nextError.message : 'Failed to load integration status')
-      }
-    }
 
     if (canWorldInventory || canSpawnTools) {
       try {
@@ -627,7 +615,37 @@ export default function WorldsSection({
 
     setError(nextErrors[0] ?? null)
     setLoading(false)
-  }, [canEntityCatalog, canPluginStatus, canSpawnTools, canStructureCatalog, canWorldInventory])
+  }, [canEntityCatalog, canSpawnTools, canStructureCatalog, canWorldInventory])
+
+  const runWorldCommand = useCallback(async (kind: 'time' | 'weather', value: string) => {
+    if (!activeWorld) {
+      setError('Choose an active world first.')
+      return
+    }
+    const key = `${kind}:${value}:${activeWorld}`
+    setWorldCommandBusy(key)
+    try {
+      const response = await fetch(`/api/minecraft/worlds/${encodeURIComponent(activeWorld)}/environment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind, value }),
+      })
+      const payload = await response.json()
+      if (payload.ok) {
+        if (payload.world) {
+          setWorldDetails(current => ({ ...current, [activeWorld]: payload.world as WorldSettingsEntry }))
+        }
+        setStatus(payload.message || `Updated ${activeWorld} ${kind}.`)
+        playSound('uiClick')
+      } else {
+        setError(payload.error || 'World action failed')
+      }
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'World action failed')
+    } finally {
+      setWorldCommandBusy(null)
+    }
+  }, [activeWorld])
 
   useEffect(() => {
     void loadFeatures()
@@ -641,11 +659,31 @@ export default function WorldsSection({
 
   useEffect(() => {
     const firstWorld = worldsData?.worlds?.[0]?.name ?? ''
+    const defaultWorld = worldsData?.defaultWorld?.trim() || firstWorld
+    if (!activeWorld && defaultWorld) setActiveWorld(defaultWorld)
     if (!spawnWorld && firstWorld) setSpawnWorld(firstWorld)
     if (!structureWorld && firstWorld) setStructureWorld(firstWorld)
     if (!entityWorld && firstWorld) setEntityWorld(firstWorld)
     if (!placementWorldFilter && firstWorld) setPlacementWorldFilter(firstWorld)
-  }, [entityWorld, placementWorldFilter, spawnWorld, structureWorld, worldsData])
+  }, [activeWorld, entityWorld, placementWorldFilter, spawnWorld, structureWorld, worldsData])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const stored = window.localStorage.getItem('mcraftr.worlds.active-world')
+    if (stored) setActiveWorld(stored)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !activeWorld) return
+    window.localStorage.setItem('mcraftr.worlds.active-world', activeWorld)
+  }, [activeWorld])
+
+  useEffect(() => {
+    if (!worldsData?.worlds?.length) return
+    if (!activeWorld || !worldsData.worlds.some(world => world.name === activeWorld)) {
+      setActiveWorld(worldsData.defaultWorld?.trim() || worldsData.worlds[0]?.name || '')
+    }
+  }, [activeWorld, worldsData])
 
   useEffect(() => {
     let cancelled = false
@@ -687,7 +725,7 @@ export default function WorldsSection({
 
   useEffect(() => {
     setStructureCategoryPage(0)
-  }, [structureCategory, structureSearch])
+  }, [structureCategory, structureSearch, structureSourceFilter])
 
   useEffect(() => {
     setEntityCategoryPage(0)
@@ -704,11 +742,13 @@ export default function WorldsSection({
   const filteredStructures = useMemo(() => {
     const needle = structureSearch.trim().toLowerCase()
     return structures.filter(entry => {
+      if (structureSourceFilter === 'templates' && entry.placementKind !== 'schematic' && entry.placementKind !== 'native-template') return false
+      if (structureSourceFilter === 'worldgen' && entry.placementKind !== 'native-worldgen') return false
       if (structureCategory !== 'all' && entry.category !== structureCategory) return false
       if (!needle) return true
       return entry.label.toLowerCase().includes(needle) || entry.id.toLowerCase().includes(needle)
     })
-  }, [structureCategory, structureSearch, structures])
+  }, [structureCategory, structureSearch, structureSourceFilter, structures])
 
   const groupedStructures = useMemo(() => {
     const groups = new Map<string, StructureCatalogEntry[]>()
@@ -762,8 +802,6 @@ export default function WorldsSection({
   const entityCategoryPageCount = Math.max(1, Math.ceil(groupedNativeEntities.length / WORLD_CATEGORY_PAGE_SIZE))
   const pagedStructureGroups = categoryPage(groupedStructures, clampPage(structureCategoryPage, structureCategoryPageCount), WORLD_CATEGORY_PAGE_SIZE)
   const pagedNativeEntityGroups = categoryPage(groupedNativeEntities, clampPage(entityCategoryPage, entityCategoryPageCount), WORLD_CATEGORY_PAGE_SIZE)
-  const forceOpenEntityGroups = entitySearch.trim().length > 0 || entityCategory !== 'all'
-
   useEffect(() => {
     setStructureCategoryPage(current => clampPage(current, structureCategoryPageCount))
   }, [structureCategoryPageCount])
@@ -1130,8 +1168,10 @@ export default function WorldsSection({
         </div>
 
         <div className="rounded-[24px] border p-2" style={{ borderColor: palette.frame, background: 'rgba(0,0,0,0.18)' }}>
-          <CatalogArtwork kind="structure" label={entry.label} category={entry.category} sourceKind={entry.sourceKind} imageUrl={entry.imageUrl} art={entry.art} className={structureArtworkClass(entry)} />
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {isCatalogArtworkEnabled('structure') && (
+            <CatalogArtwork kind="structure" label={entry.label} category={entry.category} sourceKind={entry.sourceKind} imageUrl={entry.imageUrl} art={entry.art} className={structureArtworkClass(entry)} />
+          )}
+          <div className={`${isCatalogArtworkEnabled('structure') ? 'mt-3 ' : ''}grid gap-2 sm:grid-cols-2 xl:grid-cols-4`}>
             {metaStats.map(([label, value]) => (
               <div key={label} className="rounded-2xl border px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
                 <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">{label}</div>
@@ -1195,8 +1235,10 @@ export default function WorldsSection({
         </div>
 
         <div className="rounded-[24px] border p-2" style={{ borderColor: palette.frame, background: 'rgba(0,0,0,0.18)' }}>
-          <CatalogArtwork kind="entity" label={entry.label} category={entry.category} sourceKind={entry.sourceKind} imageUrl={entry.imageUrl} art={entry.art} className={entityArtworkClass(entry)} />
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {isCatalogArtworkEnabled('entity') && (
+            <CatalogArtwork kind="entity" label={entry.label} category={entry.category} sourceKind={entry.sourceKind} imageUrl={entry.imageUrl} art={entry.art} className={entityArtworkClass(entry)} />
+          )}
+          <div className={`${isCatalogArtworkEnabled('entity') ? 'mt-3 ' : ''}grid gap-2 sm:grid-cols-2 xl:grid-cols-4`}>
             {metaStats.map(([label, value]) => (
               <div key={label} className="rounded-2xl border px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
                 <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">{label}</div>
@@ -1283,6 +1325,26 @@ export default function WorldsSection({
         </button>
       </div>
 
+      <CollapsibleCard title="ACTIVE WORLD" storageKey="worlds:active-world" bodyClassName="p-4 space-y-3" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
+        <label className="block space-y-1">
+          <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">TARGET WORLD</div>
+          <select
+            value={activeWorld}
+            onChange={event => setActiveWorld(event.target.value)}
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg2)] px-3 py-2 text-[13px] font-mono text-[var(--text)]"
+          >
+            {(worldsData?.worlds ?? []).map(world => (
+              <option key={world.name} value={world.name}>{world.alias?.trim() || world.name}</option>
+            ))}
+          </select>
+        </label>
+        <div className="text-[12px] font-mono text-[var(--text-dim)]">
+          {activeWorldEntry
+            ? <>Using <span className="text-[var(--accent)]">{activeWorldEntry.alias?.trim() || activeWorldEntry.name}</span> for world environment controls. Player-targeted structure, entity, and spawn tools still use your current active player when needed.</>
+            : 'Choose which world weather and time controls should target.'}
+        </div>
+      </CollapsibleCard>
+
       <CollapsibleCard title="ACTIVE PLAYER" storageKey="worlds:active-player" bodyClassName="p-4 space-y-3" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
         <PlayerPicker
           online={players}
@@ -1292,39 +1354,107 @@ export default function WorldsSection({
         />
         <div className="text-[12px] font-mono text-[var(--text-dim)]">
           {selectedPlayer
-            ? <>Using <span className="text-[var(--accent)]">{selectedPlayer}</span> for player-targeted structure, entity, and spawn actions.</>
-            : 'Pick a player when you want to target their current live location.'}
+            ? <>Using <span className="text-[var(--accent)]">{selectedPlayer}</span> for player-targeted spawn, structure, and entity actions.</>
+            : 'Pick an active player when you want world tools to follow a live player location.'}
         </div>
       </CollapsibleCard>
 
-      {error && <div className="glass-card p-4 text-[13px] font-mono text-red-400">{error}</div>}
-      {status && <div className="glass-card p-4 text-[13px] font-mono text-[var(--accent)]">{status}</div>}
-      {loading && !worldsData && <div className="glass-card p-4 text-[13px] font-mono text-[var(--text-dim)]">Loading world and integration surface…</div>}
-
-      {canPluginStatus && pluginStack && (
-        <CollapsibleCard title="INTEGRATIONS" storageKey="worlds:plugin-stack" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4">
-              <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">BRIDGE STATUS</div>
-              <div className="mt-2 text-[13px] font-mono text-[var(--text)]">
-                {pluginStack.bridge?.ok === false ? pluginStack.bridge.error : 'Connected'}
+      {canWorldControls && (
+        <CollapsibleCard title="WEATHER / TIME" storageKey="worlds:weather-time" bodyClassName="p-4 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 space-y-4">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_14rem]">
+              <div>
+                <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">ACTIVE WORLD</div>
+                <div className="mt-1 text-[14px] font-mono text-[var(--text)]">{activeWorldEntry?.alias?.trim() || activeWorldEntry?.name || 'No world selected'}</div>
+                <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">{activeWorldEntry ? `${activeWorldEntry.environment} · ${activeWorldEntry.loaded ? 'loaded' : 'unloaded'} · ${activeWorldEntry.players} players` : 'Select a world above to adjust its environment.'}</div>
               </div>
-              <div className="mt-1 text-[12px] font-mono text-[var(--text-dim)]">
-                {pluginStack.bridge?.serverVersion ? `Paper ${pluginStack.bridge.serverVersion}` : 'Server version unavailable'}
+              <label className="block space-y-1">
+                <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">CUSTOM TIME</div>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={23999}
+                    value={customTimeInput}
+                    onChange={event => setCustomTimeInput(event.target.value)}
+                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg2)] px-3 py-2 text-[13px] font-mono text-[var(--text)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void runWorldCommand('time', customTimeInput)}
+                    disabled={!activeWorld || !!worldCommandBusy}
+                    className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] transition-all hover:border-[var(--accent-mid)] disabled:opacity-40"
+                  >
+                    Set
+                  </button>
+                </div>
+              </label>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">TIME PRESETS</div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+                {[
+                  { value: '23000', label: 'Sunrise' },
+                  { value: '1000', label: 'Morning' },
+                  { value: '6000', label: 'Noon' },
+                  { value: '12000', label: 'Sunset' },
+                  { value: '13000', label: 'Night' },
+                  { value: '18000', label: 'Midnight' },
+                ].map(({ value, label }) => {
+                  const key = `time:${value}:${activeWorld}`
+                  const busy = worldCommandBusy === key
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => void runWorldCommand('time', value)}
+                      disabled={!activeWorld || busy || !!worldCommandBusy}
+                      className="tap-target flex flex-col items-center justify-center gap-1 rounded-lg border border-[var(--border)] px-2 py-3 text-[var(--text-dim)] transition-all hover:border-[var(--accent-mid)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <span className="text-[13px] font-mono tracking-wide">{busy ? '…' : label}</span>
+                      <span className="text-[10px] font-mono opacity-70">{value}</span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
-            <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4">
-              <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">BEACON STATUS</div>
-              <div className="mt-2 text-[13px] font-mono text-[var(--text)]">
-                {pluginStack.sidecar?.ok === false ? pluginStack.sidecar.error : 'Connected'}
-              </div>
-              <div className="mt-1 text-[12px] font-mono text-[var(--text-dim)]">
-                {(pluginStack.sidecar?.capabilities ?? []).length > 0 ? (pluginStack.sidecar?.capabilities ?? []).join(', ') : 'No beacon capabilities reported'}
+
+            <div className="space-y-2">
+              <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">WEATHER</div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[
+                  { value: 'clear', Icon: CloudSun, label: 'Clear Sky' },
+                  { value: 'rain', Icon: CloudSun, label: 'Rain' },
+                  { value: 'storm', Icon: CloudLightning, label: 'Storm' },
+                  { value: 'thunder', Icon: CloudLightning, label: 'Thunder' },
+                ].map(({ value, Icon, label }) => {
+                  const key = `weather:${value}:${activeWorld}`
+                  const busy = worldCommandBusy === key
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => void runWorldCommand('weather', value)}
+                      disabled={!activeWorld || busy || !!worldCommandBusy}
+                      className="tap-target flex flex-col items-center justify-center gap-1 rounded-lg border border-[var(--border)] px-2 py-3 text-[var(--text-dim)] transition-all hover:border-[var(--accent-mid)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <span className="flex h-5 items-center justify-center">
+                        {busy ? <span className="text-[15px] font-mono">…</span> : <Icon size={16} color="var(--text-dim)" strokeWidth={1.5} />}
+                      </span>
+                      <span className="text-[13px] font-mono tracking-wide">{label}</span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </div>
         </CollapsibleCard>
       )}
+
+      {error && <div className="glass-card p-4 text-[13px] font-mono text-red-400">{error}</div>}
+      {status && <div className="glass-card p-4 text-[13px] font-mono text-[var(--accent)]">{status}</div>}
+      {loading && !worldsData && <div className="glass-card p-4 text-[13px] font-mono text-[var(--text-dim)]">Loading world and integration surface…</div>}
 
       {canWorldInventory && worldsData && (
         <CollapsibleCard title="WORLD INVENTORY" storageKey="worlds:inventory" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
@@ -1369,7 +1499,7 @@ export default function WorldsSection({
 
                   <div className="space-y-2">
                     <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">WORLD FLAGS</div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                       {WORLD_TOGGLE_SETTINGS.map(([settingKey, label]) => {
                         const currentValue = settingKey === 'pvp'
                           ? detail.pvp
@@ -1382,16 +1512,15 @@ export default function WorldsSection({
                                 : detail.autoLoad
                         const busy = worldActionBusy === `${world.name}:${settingKey}`
                         return (
-                          <button
+                          <McraftrSwitch
                             key={settingKey}
-                            type="button"
-                            disabled={busy || currentValue === null}
-                            onClick={() => void handleWorldSettingChange(world.name, settingKey, !currentValue, 'setting')}
-                            className="rounded border px-3 py-2 text-[11px] font-mono tracking-widest disabled:opacity-40"
-                            style={pillStyle(currentValue)}
-                          >
-                            {busy ? '…' : `${label} ${currentValue ? 'ON' : 'OFF'}`}
-                          </button>
+                            checked={Boolean(currentValue)}
+                            disabled={currentValue === null}
+                            busy={busy}
+                            onCheckedChange={(next) => void handleWorldSettingChange(world.name, settingKey, next, 'setting')}
+                            label={label}
+                            description={`Toggle ${label.toLowerCase()} for ${detail.alias?.trim() || detail.name}.`}
+                          />
                         )
                       })}
                     </div>
@@ -1425,19 +1554,15 @@ export default function WorldsSection({
                           const currentValue = gamerules?.[rule] ?? null
                           const busy = worldActionBusy === `${world.name}:${rule}`
                           return (
-                            <button
+                            <McraftrSwitch
                               key={rule}
-                              type="button"
-                              disabled={busy || currentValue === null}
-                              onClick={() => void handleWorldSettingChange(world.name, rule, !currentValue, 'gamerule')}
-                              className="flex items-center justify-between rounded-xl border px-3 py-3 text-left font-mono text-[11px] disabled:opacity-40"
-                              style={currentValue
-                                ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
-                                : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
-                            >
-                              <span>{label}</span>
-                              <span>{busy ? '…' : currentValue ? 'ON' : 'OFF'}</span>
-                            </button>
+                              checked={Boolean(currentValue)}
+                              disabled={currentValue === null}
+                              busy={busy}
+                              onCheckedChange={(next) => void handleWorldSettingChange(world.name, rule, next, 'gamerule')}
+                              label={label}
+                              description={`Set ${label.toLowerCase()} for ${detail.alias?.trim() || detail.name}.`}
+                            />
                           )
                         })}
                       </div>
@@ -1483,6 +1608,19 @@ export default function WorldsSection({
                   {worldsData.worlds.map(world => <option key={world.name} value={world.name}>{world.name}</option>)}
                 </select>
               </label>
+              {spawnMode === 'player' && (
+                <div className="space-y-1">
+                  <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">PLAYER</div>
+                  <div className="rounded-xl border border-[var(--border)] bg-[var(--bg2)] p-3">
+                    <PlayerPicker
+                      online={players}
+                      selected={selectedPlayer}
+                      onSelect={onSelectedPlayerChange}
+                      placeholder="Select or type player name…"
+                    />
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 {(['player', 'coords'] as const).map(mode => (
                   <button
@@ -1538,7 +1676,7 @@ export default function WorldsSection({
       )}
 
       {canStructureCatalog && (
-        <CollapsibleCard title="STRUCTURE CATALOG" storageKey="worlds:structures" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
+        <CollapsibleCard title="STRUCTURE CATALOG" storageKey="worlds:structures" defaultOpen={false} bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
           <input
             ref={structureUploadRef}
             type="file"
@@ -1548,10 +1686,7 @@ export default function WorldsSection({
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-[12px] font-mono text-[var(--text-dim)]">
-              {structures.length} structure entries
-              {structureScan?.nativeCounts
-                ? ` · ${structureScan.nativeCounts.templates ?? 0} native templates · ${structureScan.nativeCounts.worldgen ?? 0} native worldgen`
-                : ''}
+              {structures.length} structure entries · {structureScan?.nativeCounts?.templates ?? 0} native templates · {structureScan?.nativeCounts?.worldgen ?? 0} native worldgen
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -1565,19 +1700,37 @@ export default function WorldsSection({
               </button>
             </div>
           </div>
-          <div className="flex gap-1.5 flex-wrap">
-            {structureCategories.map(category => (
+          <div className="grid gap-2 sm:grid-cols-3">
+            {[
+              { key: 'all', label: 'All Entries', count: structures.length, hint: 'Templates plus native worldgen structures' },
+              { key: 'templates', label: 'Native Templates', count: structureScan?.nativeCounts?.templates ?? 0, hint: 'Saved structure template entries' },
+              { key: 'worldgen', label: 'Native Worldgen', count: structureScan?.nativeCounts?.worldgen ?? 0, hint: 'Generated vanilla structure references' },
+            ].map(option => (
               <button
-                key={category}
-                onClick={() => setStructureCategory(category)}
-                className="px-2 py-1 rounded text-[13px] font-mono transition-all border"
-                style={structureCategory === category
-                  ? { borderColor: 'var(--accent)', background: 'var(--accent-dim)', color: 'var(--accent)' }
-                  : { borderColor: 'var(--border)', color: 'var(--text-dim)' }}
+                key={option.key}
+                type="button"
+                onClick={() => setStructureSourceFilter(option.key as 'all' | 'templates' | 'worldgen')}
+                className="rounded-2xl border px-4 py-3 text-left transition-all"
+                style={structureSourceFilter === option.key
+                  ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)' }
+                  : { borderColor: 'var(--border)', background: 'var(--panel)' }}
               >
-                {category === 'all' ? 'All' : category}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[12px] font-mono tracking-widest" style={{ color: structureSourceFilter === option.key ? 'var(--accent)' : 'var(--text)' }}>
+                    {option.label}
+                  </div>
+                  <div className="text-[18px] font-mono" style={{ color: structureSourceFilter === option.key ? 'var(--accent)' : 'var(--text)' }}>
+                    {option.count}
+                  </div>
+                </div>
+                <div className="mt-1 text-[11px] font-mono" style={{ color: 'var(--text-dim)' }}>
+                  {option.hint}
+                </div>
               </button>
             ))}
+          </div>
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[11px] font-mono text-[var(--text-dim)]">
+            Active source filter: {structureSourceFilter === 'all' ? 'all structure entries' : structureSourceFilter === 'templates' ? 'native templates and uploaded schematics' : 'native worldgen references only'}
           </div>
           <input
             type="text"
@@ -1612,7 +1765,7 @@ export default function WorldsSection({
                 key={category}
                 title={`${category.toUpperCase()} (${entries.length})`}
                 storageKey={`worlds:structures:category:${category}`}
-                defaultOpen={structureCategory !== 'all'}
+                defaultOpen={false}
                 bodyClassName="p-3 space-y-3"
                 groupKey={WORLDS_COLLAPSIBLE_GROUP}
               >
@@ -1714,7 +1867,7 @@ export default function WorldsSection({
       )}
 
       {canEntityCatalog && (
-        <CollapsibleCard title="ENTITY CATALOG" storageKey="worlds:entities" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
+        <CollapsibleCard title="ENTITY CATALOG" storageKey="worlds:entities" defaultOpen={false} bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
           <input
             ref={entityUploadRef}
             type="file"
@@ -1824,8 +1977,7 @@ export default function WorldsSection({
               <CollapsibleCard
                 title={`CUSTOM PRESETS (${filteredCustomEntities.length})`}
                 storageKey="worlds:entities:custom-presets:v1"
-                defaultOpen={true}
-                open={entitySourceFilter === 'custom' || entitySearch.trim().length > 0 ? true : undefined}
+                defaultOpen={false}
                 bodyClassName="p-3 space-y-3"
                 groupKey={WORLDS_COLLAPSIBLE_GROUP}
               >
@@ -1858,7 +2010,6 @@ export default function WorldsSection({
                 title={`${category.toUpperCase()} (${entries.length})`}
                 storageKey={`worlds:entities:category:v3:${category}`}
                 defaultOpen={false}
-                open={forceOpenEntityGroups ? true : undefined}
                 bodyClassName="p-3 space-y-3"
                 groupKey={WORLDS_COLLAPSIBLE_GROUP}
               >

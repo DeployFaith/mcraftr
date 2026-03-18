@@ -1,22 +1,21 @@
 import { NextRequest } from 'next/server'
-import { getToken } from 'next-auth/jwt'
 import { getUserById, getUserFeatures } from '@/lib/users'
 import { getDb } from '@/lib/db'
+import { getDemoReadonlyAccess, requireAdminReadable } from '@/lib/demo-readonly'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET, cookieName: 'authjs.session-token' })
-  const userId = token?.id as string | undefined
-  const serverId = token?.activeServerId as string | undefined
-  if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const auth = requireAdminReadable(await getDemoReadonlyAccess(req))
+  if (!auth.ok) return auth.response
+  const { access } = auth
+  const userId = access.userId
+  const serverId = access.serverId
   if (!serverId) return Response.json({ ok: false, error: 'No active server' }, { status: 400 })
-  const user = getUserById(userId)
-  if (!user || user.role !== 'admin') return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })
 
   const features = getUserFeatures(userId)
-  if (!features.enable_admin_moderation && !features.enable_admin_whitelist && !features.enable_admin_operator) {
+  if (!access.demoReadOnly && !features.enable_admin_moderation && !features.enable_admin_whitelist && !features.enable_admin_operator) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
 
@@ -35,5 +34,5 @@ export async function GET(req: NextRequest) {
         'SELECT player_name, last_seen FROM player_directory WHERE user_id = ? AND server_id = ? ORDER BY last_seen DESC'
       ).all(userId, serverId) as { player_name: string; last_seen: number }[]
 
-  return Response.json({ ok: true, players: rows })
+  return Response.json({ ok: true, players: rows, readOnly: access.demoReadOnly })
 }

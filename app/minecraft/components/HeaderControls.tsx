@@ -241,7 +241,7 @@ export default function HeaderControls() {
         aria-label="Open account menu"
         aria-expanded={open}
         onClick={() => setOpen(prev => !prev)}
-        className="group flex items-center gap-3 rounded-full border px-2.5 py-2 transition-all hover:-translate-y-0.5"
+        className="group flex items-center gap-2 rounded-full border px-2 py-1.5 transition-all hover:-translate-y-0.5"
         style={{
           borderColor: open ? 'var(--accent-mid)' : 'var(--border)',
           background: open
@@ -265,10 +265,10 @@ export default function HeaderControls() {
           </span>
         )}
         <span className="hidden sm:flex flex-col items-start leading-none">
-          <span className="max-w-[180px] truncate font-mono text-[11px] tracking-[0.12em]" style={{ color: 'var(--text)' }}>
+          <span className="max-w-[132px] truncate font-mono text-[11px] tracking-[0.12em]" style={{ color: 'var(--text)' }}>
             {currentEmail}
           </span>
-          <span className="max-w-[180px] truncate font-mono text-[10px] tracking-[0.12em]" style={{ color: 'var(--text-dim)' }}>
+          <span className="max-w-[132px] truncate font-mono text-[10px] tracking-[0.12em]" style={{ color: 'var(--text-dim)' }}>
             {activeServer ? formatServerLabel(activeServer) : 'No active server'}
           </span>
         </span>
@@ -285,7 +285,7 @@ export default function HeaderControls() {
 
       {open && (
         <div
-          className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4rem)] max-h-[calc(100dvh-env(safe-area-inset-top)-5rem-env(safe-area-inset-bottom))] overflow-y-auto overscroll-contain rounded-[24px] border p-4 shadow-[0_24px_64px_rgba(0,0,0,0.32)] backdrop-blur-2xl touch-pan-y [-webkit-overflow-scrolling:touch] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[calc(100%+0.75rem)] sm:max-h-[min(82vh,42rem)] sm:w-[min(92vw,360px)]"
+          className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4rem)] max-h-[calc(100dvh-env(safe-area-inset-top)-5rem-env(safe-area-inset-bottom))] overflow-y-auto overscroll-contain rounded-[24px] border p-4 shadow-[0_24px_64px_rgba(0,0,0,0.32)] backdrop-blur-2xl touch-pan-y [-webkit-overflow-scrolling:touch] sm:absolute sm:inset-x-auto sm:right-[-0.4rem] sm:top-[calc(100%+0.75rem)] sm:max-h-[min(82vh,42rem)] sm:w-[min(88vw,320px)]"
           style={{
             borderColor: 'var(--accent-mid)',
             background: 'color-mix(in srgb, var(--panel) 92%, transparent)',

@@ -11,6 +11,9 @@ export async function DELETE(
 ) {
   const access = await requireTerminalAccess(req)
   if (!access.ok) return access.response
+  if (access.context.readOnly) {
+    return Response.json({ ok: false, error: 'Public demo terminal access is read-only.' }, { status: 403 })
+  }
 
   const { id } = await params
   const deleted = deleteTerminalFavorite(access.context.userId, access.context.serverId, id)

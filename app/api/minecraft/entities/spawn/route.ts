@@ -3,6 +3,7 @@ import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUser
 import { logAudit } from '@/lib/audit'
 import { runBridgeJson } from '@/lib/server-bridge'
 import { buildPresetSnbt, normalizeEntityPresetInput } from '@/lib/entity-presets'
+import { enforceDemoGuardrails, getDemoCappedCount } from '@/lib/demo-limits'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -20,6 +21,8 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 export async function POST(req: NextRequest) {
+  const userId = await getSessionUserId(req)
+  const serverId = await getSessionActiveServerId(req)
   const features = await getUserFeatureFlags(req)
   if (!checkFeatureAccess(features, 'enable_entity_catalog')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
@@ -29,7 +32,8 @@ export async function POST(req: NextRequest) {
   const entityId = typeof body.entityId === 'string' ? body.entityId.trim() : ''
   const sourceKind = typeof body.sourceKind === 'string' ? body.sourceKind.trim() : 'native'
   const locationMode = body.locationMode === 'coords' ? 'coords' : 'player'
-  const count = Math.max(1, Math.min(64, Number(body.count) || 1))
+  const requestedCount = Math.max(1, Math.min(64, Number(body.count) || 1))
+  const count = getDemoCappedCount(userId, requestedCount, 32)
   if (!entityId) {
     return Response.json({ ok: false, error: 'Entity id is required' }, { status: 400 })
   }
@@ -47,6 +51,9 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: 'World and coordinates are required' }, { status: 400 })
   }
 
+  const demoGuard = await enforceDemoGuardrails(userId, serverId, 'entity_spawn', count)
+  if (demoGuard) return demoGuard
+
   if (sourceKind !== 'native') {
     const preset = normalizeEntityPresetInput(body)
     const snbt = buildPresetSnbt(preset)
@@ -59,8 +66,6 @@ export async function POST(req: NextRequest) {
         return Response.json({ ok: false, error: result.error || 'Failed to spawn entity preset' }, { status: 502 })
       }
     }
-    const userId = await getSessionUserId(req)
-    const serverId = await getSessionActiveServerId(req)
     if (userId) {
       logAudit(userId, 'entity_spawn', preset.label, `${locationMode === 'player' ? player : world} count=${count}`.trim(), serverId)
     }
@@ -79,8 +84,6 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || 'Failed to spawn entity' : bridge.error }, { status: 502 })
   }
 
-  const userId = await getSessionUserId(req)
-  const serverId = await getSessionActiveServerId(req)
   if (userId) {
     logAudit(userId, 'entity_spawn', entityId, `${bridge.data.world ?? ''} count=${count}`.trim(), serverId)
   }

@@ -54,6 +54,8 @@ export type User = {
   email: string
   passwordHash: string
   role: 'admin' | 'user'
+  isTemporary: boolean
+  temporaryLastUsedAt: number | null
   avatar: UserAvatar
   activeServerId: string | null
   servers: SavedServer[]
@@ -327,6 +329,8 @@ type UserRow = {
   email: string
   password_hash: string
   role: 'admin' | 'user'
+  is_temporary?: number | null
+  temporary_last_used_at?: number | null
   avatar_type?: string | null
   avatar_value?: string | null
   active_server_id?: string | null
@@ -447,6 +451,8 @@ function rowToUser(row: UserRow, savedServerRows: SavedServerRow[]): User {
     email:        row.email,
     passwordHash: row.password_hash,
     role:         row.role,
+    isTemporary:  row.is_temporary === 1,
+    temporaryLastUsedAt: row.temporary_last_used_at ?? null,
     avatar: {
       type: row.avatar_type === 'builtin' || row.avatar_type === 'upload' ? row.avatar_type : 'none',
       value: row.avatar_type === 'builtin' || row.avatar_type === 'upload' ? row.avatar_value ?? null : null,
@@ -675,6 +681,19 @@ export function setActiveUserServer(userId: string, serverId: string): User {
   return getUserById(userId)!
 }
 
+function deleteServerScopedData(db: Database.Database, userId: string, serverId: string): void {
+  db.prepare('DELETE FROM scheduled_task_runs WHERE user_id = ? AND server_id = ?').run(userId, serverId)
+  db.prepare('DELETE FROM scheduled_tasks WHERE user_id = ? AND server_id = ?').run(userId, serverId)
+  db.prepare('DELETE FROM world_structure_placements WHERE user_id = ? AND server_id = ?').run(userId, serverId)
+  db.prepare('DELETE FROM chat_log WHERE user_id = ? AND server_id = ?').run(userId, serverId)
+  db.prepare('DELETE FROM player_sessions WHERE user_id = ? AND server_id = ?').run(userId, serverId)
+  db.prepare('DELETE FROM player_directory WHERE user_id = ? AND server_id = ?').run(userId, serverId)
+  db.prepare('DELETE FROM audit_log WHERE user_id = ? AND server_id = ?').run(userId, serverId)
+  db.prepare('DELETE FROM terminal_state WHERE user_id = ? AND server_id = ?').run(userId, serverId)
+  db.prepare('DELETE FROM terminal_history WHERE user_id = ? AND server_id = ?').run(userId, serverId)
+  db.prepare('DELETE FROM terminal_saved_commands WHERE user_id = ? AND server_id = ?').run(userId, serverId)
+}
+
 export function deleteUserServer(id: string, serverId: string): User {
   const db = initDb()
   const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined
@@ -688,13 +707,7 @@ export function deleteUserServer(id: string, serverId: string): User {
   const nextActive = remaining?.id ?? null
   db.prepare('UPDATE users SET active_server_id = ? WHERE id = ?').run(nextActive, id)
 
-  db.prepare('DELETE FROM chat_log WHERE user_id = ? AND server_id = ?').run(id, serverId)
-  db.prepare('DELETE FROM player_sessions WHERE user_id = ? AND server_id = ?').run(id, serverId)
-  db.prepare('DELETE FROM player_directory WHERE user_id = ? AND server_id = ?').run(id, serverId)
-  db.prepare('DELETE FROM audit_log WHERE user_id = ? AND server_id = ?').run(id, serverId)
-  db.prepare('DELETE FROM terminal_state WHERE user_id = ? AND server_id = ?').run(id, serverId)
-  db.prepare('DELETE FROM terminal_history WHERE user_id = ? AND server_id = ?').run(id, serverId)
-  db.prepare('DELETE FROM terminal_saved_commands WHERE user_id = ? AND server_id = ?').run(id, serverId)
+  deleteServerScopedData(db, id, serverId)
 
   return getUserById(id)!
 }
@@ -827,27 +840,53 @@ export function updateServerBridgeHealth(
 }
 
 export function createUser(email: string, password: string): User {
+  return createUserWithOptions(email, password)
+}
+
+export function createUserWithOptions(
+  email: string,
+  password: string,
+  options?: {
+    temporary?: boolean
+    temporaryLastUsedAt?: number | null
+  },
+): User {
   const db = initDb()
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
   if (existing) throw new Error('An account with that email already exists')
 
   const id = crypto.randomUUID()
+  const isTemporary = options?.temporary === true ? 1 : 0
+  const temporaryLastUsedAt = options?.temporary === true
+    ? (options?.temporaryLastUsedAt ?? Math.floor(Date.now() / 1000))
+    : null
   db.prepare(`
-    INSERT INTO users (id, email, password_hash, role)
-    VALUES (?, ?, ?, 'user')
-  `).run(id, email, bcrypt.hashSync(password, 10))
+    INSERT INTO users (id, email, password_hash, role, is_temporary, temporary_last_used_at)
+    VALUES (?, ?, ?, 'user', ?, ?)
+  `).run(id, email, bcrypt.hashSync(password, 10), isTemporary, temporaryLastUsedAt)
 
   return {
     id,
     email,
     passwordHash: '',  // not needed after creation
     role: 'user',
+    isTemporary: isTemporary === 1,
+    temporaryLastUsedAt,
     avatar: { type: 'none', value: null },
     activeServerId: null,
     servers: [],
     server: null,
     serverLabel: null,
   }
+}
+
+export function touchTemporaryUser(id: string, timestamp = Math.floor(Date.now() / 1000)): void {
+  const db = initDb()
+  db.prepare(`
+    UPDATE users
+    SET temporary_last_used_at = ?
+    WHERE id = ? AND is_temporary = 1
+  `).run(timestamp, id)
 }
 
 export function validatePassword(user: User, password: string): boolean {
@@ -871,9 +910,37 @@ export function updateEmail(id: string, newEmail: string): void {
 
 export function deleteUser(id: string): void {
   const db = initDb()
-  // servers row cascades via FK ON DELETE CASCADE
-  const result = db.prepare('DELETE FROM users WHERE id = ?').run(id)
-  if (result.changes === 0) throw new Error('User not found')
+  const existing = db.prepare('SELECT id FROM users WHERE id = ?').get(id) as { id: string } | undefined
+  if (!existing) throw new Error('User not found')
+
+  const serverRows = db.prepare('SELECT id FROM saved_servers WHERE user_id = ?').all(id) as { id: string }[]
+  const tx = db.transaction(() => {
+    for (const server of serverRows) {
+      deleteServerScopedData(db, id, server.id)
+    }
+    db.prepare('DELETE FROM scheduled_task_runs WHERE user_id = ?').run(id)
+    db.prepare('DELETE FROM chat_log WHERE user_id = ?').run(id)
+    db.prepare('DELETE FROM player_sessions WHERE user_id = ?').run(id)
+    db.prepare('DELETE FROM player_directory WHERE user_id = ?').run(id)
+    db.prepare('DELETE FROM audit_log WHERE user_id = ?').run(id)
+    db.prepare('DELETE FROM users WHERE id = ?').run(id)
+  })
+  tx()
+}
+
+export function cloneActiveServerToUser(sourceUserId: string, targetUserId: string): SavedServer {
+  const source = getActiveServer(sourceUserId)
+  if (!source) throw new Error('Source user has no active server configured')
+
+  return createUserServer(targetUserId, {
+    label: source.label,
+    host: source.host,
+    port: source.port,
+    password: source.password,
+    minecraftVersion: source.minecraftVersion,
+    bridge: source.bridge,
+    sidecar: source.sidecar,
+  })
 }
 
 export type UserSummary = {
@@ -886,6 +953,22 @@ export type UserSummary = {
 export function listUsers(): UserSummary[] {
   const db = initDb()
   return db.prepare('SELECT id, email, role, created_at FROM users ORDER BY created_at ASC').all() as UserSummary[]
+}
+
+export function purgeTemporaryUsersOlderThan(cutoffUnix: number): number {
+  const db = initDb()
+  const rows = db.prepare(`
+    SELECT id
+    FROM users
+    WHERE is_temporary = 1
+      AND COALESCE(temporary_last_used_at, created_at) < ?
+  `).all(cutoffUnix) as { id: string }[]
+
+  for (const row of rows) {
+    deleteUser(row.id)
+  }
+
+  return rows.length
 }
 
 export function setUserRole(id: string, role: 'admin' | 'user'): void {
@@ -911,7 +994,19 @@ export function createUserByAdmin(email: string, password: string): User {
     VALUES (?, ?, ?, 'user')
   `).run(id, email, bcrypt.hashSync(password, 10))
 
-  return { id, email, passwordHash: '', role: 'user', avatar: { type: 'none', value: null }, activeServerId: null, servers: [], server: null, serverLabel: null }
+  return {
+    id,
+    email,
+    passwordHash: '',
+    role: 'user',
+    isTemporary: false,
+    temporaryLastUsedAt: null,
+    avatar: { type: 'none', value: null },
+    activeServerId: null,
+    servers: [],
+    server: null,
+    serverLabel: null,
+  }
 }
 
 export function updateUserAvatar(id: string, avatar: UserAvatar): void {

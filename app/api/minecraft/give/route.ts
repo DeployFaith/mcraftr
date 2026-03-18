@@ -2,6 +2,9 @@ import { NextRequest } from 'next/server'
 import { getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 import { VALID_ITEM_IDS } from '@/lib/items'
 import { giveItemViaRcon } from '@/lib/minecraft-give'
+import { getActiveServer, getUserById } from '@/lib/users'
+import { giveDemoSyntheticItem } from '@/lib/demo-synthetic-player'
+import { getDemoPlayerActionError } from '@/lib/demo-policy'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,6 +25,19 @@ export async function POST(req: NextRequest) {
     if (!PLAYER_RE.test(player)) return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
     if (!item   || typeof item   !== 'string') return Response.json({ ok: false, error: 'Missing item' },   { status: 400 })
     if (!VALID_ITEM_IDS.has(item)) return Response.json({ ok: false, error: 'Invalid item' }, { status: 400 })
+    const user = getUserById(userId)
+    const restrictedError = getDemoPlayerActionError(user, player)
+    if (restrictedError) return Response.json({ ok: false, error: restrictedError }, { status: 403 })
+
+    const server = getActiveServer(userId)
+    if (!server) return Response.json({ ok: false, error: 'No server configured' }, { status: 400 })
+    const synthetic = giveDemoSyntheticItem(userId, server.id, player, item, parseInt(qty) || 1)
+    if (synthetic) {
+      if (synthetic.ok) {
+        return Response.json({ ok: true, message: `Gave ${synthetic.given}× ${item} to ${player}` })
+      }
+      return Response.json({ ok: false, error: `Only added ${synthetic.given}× ${item}; the shared demo inventory is full.` }, { status: 400 })
+    }
 
     const result = await giveItemViaRcon(req, player, item, parseInt(qty) || 1)
     if (!result.ok) return Response.json({ ok: false, error: result.error })

@@ -39,16 +39,15 @@ The full screenshot set lives in `docs/screenshots/highlights/`.
 
 Try the public demo:
 
-- App: `https://demo.mcraftr.deployfaith.xyz/login`
-- Shared demo account: `demo@mcraftr.local`
-- Password: `L2TGLbw1zTbra6jeL0E`
+- App: `https://demo.mcraftr.deployfaith.xyz/demo`
+- Access: one click creates or reuses a temporary demo account for your browser and signs you in automatically
 - Demo Minecraft server: `play.demo.mcraftr.deployfaith.xyz:25566`
 
 Notes:
 
 - The demo is a shared environment.
 - Demo state resets every 12 hours.
-- The shared demo account cannot change its email, password, or delete itself.
+- Temporary demo accounts are cleaned up automatically and profile changes stay locked.
 - Expect occasional admin changes, test data churn, and other users online at the same time.
 
 What you can test there:
@@ -166,6 +165,8 @@ Mcraftr works best as a focused Minecraft operations panel sitting in front of o
 * sound effects and background music
 * built-in or uploaded profile avatars
 
+Theme pack format docs: `docs/theme-packs.md`
+
 ## Quick Start
 
 Mcraftr is easiest to run with Docker Compose.
@@ -202,6 +203,8 @@ http://localhost:3054
    * RCON port
    * RCON password
    * optional Minecraft version override
+
+For fuller setup and deployment details, see [`INSTALL.md`](./INSTALL.md).
 
 ## Requirements
 
@@ -272,6 +275,12 @@ See `.env.example` for the full configuration surface.
 ## Contributing
 
 If you want to contribute, start with [`CONTRIBUTING.md`](./CONTRIBUTING.md) and check the near-term priorities in [`ROADMAP.md`](./ROADMAP.md).
+
+## Support
+
+Mcraftr is open source and free to use. If you'd like to support ongoing development, you can do that here:
+
+- https://buymeacoffee.com/deployfaith
 
 ## License
 

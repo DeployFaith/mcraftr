@@ -3,6 +3,7 @@ import { createUserServer, deleteUserServer, getUserById, updateUserServer } fro
 import { DEFAULT_MINECRAFT_VERSION, normalizeMinecraftVersion } from '@/lib/minecraft-version'
 import { testRconConnection, getSessionUserId } from '@/lib/rcon'
 import { testBeaconConnection, testBridgeConnection } from '@/lib/server-bridge'
+import { sanitizeBridgePrefix } from '@/lib/public-branding'
 import { getServerStackDescription, getServerStackLabel } from '@/lib/server-stack'
 
 export const runtime = 'nodejs'
@@ -160,7 +161,7 @@ export async function PUT(req: NextRequest) {
       const override = normalizeMinecraftVersion(minecraftVersionOverride)
       return Response.json({
         ok: true,
-        message: `Connected! ${clean} Bridge prefix "${typeof bridgeCommandPrefix === 'string' ? bridgeCommandPrefix.trim().replace(/^\/+/, '') || 'mcraftr' : 'mcraftr'}" responded successfully.`,
+          message: `Connected! ${clean} Bridge prefix "${sanitizeBridgePrefix(typeof bridgeCommandPrefix === 'string' ? bridgeCommandPrefix : 'bridge')}" responded successfully.`,
         bridge,
         minecraftVersion: {
           override,

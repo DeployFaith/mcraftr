@@ -22,7 +22,7 @@ type ServerInfo = {
   tps: number | null; weather: string | null; timeOfDay: string | null
 }
 
-type Props = { players: string[] }
+type Props = { players: string[]; readOnly?: boolean }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -84,7 +84,7 @@ function StatTile({ label, value, sub }: { label: string; value: React.ReactNode
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function AdminSection({ players }: Props) {
+export default function AdminSection({ players, readOnly = false }: Props) {
   const { toasts, addToast } = useToast()
   const [confirmModal, setConfirmModal] = useState<Omit<ConfirmModalProps, 'onCancel'> | null>(null)
   const [features, setFeatures] = useState<Record<FeatureKey, boolean> | null>(null)
@@ -501,6 +501,12 @@ export default function AdminSection({ players }: Props) {
 
       <Toasts toasts={toasts} />
 
+      {readOnly && (
+        <div className="glass-card border border-[var(--accent-mid)] bg-[var(--accent-dim)] p-4 text-[13px] font-mono text-[var(--accent)]">
+          Public demo admin access is read-only. You can inspect the full admin surface here, but all changes stay disabled until you self-host Mcraftr.
+        </div>
+      )}
+
       {anySectionsEnabled && (
         <div className="flex justify-end">
           <button
@@ -570,7 +576,43 @@ export default function AdminSection({ players }: Props) {
 
       {/* ── SERVER CONFIG ── */}
       {(canRules || canServerControls) && (
-      <CollapsibleCard title="SAFE SERVER SETTINGS" storageKey="admin:server-config" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="SERVER RULES & CONTROLS" storageKey="admin:server-config" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
+
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[12px] font-mono text-[var(--text-dim)]">
+          Review and adjust the most important server-wide rules here: difficulty, survival-safety gamerules, and lifecycle actions like saving or stopping the server.
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+            <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">DIFFICULTY</div>
+            <div className="mt-1 text-[14px] font-mono text-[var(--text)]">{difficulty ? difficulty.toUpperCase() : 'UNKNOWN'}</div>
+            <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">Current combat and survival pressure.</div>
+          </div>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+            <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">KEEP INVENTORY</div>
+            <div className="mt-1 text-[14px] font-mono text-[var(--text)]">{gamerules?.keepInventory === 'true' ? 'ON' : gamerules?.keepInventory === 'false' ? 'OFF' : 'LOAD BELOW'}</div>
+            <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">Whether players keep gear after death.</div>
+          </div>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+            <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">PVP</div>
+            <div className="mt-1 text-[14px] font-mono text-[var(--text)]">{gamerules?.pvp === 'true' ? 'ON' : gamerules?.pvp === 'false' ? 'OFF' : 'LOAD BELOW'}</div>
+            <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">Player-vs-player damage permissions.</div>
+          </div>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+            <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">WORLD CYCLES</div>
+            <div className="mt-1 text-[14px] font-mono text-[var(--text)]">
+              {gamerules
+                ? `${gamerules.doDaylightCycle === 'true' ? 'DAYLIGHT' : 'DAYLIGHT OFF'} · ${gamerules.doWeatherCycle === 'true' ? 'WEATHER' : 'WEATHER OFF'}`
+                : 'LOAD BELOW'}
+            </div>
+            <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">Automatic daylight and weather updates.</div>
+          </div>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+            <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">WHITELIST</div>
+            <div className="mt-1 text-[14px] font-mono text-[var(--text)]">{wlPlayers ? `${wlPlayers.length} ENTRIES` : 'LOAD BELOW'}</div>
+            <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">Who can join when whitelist enforcement is on.</div>
+          </div>
+        </div>
 
         {canRules && (
         <div>
@@ -595,7 +637,7 @@ export default function AdminSection({ players }: Props) {
         {canRules && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <SectionLabel>GAMERULES</SectionLabel>
+            <SectionLabel>CORE GAMERULES</SectionLabel>
             <button onClick={fetchGamerules} disabled={gamerulesLoading}
               className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
               {gamerulesLoading ? '…' : gamerules === null ? 'Load' : 'Refresh'}
@@ -633,7 +675,7 @@ export default function AdminSection({ players }: Props) {
 
         {canServerControls && (
         <div>
-          <SectionLabel>SERVER CONTROLS</SectionLabel>
+          <SectionLabel>LIFECYCLE CONTROLS</SectionLabel>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button onClick={async () => {
               const r = await fetch('/api/minecraft/server-ctrl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: 'save-all' }) })

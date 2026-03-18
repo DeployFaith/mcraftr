@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
+import { getDemoSyntheticEffects } from '@/lib/demo-synthetic-player'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -29,6 +30,9 @@ export async function GET(req: NextRequest) {
   const player = req.nextUrl.searchParams.get('player')
   if (!player) return Response.json({ ok: false, error: 'Missing player' }, { status: 400 })
   if (!PLAYER_RE.test(player)) return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
+
+  const synthetic = getDemoSyntheticEffects(userId, player)
+  if (synthetic) return Response.json(synthetic)
 
   try {
     const [effectsRes, abilitiesRes] = await Promise.all([

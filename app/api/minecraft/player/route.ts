@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { getDemoSyntheticPlayerStats } from '@/lib/demo-synthetic-player'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -84,7 +85,8 @@ function parseUuid(stdout: string): string | null {
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  if (!await getSessionUserId(req)) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const userId = await getSessionUserId(req)
+  if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   const player = req.nextUrl.searchParams.get('player')
   if (!player) {
     return Response.json({ ok: false, error: 'Missing player' }, { status: 400 })
@@ -92,6 +94,9 @@ export async function GET(req: NextRequest) {
   if (!PLAYER_RE.test(player)) {
     return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
   }
+
+  const synthetic = getDemoSyntheticPlayerStats(userId, player)
+  if (synthetic) return Response.json(synthetic)
 
   // Fire all queries in parallel — allSettled so each field degrades independently
   const [

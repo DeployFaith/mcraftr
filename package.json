@@ -24,6 +24,7 @@
     "pw:audit:headed": "playwright test --headed"
   },
   "dependencies": {
+    "@radix-ui/react-switch": "^1.2.6",
     "@types/ioredis": "^4.28.10",
     "@uiw/react-color": "^2.9.6",
     "adm-zip": "^0.5.16",

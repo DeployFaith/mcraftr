@@ -12,15 +12,15 @@ This guide focuses on the easiest supported ways to run Mcraftr.
 If you want to try Mcraftr before installing it:
 
 - App: `https://demo.mcraftr.deployfaith.xyz/login`
-- Shared demo account: `demo@mcraftr.local`
-- Password: `L2TGLbw1zTbra6jeL0E`
+- Access: `https://demo.mcraftr.deployfaith.xyz/demo`
+- Sign-in: one click creates or reuses a temporary demo account for your browser
 - Demo Minecraft server: `play.demo.mcraftr.deployfaith.xyz:25566`
 
 Notes:
 
 - This is a shared demo environment.
 - Demo state resets every 12 hours.
-- The shared demo account cannot change its email, password, or delete itself.
+- Temporary demo accounts are cleaned up automatically and profile changes stay locked.
 
 ## Bridge And Beacon, Plainly
 

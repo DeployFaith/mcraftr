@@ -3,7 +3,9 @@
 import { useEffect, useMemo } from 'react'
 import { X } from 'lucide-react'
 import type { CatalogArtPayload } from '@/lib/catalog-art/types'
-import CatalogArtwork from './CatalogArtwork'
+import CatalogArtwork, { isCatalogArtworkEnabled } from './CatalogArtwork'
+
+const ENTITY_COUNT_PRESETS = ['1', '4', '8', '16', '32', '64']
 
 export type LocationMode = 'player' | 'world-player' | 'coords'
 
@@ -185,6 +187,7 @@ export default function SpawnInspectModal({
   onConfirm,
 }: Props) {
   const target = structure ?? entity
+  const selectedPlayerWorld = selectedPlayer ? playerWorlds[selectedPlayer] ?? null : null
   const worldPlayers = useMemo(
     () => players.filter(player => !world || playerWorlds[player] === world),
     [playerWorlds, players, world],
@@ -232,19 +235,21 @@ export default function SpawnInspectModal({
         </div>
 
         <div className="min-h-0 overflow-y-auto touch-pan-y [-webkit-overflow-scrolling:touch]">
-          <div className="grid gap-0 md:grid-cols-[1.05fr_0.95fr]">
-          <div className="border-b p-5 md:border-b-0 md:border-r" style={{ borderColor: 'var(--border)' }}>
-            <CatalogArtwork
-              kind={structure ? 'structure' : 'entity'}
-              label={target.label}
-              category={target.category}
-              sourceKind={structure?.sourceKind ?? null}
-              imageUrl={target.imageUrl}
-              art={target.art}
-              className={structure
-                ? 'h-[260px] w-full rounded-[22px] border bg-[var(--bg2)] object-contain p-3'
-                : 'mx-auto h-[260px] w-full max-w-[22rem] rounded-[22px] border bg-[var(--bg2)] object-contain p-3'}
-            />
+          <div className={`grid gap-0 ${isCatalogArtworkEnabled(structure ? 'structure' : 'entity') ? 'md:grid-cols-[1.05fr_0.95fr]' : ''}`}>
+          <div className={`p-5 ${isCatalogArtworkEnabled(structure ? 'structure' : 'entity') ? 'border-b md:border-b-0 md:border-r' : ''}`} style={{ borderColor: 'var(--border)' }}>
+            {isCatalogArtworkEnabled(structure ? 'structure' : 'entity') && (
+              <CatalogArtwork
+                kind={structure ? 'structure' : 'entity'}
+                label={target.label}
+                category={target.category}
+                sourceKind={structure?.sourceKind ?? null}
+                imageUrl={target.imageUrl}
+                art={target.art}
+                className={structure
+                  ? 'h-[260px] w-full rounded-[22px] border bg-[var(--bg2)] object-contain p-3'
+                  : 'mx-auto h-[260px] w-full max-w-[22rem] rounded-[22px] border bg-[var(--bg2)] object-contain p-3'}
+              />
+            )}
             <div className="mt-4">
               <div className="font-mono text-[18px] tracking-[0.12em]" style={{ color: 'var(--text)' }}>
                 {target.label}
@@ -293,42 +298,63 @@ export default function SpawnInspectModal({
             <div className="mt-4 space-y-4">
               {mode !== 'remove-structure' && (
                 <>
-                  <div className="flex gap-2">
+                  <div className="grid gap-2 sm:grid-cols-3">
                     {(['player', 'world-player', 'coords'] as const).map(entry => (
                       <button
                         key={entry}
                         type="button"
                         onClick={() => onLocationModeChange(entry)}
-                        className="rounded-2xl border px-4 py-3 font-mono text-[12px] tracking-[0.16em] transition-all"
+                        className="rounded-2xl border px-4 py-3 text-left font-mono text-[12px] transition-all"
                         style={locationMode === entry
                           ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
                           : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
                       >
-                        {entry === 'player' ? 'Selected Player' : entry === 'world-player' ? 'World + Player' : 'Coordinates'}
+                        <div className="tracking-[0.16em]">
+                          {entry === 'player' ? 'Selected Player' : entry === 'world-player' ? 'World + Player' : 'Coordinates'}
+                        </div>
+                        <div className="mt-1 text-[10px] leading-4 opacity-80">
+                          {entry === 'player'
+                            ? 'Follow the active player and infer the world automatically.'
+                            : entry === 'world-player'
+                              ? 'Lock the target world first, then choose a player already inside it.'
+                              : 'Place directly with an explicit world and coordinates.'}
+                        </div>
                       </button>
                     ))}
                   </div>
 
                   {locationMode === 'player' ? (
-                    <label className="block space-y-1">
-                      <div className="font-mono text-[11px] tracking-[0.14em]" style={{ color: 'var(--text-dim)' }}>
-                        PLAYER
+                    <div className="space-y-3 rounded-2xl border px-4 py-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg) 70%, transparent)' }}>
+                      <label className="block space-y-1">
+                        <div className="font-mono text-[11px] tracking-[0.14em]" style={{ color: 'var(--text-dim)' }}>
+                          PLAYER
+                        </div>
+                        <select
+                          value={selectedPlayer}
+                          onChange={event => onSelectedPlayerChange(event.target.value)}
+                          className="w-full rounded-2xl border px-3 py-3 font-mono text-[13px] focus:outline-none"
+                          style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+                        >
+                          <option value="">Select player</option>
+                          {players.map(player => <option key={player} value={player}>{player}</option>)}
+                        </select>
+                      </label>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="rounded-xl border px-3 py-3 font-mono text-[11px]" style={{ borderColor: 'var(--border)', background: 'var(--panel)' }}>
+                          <div style={{ color: 'var(--text-dim)' }}>Resolved World</div>
+                          <div className="mt-1" style={{ color: 'var(--text)' }}>{selectedPlayerWorld ?? 'Waiting for live player location'}</div>
+                        </div>
+                        <div className="rounded-xl border px-3 py-3 font-mono text-[11px]" style={{ borderColor: 'var(--border)', background: 'var(--panel)' }}>
+                          <div style={{ color: 'var(--text-dim)' }}>Target Mode</div>
+                          <div className="mt-1" style={{ color: 'var(--text)' }}>Use live player position</div>
+                        </div>
                       </div>
-                      <select
-                        value={selectedPlayer}
-                        onChange={event => onSelectedPlayerChange(event.target.value)}
-                        className="w-full rounded-2xl border px-3 py-3 font-mono text-[13px] focus:outline-none"
-                        style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
-                      >
-                        <option value="">Select player</option>
-                        {players.map(player => <option key={player} value={player}>{player}</option>)}
-                      </select>
                       <div className="font-mono text-[11px]" style={{ color: 'var(--text-dim)' }}>
-                        World is inferred from the selected player&apos;s live location.
+                        World and coordinates are inferred from the selected player&apos;s current live location.
                       </div>
-                    </label>
+                    </div>
                   ) : locationMode === 'world-player' ? (
-                    <>
+                    <div className="space-y-3 rounded-2xl border px-4 py-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg) 70%, transparent)' }}>
                       <label className="block space-y-1">
                         <div className="font-mono text-[11px] tracking-[0.14em]" style={{ color: 'var(--text-dim)' }}>
                           WORLD
@@ -360,9 +386,12 @@ export default function SpawnInspectModal({
                           Choose a player already standing in the selected world, or switch to Coordinates.
                         </div>
                       </label>
-                    </>
+                      <div className="rounded-xl border px-3 py-3 font-mono text-[11px]" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}>
+                        Mcraftr will keep the selected world locked, then resolve coordinates from that player only if they are already in it.
+                      </div>
+                    </div>
                   ) : (
-                    <>
+                    <div className="space-y-3 rounded-2xl border px-4 py-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg) 70%, transparent)' }}>
                       <label className="block space-y-1">
                         <div className="font-mono text-[11px] tracking-[0.14em]" style={{ color: 'var(--text-dim)' }}>
                           WORLD
@@ -396,7 +425,10 @@ export default function SpawnInspectModal({
                           </label>
                         ))}
                       </div>
-                    </>
+                      <div className="rounded-xl border px-3 py-3 font-mono text-[11px]" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}>
+                        Best for precise structure anchors, scripted entity drops, and repeatable placement tests.
+                      </div>
+                    </div>
                   )}
                 </>
               )}
@@ -434,17 +466,45 @@ export default function SpawnInspectModal({
               )}
 
               {entity && onCountChange && (
-                <label className="block space-y-1">
-                  <div className="font-mono text-[11px] tracking-[0.14em]" style={{ color: 'var(--text-dim)' }}>
-                    COUNT
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-mono text-[11px] tracking-[0.14em]" style={{ color: 'var(--text-dim)' }}>
+                      COUNT
+                    </div>
+                    <div className="font-mono text-[11px]" style={{ color: 'var(--text-dim)' }}>
+                      Spawn {Math.max(1, Math.min(64, Number(count) || 1))} at once
+                    </div>
                   </div>
-                  <input
-                    value={count}
-                    onChange={event => onCountChange(event.target.value)}
-                    className="w-full rounded-2xl border px-3 py-3 font-mono text-[13px] focus:outline-none"
-                    style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
-                  />
-                </label>
+                  <div className="flex flex-wrap gap-2">
+                    {ENTITY_COUNT_PRESETS.map(option => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => onCountChange(option)}
+                        className="rounded-xl border px-3 py-2 font-mono text-[11px] transition-all"
+                        style={count === option
+                          ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
+                          : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+                      >
+                        x{option}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="block space-y-1">
+                    <div className="font-mono text-[11px] tracking-[0.14em]" style={{ color: 'var(--text-dim)' }}>
+                      CUSTOM COUNT
+                    </div>
+                    <input
+                      type="number"
+                      min="1"
+                      max="64"
+                      value={count}
+                      onChange={event => onCountChange(event.target.value)}
+                      className="w-full rounded-2xl border px-3 py-3 font-mono text-[13px] focus:outline-none"
+                      style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+                    />
+                  </label>
+                </div>
               )}
             </div>
 

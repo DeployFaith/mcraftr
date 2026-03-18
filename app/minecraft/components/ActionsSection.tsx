@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
-  Sun, Moon, CloudSun, CloudLightning,
   Hammer, Shield, Map as MapIcon,
   Wind, Heart, Eye, Zap, EyeOff, ArrowUp, Swords, Pickaxe, Sparkles,
   Plus, Save, Trash2, Upload, RefreshCcw,
@@ -42,14 +41,16 @@ type Props = {
 
 type FeatureFlags = Record<FeatureKey, boolean>
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+type LiveEntity = {
+  uuid: string
+  id: string
+  label: string
+  world: string
+  customName?: string | null
+  location?: { x: number; y: number; z: number } | null
+}
 
-const WEATHER_CMDS: { id: string; Icon: LucideIcon; label: string }[] = [
-  { id: 'day',           Icon: Sun,            label: 'Day'       },
-  { id: 'night',         Icon: Moon,           label: 'Night'     },
-  { id: 'clear_weather', Icon: CloudSun,       label: 'Clear Sky' },
-  { id: 'storm',         Icon: CloudLightning, label: 'Storm'     },
-]
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const GAMEMODE_CMDS: { id: string; Icon: LucideIcon; label: string }[] = [
   { id: 'creative',  Icon: Hammer, label: 'Creative'  },
@@ -73,14 +74,55 @@ const CAT_PAGE_SIZE = 24
 const MAX_STACK_BATCHES = 36
 const ACTIONS_COLLAPSIBLE_GROUP = 'actions-tab'
 
-function totalGiveQty(item: CatalogItem, fullStacks: number, extraQty: number) {
-  const maxStack = Math.max(1, item.maxStack ?? 64)
-  const maxStacks = Math.max(1, MAX_STACK_BATCHES)
-  const safeStacks = Math.max(0, Math.min(maxStacks, Math.floor(fullStacks) || 0))
-  const safeExtra = maxStack === 1
-    ? Math.max(1, Math.min(maxStacks, Math.floor(extraQty) || 1))
-    : Math.max(0, Math.min(maxStack, Math.floor(extraQty) || 0))
-  return maxStack === 1 ? safeExtra : (safeStacks * maxStack) + safeExtra
+function totalGiveQty(item: CatalogItem, qty: number) {
+  return Math.max(1, Math.min(getItemMaxQty(item), Math.floor(qty) || 1))
+}
+
+function quickGiveOptions(item: CatalogItem) {
+  const maxQty = getItemMaxQty(item)
+  const options = item.maxStack > 1
+    ? [1, 8, 16, 32, item.maxStack, item.maxStack * 2]
+    : [1, 2, 4, 8, 16]
+  return Array.from(new Set(options)).filter(value => value <= maxQty)
+}
+
+function splitGiveQty(item: CatalogItem, qty: number) {
+  const total = totalGiveQty(item, qty)
+  const perStack = Math.max(1, item.maxStack)
+  if (perStack === 1) {
+    return { stacks: 0, singles: total }
+  }
+  return {
+    stacks: Math.floor(total / perStack),
+    singles: total % perStack,
+  }
+}
+
+function formatQuickGiveLabel(item: CatalogItem, qty: number) {
+  const total = totalGiveQty(item, qty)
+  const { stacks, singles } = splitGiveQty(item, total)
+  if (item.maxStack <= 1) return `${total} item${total === 1 ? '' : 's'}`
+  if (stacks > 0 && singles > 0) return `${stacks} stack${stacks === 1 ? '' : 's'} + ${singles}`
+  if (stacks > 0) return `${stacks} stack${stacks === 1 ? '' : 's'}`
+  return `${singles} single${singles === 1 ? '' : 's'}`
+}
+
+function itemBatchSummary(item: CatalogItem, qty: number) {
+  const total = totalGiveQty(item, qty)
+  if (item.maxStack <= 1) {
+    return `${total} item${total === 1 ? '' : 's'}`
+  }
+  const { stacks, singles } = splitGiveQty(item, total)
+  if (stacks > 0 && singles > 0) return `${stacks} stack${stacks === 1 ? '' : 's'} + ${singles}`
+  if (stacks > 0) return `${stacks} stack${stacks === 1 ? '' : 's'}`
+  return `${singles} single${singles === 1 ? '' : 's'}`
+}
+
+function formatEntityOption(entity: LiveEntity) {
+  const coords = entity.location ? `${Math.round(entity.location.x)}, ${Math.round(entity.location.y)}, ${Math.round(entity.location.z)}` : 'unknown location'
+  return entity.customName?.trim()
+    ? `${entity.customName} · ${entity.label} · ${entity.world} · ${coords}`
+    : `${entity.label} · ${entity.world} · ${coords}`
 }
 
 function itemLabelForId(itemId: string, allItems: CatalogItem[]) {
@@ -388,49 +430,6 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
     )
   }
 
-  // ── Broadcast ─────────────────────────────────────────────────────────────────
-
-  const [bcMessage, setBcMessage] = useState('')
-  const [bcBusy,    setBcBusy]    = useState(false)
-
-  const sendBroadcast = async () => {
-    if (!bcMessage.trim()) return
-    setBcBusy(true)
-    try {
-      const r = await fetch('/api/minecraft/broadcast', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: bcMessage }),
-      })
-      const d = await r.json()
-      addToast(d.ok ? 'ok' : 'error', d.ok ? d.message : (d.error || 'Broadcast failed'))
-      if (d.ok) setBcMessage('')
-    } catch (e) {
-      addToast('error', e instanceof Error ? e.message : 'Network error')
-    } finally { setBcBusy(false) }
-  }
-
-  // ── Private message ───────────────────────────────────────────────────────────
-
-  const [msgText,   setMsgText]   = useState('')
-  const [msgBusy,   setMsgBusy]   = useState(false)
-
-  const sendPrivateMsg = async () => {
-    const player = selectedPlayer.trim()
-    if (!player || !msgText.trim()) return
-    setMsgBusy(true)
-    try {
-      const r = await fetch('/api/minecraft/msg', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ player, message: msgText }),
-      })
-      const d = await r.json()
-      addToast(d.ok ? 'ok' : 'error', d.ok ? d.message : (d.error || 'Failed'))
-      if (d.ok) setMsgText('')
-    } catch (e) {
-      addToast('error', e instanceof Error ? e.message : 'Network error')
-    } finally { setMsgBusy(false) }
-  }
-
   // ── Teleport ──────────────────────────────────────────────────────────────────
 
   const [tpTo,        setTpTo]        = useState('')
@@ -439,6 +438,25 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
   const [tpY, setTpY] = useState('')
   const [tpZ, setTpZ] = useState('')
   const [tpLocing,    setTpLocing]    = useState(false)
+  const [liveEntities, setLiveEntities] = useState<LiveEntity[]>([])
+  const [liveEntitiesLoading, setLiveEntitiesLoading] = useState(false)
+  const [entitySearch, setEntitySearch] = useState('')
+  const [entityToPlayerId, setEntityToPlayerId] = useState('')
+  const [playerToEntityId, setPlayerToEntityId] = useState('')
+  const [entityCoordId, setEntityCoordId] = useState('')
+  const [entityTpX, setEntityTpX] = useState('')
+  const [entityTpY, setEntityTpY] = useState('')
+  const [entityTpZ, setEntityTpZ] = useState('')
+  const [actorTping, setActorTping] = useState(false)
+
+  const filteredEntities = useMemo(() => {
+    const query = entitySearch.trim().toLowerCase()
+    if (!query) return liveEntities.slice(0, 50)
+    return liveEntities.filter(entity => {
+      const haystack = `${entity.label} ${entity.id} ${entity.customName ?? ''} ${entity.world}`.toLowerCase()
+      return haystack.includes(query)
+    }).slice(0, 50)
+  }, [entitySearch, liveEntities])
 
   const teleport = async () => {
     const from = selectedPlayer.trim()
@@ -471,6 +489,41 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
     } catch (e) {
       addToast('error', e instanceof Error ? e.message : 'Network error')
     } finally { setTpLocing(false) }
+  }
+
+  const loadLiveEntities = useCallback(async () => {
+    setLiveEntitiesLoading(true)
+    try {
+      const response = await fetch('/api/minecraft/entities/live')
+      const payload = await response.json()
+      if (payload.ok) {
+        setLiveEntities(Array.isArray(payload.entities) ? payload.entities as LiveEntity[] : [])
+      } else {
+        addToast('error', payload.error || 'Failed to load live entities')
+      }
+    } catch (error) {
+      addToast('error', error instanceof Error ? error.message : 'Failed to load live entities')
+    } finally {
+      setLiveEntitiesLoading(false)
+    }
+  }, [addToast])
+
+  const teleportActor = async (payload: Record<string, unknown>, reset?: () => void) => {
+    setActorTping(true)
+    try {
+      const response = await fetch('/api/minecraft/teleport', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const body = await response.json()
+      addToast(body.ok ? 'ok' : 'error', body.ok ? body.message : (body.error || 'Teleport failed'))
+      if (body.ok) reset?.()
+    } catch (error) {
+      addToast('error', error instanceof Error ? error.message : 'Teleport failed')
+    } finally {
+      setActorTping(false)
+    }
   }
 
   // ── Kits ──────────────────────────────────────────────────────────────────────
@@ -726,9 +779,11 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
   const [catPage,     setCatPage]     = useState(0)
   const [catSearch,   setCatSearch]   = useState('')
   const [catSelected, setCatSelected] = useState<CatalogItem | null>(null)
-  const [catStacks,   setCatStacks]   = useState(0)
-  const [catExtraQty, setCatExtraQty] = useState(1)
+  const [catQty,      setCatQty]      = useState(1)
+  const [catBatchSelection, setCatBatchSelection] = useState<Record<string, number>>({})
   const [catGiving,   setCatGiving]   = useState(false)
+  const catalogHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const catalogLongPressItemRef = useRef<string | null>(null)
 
   const activeCat  = hydratedCatalog.find(c => c.id === catCatId) ?? hydratedCatalog[0]
   const filtered   = catSearch.trim()
@@ -737,11 +792,82 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
   const totalPages = Math.ceil(filtered.length / CAT_PAGE_SIZE)
   const pageItems  = filtered.slice(catPage * CAT_PAGE_SIZE, (catPage + 1) * CAT_PAGE_SIZE)
   const selectedCategoryLabel = catSearch.trim() ? 'Search Results' : activeCat.label
+  const catBatchEntries = useMemo(() => Object.entries(catBatchSelection)
+    .map(([itemId, qty]) => {
+      const item = allItems.find(entry => entry.id === itemId)
+      return item ? { item, qty: totalGiveQty(item, qty) } : null
+    })
+    .filter((entry): entry is { item: CatalogItem; qty: number } => Boolean(entry)), [allItems, catBatchSelection])
+  const currentCatalogQty = catSelected ? totalGiveQty(catSelected, catBatchSelection[catSelected.id] ?? catQty) : catQty
+
+  const clearCatalogHold = () => {
+    if (catalogHoldTimerRef.current) {
+      clearTimeout(catalogHoldTimerRef.current)
+      catalogHoldTimerRef.current = null
+    }
+  }
+
+  const toggleBatchItem = (item: CatalogItem) => {
+    setCatSelected(item)
+    setCatBatchSelection(current => {
+      if (current[item.id] != null) {
+        const next = { ...current }
+        delete next[item.id]
+        return next
+      }
+      return { ...current, [item.id]: 1 }
+    })
+  }
+
+  const updateCatalogQty = (item: CatalogItem, nextQty: number) => {
+    const normalized = totalGiveQty(item, nextQty)
+    if (catBatchSelection[item.id] != null) {
+      setCatBatchSelection(current => ({ ...current, [item.id]: normalized }))
+      return
+    }
+    setCatQty(normalized)
+  }
+
+  const giveBatchItems = async () => {
+    const player = selectedPlayer.trim()
+    if (!player || catBatchEntries.length === 0) return
+    setCatGiving(true)
+    let successCount = 0
+    const failures: string[] = []
+    try {
+      for (const entry of catBatchEntries) {
+        const response = await fetch('/api/minecraft/give', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ player, item: entry.item.id, qty: entry.qty }),
+        })
+        const body = await response.json()
+        if (body.ok) {
+          successCount += 1
+        } else {
+          failures.push(`${entry.item.label}: ${body.error || 'Give failed'}`)
+        }
+      }
+      if (successCount > 0) {
+        addToast('ok', `Gave ${successCount} selected item ${successCount === 1 ? 'type' : 'types'} to ${player}`)
+      }
+      if (failures.length > 0) {
+        addToast('error', failures[0])
+      }
+      if (successCount > 0 && invPlayer === player) {
+        void loadInventory()
+      }
+    } catch (e) {
+      addToast('error', e instanceof Error ? e.message : 'Network error')
+    } finally {
+      setCatGiving(false)
+    }
+  }
 
   const giveItem = async () => {
     const player = selectedPlayer.trim()
     if (!player || !catSelected) return
-    const totalQty = totalGiveQty(catSelected, catStacks, catExtraQty)
+    const totalQty = currentCatalogQty
     if (totalQty < 1) return
     setCatGiving(true)
     try {
@@ -751,6 +877,9 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
       })
       const d = await r.json()
       addToast(d.ok ? 'ok' : 'error', d.ok ? d.message : (d.error || 'Give failed'))
+      if (d.ok && invPlayer === player) {
+        void loadInventory()
+      }
     } catch (e) {
       addToast('error', e instanceof Error ? e.message : 'Network error')
     } finally { setCatGiving(false) }
@@ -788,7 +917,10 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
         body: JSON.stringify({ player, item: item.id, count: item.count, slot: item.slot }),
       })
       const d = await r.json()
-      if (d.ok) { addToast('ok', `Cleared ${item.label}`); setInvItems(prev => prev.filter(i => i.slot !== item.slot)) }
+      if (d.ok) {
+        addToast('ok', `Cleared ${item.label}`)
+        void loadInventory()
+      }
       else addToast('error', d.error || 'Failed to clear item')
     } catch (e) {
       addToast('error', e instanceof Error ? e.message : 'Network error')
@@ -808,6 +940,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
         setInvItems([])
         setSelectedInvSlot(null)
         addToast('ok', d.message || `Cleared inventory for ${player}`)
+        void loadInventory()
       } else {
         addToast('error', d.error || 'Failed to clear inventory')
       }
@@ -842,6 +975,10 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
     if (currentSelected) {
       if (clickedItem && clickedItem.slot === currentSelected.slot) {
         setSelectedInvSlot(null)
+      } else if (clickedItem && clickedItem.id === currentSelected.id) {
+        moveInvItem(player, currentSelected.slot, clickedSlot)
+      } else if (!clickedItem) {
+        moveInvItem(player, currentSelected.slot, clickedSlot)
       } else if (clickedItem) {
         setSelectedInvSlot(clickedItem)
       }
@@ -855,15 +992,18 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
     moveInvItem(player, currentSelected.slot, targetSlot)
   }
 
-  const canWorld = features ? features.enable_world : true
   const canPlayerCmd = features ? features.enable_player_commands : true
-  const canChatWrite = features ? (features.enable_chat && features.enable_chat_write) : true
   const canTeleport = features ? features.enable_teleport : true
   const canKits = features ? features.enable_kits : true
   const canCustomKits = features ? features.enable_custom_kits : true
   const canCatalog = features ? features.enable_item_catalog : true
   const canInventory = features ? features.enable_inventory : true
-  const allSectionsDisabled = !canWorld && !canPlayerCmd && !canChatWrite && !canTeleport && !canKits && !canCatalog && !canInventory
+  const allSectionsDisabled = !canPlayerCmd && !canTeleport && !canKits && !canCatalog && !canInventory
+  useEffect(() => {
+    if (canTeleport) {
+      loadLiveEntities()
+    }
+  }, [canTeleport, loadLiveEntities])
   const [collapseAllActive, setCollapseAllActive] = useState(false)
   const toggleCollapseAll = () => {
     const nextOpen = collapseAllActive
@@ -912,20 +1052,6 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
         </CollapsibleCard>
       )}
 
-      {/* ── WORLD COMMANDS ── */}
-      {canWorld && (
-      <CollapsibleCard title="WORLD" storageKey="actions:world" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
-        <div>
-          <SectionLabel>
-            WEATHER / TIME {selectedPlayer && <span className="text-[var(--accent)] normal-case">— {selectedPlayer}</span>}
-          </SectionLabel>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {WEATHER_CMDS.map(c => cmdBtn(c.id, c.Icon, c.label, selectedPlayer || undefined))}
-          </div>
-        </div>
-      </CollapsibleCard>
-      )}
-
       {/* ── PLAYER COMMANDS ── */}
       {canPlayerCmd && (
       <CollapsibleCard title="PLAYER COMMANDS" storageKey="actions:player-commands" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
@@ -942,7 +1068,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
         <div>
           <SectionLabel>ABILITIES {selectedPlayer && <span className="text-[var(--accent)] normal-case">— {selectedPlayer}</span>}</SectionLabel>
           {selectedPlayer ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {ABILITY_CMDS.map(c => {
                 const key    = c.id + selectedPlayer
                 const busy   = busyCmd === key
@@ -950,7 +1076,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                 const iconColor = active ? 'var(--bg)' : 'var(--text-dim)'
                 return (
                   <button key={c.id} onClick={() => issueCmd(c.id, selectedPlayer)} disabled={busy || !!busyCmd}
-                    className="flex flex-col items-center gap-1 px-2 py-3 rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex min-h-[3.35rem] flex-col items-center justify-center gap-1 rounded-lg border px-1.5 py-2.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     style={active
                       ? { borderColor: 'var(--accent)', background: 'var(--accent)', color: 'var(--bg)', boxShadow: '0 0 10px var(--accent-mid)' }
                       : { borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
@@ -959,7 +1085,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                         ? <span className="text-[15px] font-mono" style={{ color: iconColor }}>…</span>
                         : <c.Icon size={16} color={iconColor} strokeWidth={1.5} />}
                     </span>
-                    <span className="text-[13px] font-mono tracking-wide" style={{ color: iconColor }}>{c.label}</span>
+                    <span className="text-[12px] font-mono tracking-wide" style={{ color: iconColor }}>{c.label}</span>
                   </button>
                 )
               })}
@@ -969,57 +1095,51 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
       </CollapsibleCard>
       )}
 
-      {/* ── BROADCAST ── */}
-      {canChatWrite && (
-      <CollapsibleCard title="BROADCAST" storageKey="actions:broadcast" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
-        <div>
-          <SectionLabel>MESSAGE TO ALL PLAYERS</SectionLabel>
-          <textarea placeholder="Type a message…" value={bcMessage} onChange={e => setBcMessage(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBroadcast() } }}
-            rows={3} maxLength={256}
-            className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)] resize-none"
-            style={{ fontSize: '16px' }} />
-          <div className="flex items-center justify-between mt-1">
-            <span className={`text-[13px] font-mono ${bcMessage.length >= 256 ? 'text-red-400' : bcMessage.length >= 230 ? 'text-yellow-500 opacity-70' : 'text-[var(--text-dim)] opacity-60'}`}>
-              {bcMessage.length}/256 · Enter to send · Shift+Enter for newline
-            </span>
-            <button onClick={sendBroadcast} disabled={!bcMessage.trim() || bcBusy}
-              className="px-4 py-2 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-              {bcBusy ? 'Sending...' : 'Send'}
-            </button>
-          </div>
-        </div>
-
-        <div className="border-t border-[var(--border)] pt-3">
-          <SectionLabel>PRIVATE MESSAGE</SectionLabel>
-          <div className="space-y-2">
-            {selectedPlayer ? (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
-                <span className="text-[13px] font-mono text-[var(--text-dim)]">To:</span>
-                <span className="text-[13px] font-mono text-[var(--accent)]">{selectedPlayer}</span>
-                <span className="text-[13px] font-mono text-[var(--text-dim)] opacity-60 ml-auto">from Active Player</span>
-              </div>
-            ) : (
-              <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">Choose an active player above</div>
-            )}
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input type="text" placeholder="Message…" value={msgText} onChange={e => setMsgText(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && sendPrivateMsg()} maxLength={256}
-                className="flex-1 bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
-                style={{ fontSize: '16px' }} />
-              <button onClick={sendPrivateMsg} disabled={!selectedPlayer.trim() || !msgText.trim() || msgBusy}
-                className="tap-target px-4 py-2 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-                {msgBusy ? '…' : 'Send'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </CollapsibleCard>
-      )}
-
       {/* ── TELEPORT ── */}
       {canTeleport && (
       <CollapsibleCard title="TELEPORT" storageKey="actions:teleport" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-3 text-[12px] font-mono text-[var(--text-dim)]">
+          {liveEntitiesLoading ? 'Loading live entities…' : `${liveEntities.length} live entit${liveEntities.length === 1 ? 'y' : 'ies'} available for actor-based teleport controls.`}
+        </div>
+
+        <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-3">
+          <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">LIVE ENTITY PICKER</div>
+          <input
+            type="text"
+            value={entitySearch}
+            onChange={event => setEntitySearch(event.target.value)}
+            placeholder="Search entity label, custom name, or world"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[13px] font-mono text-[var(--text)]"
+          />
+          <div className="max-h-48 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2">
+            {filteredEntities.length === 0 ? (
+              <div className="px-2 py-2 text-[12px] font-mono text-[var(--text-dim)]">No matching live entities.</div>
+            ) : (
+              <div className="space-y-1">
+                {filteredEntities.map(entity => {
+                  const selected = entity.uuid === entityToPlayerId || entity.uuid === playerToEntityId || entity.uuid === entityCoordId
+                  return (
+                    <button
+                      key={entity.uuid}
+                      type="button"
+                      onClick={() => {
+                        setEntityToPlayerId(entity.uuid)
+                        setPlayerToEntityId(entity.uuid)
+                        setEntityCoordId(entity.uuid)
+                      }}
+                      className="w-full rounded-lg border px-3 py-2 text-left font-mono text-[12px] transition-all"
+                      style={selected
+                        ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
+                        : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+                    >
+                      {formatEntityOption(entity)}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
 
         <div>
           <SectionLabel>PLAYER → PLAYER</SectionLabel>
@@ -1076,6 +1196,107 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
               className="w-full py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}>
               {tpLocing ? 'Teleporting...' : 'Teleport to Coordinates'}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <SectionLabel>ENTITY → PLAYER</SectionLabel>
+          {!selectedPlayer ? (
+            <div className="text-[13px] font-mono text-[var(--text-dim)]">Choose an active player above</div>
+          ) : (
+            <div className="space-y-3">
+              <select
+                value={entityToPlayerId}
+                onChange={event => setEntityToPlayerId(event.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[13px] font-mono text-[var(--text)]"
+              >
+                <option value="">Select live entity</option>
+                {filteredEntities.map(entity => <option key={entity.uuid} value={entity.uuid}>{formatEntityOption(entity)}</option>)}
+              </select>
+              <button
+                onClick={() => void teleportActor({
+                  mode: 'actor-to-actor',
+                  from: { type: 'entity', value: entityToPlayerId, label: liveEntities.find(entity => entity.uuid === entityToPlayerId)?.label ?? null },
+                  to: { type: 'player', value: selectedPlayer },
+                }, () => setEntityToPlayerId(''))}
+                disabled={actorTping || !selectedPlayer || !entityToPlayerId}
+                className="w-full py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}
+              >
+                {actorTping ? 'Teleporting...' : 'Teleport Entity to Player'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <SectionLabel>PLAYER → ENTITY</SectionLabel>
+          {!selectedPlayer ? (
+            <div className="text-[13px] font-mono text-[var(--text-dim)]">Choose an active player above</div>
+          ) : (
+            <div className="space-y-3">
+              <select
+                value={playerToEntityId}
+                onChange={event => setPlayerToEntityId(event.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[13px] font-mono text-[var(--text)]"
+              >
+                <option value="">Select live entity</option>
+                {filteredEntities.map(entity => <option key={entity.uuid} value={entity.uuid}>{formatEntityOption(entity)}</option>)}
+              </select>
+              <button
+                onClick={() => void teleportActor({
+                  mode: 'actor-to-actor',
+                  from: { type: 'player', value: selectedPlayer },
+                  to: { type: 'entity', value: playerToEntityId, label: liveEntities.find(entity => entity.uuid === playerToEntityId)?.label ?? null },
+                }, () => setPlayerToEntityId(''))}
+                disabled={actorTping || !selectedPlayer || !playerToEntityId}
+                className="w-full py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}
+              >
+                {actorTping ? 'Teleporting...' : 'Teleport Player to Entity'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <SectionLabel>ENTITY → COORDINATES</SectionLabel>
+          <div className="space-y-3">
+            <select
+              value={entityCoordId}
+              onChange={event => setEntityCoordId(event.target.value)}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[13px] font-mono text-[var(--text)]"
+            >
+              <option value="">Select live entity</option>
+              {filteredEntities.map(entity => <option key={entity.uuid} value={entity.uuid}>{formatEntityOption(entity)}</option>)}
+            </select>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {(['X', 'Y', 'Z'] as const).map((axis, index) => (
+                <div key={axis}>
+                  <div className="text-[13px] font-mono text-[var(--text-dim)] mb-1">{axis}</div>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={[entityTpX, entityTpY, entityTpZ][index]}
+                    onChange={event => [setEntityTpX, setEntityTpY, setEntityTpZ][index](event.target.value)}
+                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-2 text-[15px] font-mono text-[var(--text)]"
+                    style={{ fontSize: '16px' }}
+                  />
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => void teleportActor({
+                mode: 'actor-to-coords',
+                actor: { type: 'entity', value: entityCoordId, label: liveEntities.find(entity => entity.uuid === entityCoordId)?.label ?? null },
+                x: Number(entityTpX), y: Number(entityTpY), z: Number(entityTpZ),
+              }, () => { setEntityCoordId(''); setEntityTpX(''); setEntityTpY(''); setEntityTpZ('') })}
+              disabled={actorTping || !entityCoordId || !entityTpX || !entityTpY || !entityTpZ}
+              className="w-full py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}
+            >
+              {actorTping ? 'Teleporting...' : 'Teleport Entity to Coordinates'}
             </button>
           </div>
         </div>
@@ -1196,20 +1417,21 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
             })()}
 
             {canCustomKits && (
-            <div className="border-t border-[var(--border)] pt-4 space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <SectionLabel>4 · KIT BUILDER</SectionLabel>
-                <button
-                  onClick={resetKitBuilder}
-                  disabled={kitsBusy}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--border)] text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40"
-                >
-                  <RefreshCcw size={14} />
-                  New
-                </button>
-              </div>
+            <div className="border-t border-[var(--border)] pt-4">
+              <CollapsibleCard title="4 · KIT BUILDER" storageKey="actions:kits:builder" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-0 pt-4 space-y-4" className="border border-[var(--border)] bg-transparent">
+                <div className="flex items-center justify-between gap-3 px-4">
+                  <div className="text-[12px] font-mono text-[var(--text-dim)]">Build reusable custom kits without leaving the assignment flow.</div>
+                  <button
+                    onClick={resetKitBuilder}
+                    disabled={kitsBusy}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--border)] text-[13px] font-mono text-[var(--text-dim)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40"
+                  >
+                    <RefreshCcw size={14} />
+                    New
+                  </button>
+                </div>
 
-              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] gap-4">
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] gap-4 px-4 pb-4">
                 <div className="space-y-4">
                   <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_12rem] gap-3">
@@ -1510,6 +1732,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                   </div>
                 </div>
               </div>
+              </CollapsibleCard>
             </div>
             )}
           </>
@@ -1519,7 +1742,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
 
       {/* ── ITEM CATALOG ── */}
       {canCatalog && (
-      <CollapsibleCard title="ITEM CATALOG" storageKey="actions:item-catalog" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
+      <CollapsibleCard title="ITEM CATALOG" storageKey="actions:item-catalog" defaultOpen={false} groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
 
         <div>
           <SectionLabel>ACTIVE PLAYER</SectionLabel>
@@ -1535,7 +1758,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
           <>
             <div className="flex gap-1.5 flex-wrap">
               {hydratedCatalog.map(cat => (
-                <button key={cat.id} onClick={() => { setCatCatId(cat.id); setCatPage(0); setCatSearch(''); setCatSelected(null) }}
+                <button key={cat.id} onClick={() => { setCatCatId(cat.id); setCatPage(0); setCatSearch(''); setCatSelected(null); setCatBatchSelection({}) }}
                   className={`px-2 py-1 rounded text-[13px] font-mono transition-all border ${
                     catCatId === cat.id
                       ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]'
@@ -1547,23 +1770,43 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
             </div>
 
             <input type="text" placeholder="Search"
-              value={catSearch} onChange={e => { setCatSearch(e.target.value); setCatPage(0); setCatSelected(null) }}
+              value={catSearch} onChange={e => { setCatSearch(e.target.value); setCatPage(0); setCatSelected(null); setCatBatchSelection({}) }}
               className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
               style={{ fontSize: '16px' }} />
 
+            <div className="text-[11px] font-mono text-[var(--text-dim)]">
+              Click once to preview. Double-click on desktop or press and hold on mobile to add items to a multi-give batch.
+            </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
               {pageItems.map(item => (
-                <button key={item.id} onClick={() => {
-                  setCatSelected(s => s?.id === item.id ? null : item)
-                  setCatStacks(0)
-                  setCatExtraQty(1)
-                }}
+                <button key={item.id}
+                  onClick={() => {
+                    if (catalogLongPressItemRef.current === item.id) {
+                      catalogLongPressItemRef.current = null
+                      return
+                    }
+                    setCatSelected(current => current?.id === item.id ? null : item)
+                    setCatQty(1)
+                  }}
+                  onDoubleClick={() => toggleBatchItem(item)}
+                  onPointerDown={event => {
+                    if (event.pointerType === 'mouse') return
+                    clearCatalogHold()
+                    catalogHoldTimerRef.current = setTimeout(() => {
+                      catalogLongPressItemRef.current = item.id
+                      toggleBatchItem(item)
+                    }, 450)
+                  }}
+                  onPointerUp={clearCatalogHold}
+                  onPointerLeave={clearCatalogHold}
+                  onPointerCancel={clearCatalogHold}
                   className={`flex flex-col gap-2 rounded-[22px] border p-2.5 text-left transition-all ${
-                    catSelected?.id === item.id
+                    catSelected?.id === item.id || catBatchSelection[item.id] != null
                       ? 'text-[var(--accent)]'
                       : 'text-[var(--text-dim)] hover:border-[var(--accent-mid)]'
                   }`}
-                  style={catSelected?.id === item.id
+                  style={catSelected?.id === item.id || catBatchSelection[item.id] != null
                     ? {
                         borderColor: 'var(--accent)',
                         background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--panel) 92%, transparent))',
@@ -1585,6 +1828,9 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                   <div>
                     <div className="text-[12px] font-mono leading-tight line-clamp-2">{item.label}</div>
                     <div className="mt-1 text-[10px] font-mono tracking-[0.18em] opacity-70">{item.maxStack === 1 ? 'UNSTACKABLE' : `STACK ${item.maxStack}`}</div>
+                    {catBatchSelection[item.id] != null && (
+                      <div className="mt-1 text-[10px] font-mono tracking-[0.18em] text-[var(--accent)]">BATCHED</div>
+                    )}
                   </div>
                 </button>
               ))}
@@ -1600,103 +1846,197 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
               </div>
             )}
 
+            {catBatchEntries.length > 0 && (
+              <div className="space-y-3 rounded-[24px] border border-[var(--border)] bg-[var(--panel)] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[13px] font-mono text-[var(--text)]">MULTI-GIVE QUEUE</div>
+                    <div className="text-[11px] font-mono text-[var(--text-dim)]">{catBatchEntries.length} selected item {catBatchEntries.length === 1 ? 'type' : 'types'}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCatBatchSelection({})}
+                    className="rounded-lg border border-[var(--border)] px-3 py-2 text-[11px] font-mono text-[var(--text-dim)] transition-all hover:border-[var(--accent-mid)]"
+                  >
+                    Clear Queue
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {catBatchEntries.map(({ item, qty }) => (
+                    <div key={item.id} className="grid gap-2 rounded-2xl border border-[var(--border)] bg-[var(--bg)] px-3 py-3 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-center">
+                      <div className="min-w-0">
+                        <div className="truncate text-[12px] font-mono text-[var(--text)]">{item.label}</div>
+                        <div className="text-[10px] font-mono tracking-[0.16em] text-[var(--text-dim)]">{itemBatchSummary(item, qty)}</div>
+                      </div>
+                      <input
+                        type="number"
+                        min={1}
+                        max={getItemMaxQty(item)}
+                        value={qty}
+                        onChange={event => updateCatalogQty(item, Number(event.target.value) || 1)}
+                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[13px] font-mono text-[var(--text)] focus:outline-none focus:border-[var(--accent-mid)]"
+                        style={{ fontSize: '16px' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleBatchItem(item)}
+                        className="rounded-lg border border-[var(--border)] px-3 py-2 text-[11px] font-mono text-[var(--text-dim)] transition-all hover:border-red-700 hover:text-red-300"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={giveBatchItems}
+                  disabled={catGiving}
+                  className="w-full rounded-lg py-2.5 font-mono text-[13px] tracking-widest transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}
+                >
+                  {catGiving ? 'Giving...' : `Give ${catBatchEntries.length} Selected Item ${catBatchEntries.length === 1 ? 'Type' : 'Types'} → ${selectedPlayer}`}
+                </button>
+              </div>
+            )}
+
             {catSelected && (
               <div className="space-y-3 pt-1">
-                <div
-                  className="space-y-3 rounded-[28px] border p-4"
-                  style={{
-                    borderColor: itemCardPalette(catSelected, selectedCategoryLabel).frame,
-                    background: `linear-gradient(180deg, ${itemCardPalette(catSelected, selectedCategoryLabel).frameSoft}, rgba(8,11,16,0.94))`,
-                    boxShadow: `0 18px 42px ${itemCardPalette(catSelected, selectedCategoryLabel).frameGlow}`,
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-[10px] font-mono tracking-[0.35em]" style={{ color: itemCardPalette(catSelected, selectedCategoryLabel).badgeText }}>ITEM CARD</div>
-                      <div className="mt-1 text-[18px] font-mono text-[var(--text)]">{catSelected.label}</div>
-                    </div>
-                    <div className="flex flex-wrap justify-end gap-2 text-[10px] font-mono tracking-widest">
-                      <span className="rounded-full border px-2 py-1" style={{ borderColor: itemCardPalette(catSelected, selectedCategoryLabel).frame, background: itemCardPalette(catSelected, selectedCategoryLabel).badge, color: itemCardPalette(catSelected, selectedCategoryLabel).badgeText }}>{selectedCategoryLabel}</span>
-                      <span className="rounded-full border border-[var(--border)] px-2 py-1 text-[var(--text-dim)]">{minecraftVersion || 'fallback version'}</span>
-                    </div>
-                  </div>
-                  <div className="rounded-[24px] border p-2" style={{ borderColor: itemCardPalette(catSelected, selectedCategoryLabel).frame, background: 'rgba(0,0,0,0.18)' }}>
-                    <CatalogArtwork
-                      kind="item"
-                      label={catSelected.label}
-                      category={selectedCategoryLabel}
-                      imageUrl={catSelected.imageUrl}
-                      art={catSelected.art}
-                      className="h-52 w-full rounded-[18px] border border-white/10 object-contain"
-                    />
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                      {[
-                        ['Id', `minecraft:${catSelected.id}`],
-                        ['Category', selectedCategoryLabel],
-                        ['Per Stack', String(catSelected.maxStack)],
-                        ['Max Batch', String(catSelected.maxStack > 1 ? MAX_STACK_BATCHES * catSelected.maxStack : MAX_STACK_BATCHES)],
-                      ].map(([label, value]) => (
-                        <div key={label} className="rounded-2xl border px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
-                          <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">{label}</div>
-                          <div className="mt-1 text-[12px] font-mono text-[var(--text)] break-all">{value}</div>
+                {(() => {
+                  const totalQty = currentCatalogQty
+                  const qtyBreakdown = splitGiveQty(catSelected, currentCatalogQty)
+                  return (
+                    <>
+                      <div
+                        className="space-y-3 rounded-[28px] border p-4"
+                        style={{
+                          borderColor: itemCardPalette(catSelected, selectedCategoryLabel).frame,
+                          background: `linear-gradient(180deg, ${itemCardPalette(catSelected, selectedCategoryLabel).frameSoft}, rgba(8,11,16,0.94))`,
+                          boxShadow: `0 18px 42px ${itemCardPalette(catSelected, selectedCategoryLabel).frameGlow}`,
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-[10px] font-mono tracking-[0.35em]" style={{ color: itemCardPalette(catSelected, selectedCategoryLabel).badgeText }}>ITEM CARD</div>
+                            <div className="mt-1 text-[18px] font-mono text-[var(--text)]">{catSelected.label}</div>
+                          </div>
+                          <div className="flex flex-wrap justify-end gap-2 text-[10px] font-mono tracking-widest">
+                            <span className="rounded-full border px-2 py-1" style={{ borderColor: itemCardPalette(catSelected, selectedCategoryLabel).frame, background: itemCardPalette(catSelected, selectedCategoryLabel).badge, color: itemCardPalette(catSelected, selectedCategoryLabel).badgeText }}>{selectedCategoryLabel}</span>
+                            <span className="rounded-full border border-[var(--border)] px-2 py-1 text-[var(--text-dim)]">{minecraftVersion || 'fallback version'}</span>
+                          </div>
                         </div>
-                      ))}
+                        <div className="rounded-[24px] border p-2" style={{ borderColor: itemCardPalette(catSelected, selectedCategoryLabel).frame, background: 'rgba(0,0,0,0.18)' }}>
+                          <CatalogArtwork
+                            kind="item"
+                            label={catSelected.label}
+                            category={selectedCategoryLabel}
+                            imageUrl={catSelected.imageUrl}
+                            art={catSelected.art}
+                            className="h-52 w-full rounded-[18px] border border-white/10 object-contain"
+                          />
+                          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                            {[
+                              ['Id', `minecraft:${catSelected.id}`],
+                              ['Category', selectedCategoryLabel],
+                              ['Per Stack', String(catSelected.maxStack)],
+                              ['Max Batch', String(catSelected.maxStack > 1 ? MAX_STACK_BATCHES * catSelected.maxStack : MAX_STACK_BATCHES)],
+                            ].map(([label, value]) => (
+                              <div key={label} className="rounded-2xl border px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
+                                <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">{label}</div>
+                                <div className="mt-1 text-[12px] font-mono text-[var(--text)] break-all">{value}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[13px] font-mono text-[var(--text-dim)]">Quantity</div>
+                    <div className="text-[12px] font-mono text-[var(--text-dim)]">
+                      {catSelected.maxStack > 1
+                        ? `${qtyBreakdown.stacks} stack${qtyBreakdown.stacks === 1 ? '' : 's'} · ${qtyBreakdown.singles} single${qtyBreakdown.singles === 1 ? '' : 's'}`
+                        : `${totalQty} item${totalQty === 1 ? '' : 's'}`}
                     </div>
                   </div>
-                </div>
-                {catSelected.maxStack > 1 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <label className="space-y-1">
-                      <div className="text-[13px] font-mono text-[var(--text-dim)]">Stacks</div>
-                      <input
-                        type="number"
-                        min={0}
-                        max={MAX_STACK_BATCHES}
-                        value={catStacks}
-                        onChange={e => setCatStacks(Math.max(0, Math.min(MAX_STACK_BATCHES, Number(e.target.value) || 0)))}
-                        className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] focus:outline-none focus:border-[var(--accent-mid)]"
-                        style={{ fontSize: '16px' }}
-                      />
-                    </label>
-                    <label className="space-y-1">
-                      <div className="text-[13px] font-mono text-[var(--text-dim)]">Extra</div>
-                      <input
-                        type="number"
-                        min={0}
-                        max={catSelected.maxStack}
-                        value={catExtraQty}
-                        onChange={e => setCatExtraQty(Math.max(0, Math.min(catSelected.maxStack, Number(e.target.value) || 0)))}
-                        className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] focus:outline-none focus:border-[var(--accent-mid)]"
-                        style={{ fontSize: '16px' }}
-                      />
-                    </label>
+                  <div className="flex flex-wrap gap-2">
+                    {quickGiveOptions(catSelected).map(option => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setCatQty(option)}
+                        className="rounded-lg border px-3 py-2 text-[12px] font-mono transition-all"
+                        style={catQty === option
+                          ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
+                          : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+                      >
+                        {formatQuickGiveLabel(catSelected, option)}
+                      </button>
+                    ))}
+                  </div>
+                  <div className={`grid gap-2 ${catSelected.maxStack > 1 ? 'sm:grid-cols-3' : 'sm:grid-cols-[minmax(0,1fr)_8rem]'}`}>
+                    {catSelected.maxStack > 1 && (
+                      <>
+                        <label className="space-y-1 block">
+                          <div className="text-[13px] font-mono text-[var(--text-dim)]">Stacks</div>
+                          <input
+                            type="number"
+                            min={0}
+                            max={MAX_STACK_BATCHES}
+                            value={qtyBreakdown.stacks}
+                            onChange={e => {
+                              const stacks = Math.max(0, Math.min(MAX_STACK_BATCHES, Number(e.target.value) || 0))
+                              updateCatalogQty(catSelected, (stacks * catSelected.maxStack) + qtyBreakdown.singles)
+                            }}
+                            className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] focus:outline-none focus:border-[var(--accent-mid)]"
+                            style={{ fontSize: '16px' }}
+                          />
+                        </label>
+                        <label className="space-y-1 block">
+                          <div className="text-[13px] font-mono text-[var(--text-dim)]">Singles</div>
+                          <input
+                            type="number"
+                            min={0}
+                            max={catSelected.maxStack - 1}
+                            value={qtyBreakdown.singles}
+                            onChange={e => {
+                              const singles = Math.max(0, Math.min(catSelected.maxStack - 1, Number(e.target.value) || 0))
+                              updateCatalogQty(catSelected, (qtyBreakdown.stacks * catSelected.maxStack) + singles)
+                            }}
+                            className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] focus:outline-none focus:border-[var(--accent-mid)]"
+                            style={{ fontSize: '16px' }}
+                          />
+                        </label>
+                      </>
+                    )}
+                    {catSelected.maxStack <= 1 && (
+                      <label className="space-y-1 block">
+                        <div className="text-[13px] font-mono text-[var(--text-dim)]">Item Count</div>
+                        <input
+                          type="number"
+                          min={1}
+                          max={getItemMaxQty(catSelected)}
+                          value={currentCatalogQty}
+                          onChange={e => updateCatalogQty(catSelected, Number(e.target.value) || 1)}
+                          className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] focus:outline-none focus:border-[var(--accent-mid)]"
+                          style={{ fontSize: '16px' }}
+                        />
+                      </label>
+                    )}
                     <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
                       <div className="text-[13px] font-mono text-[var(--text-dim)]">Total</div>
-                      <div className="text-[15px] font-mono text-[var(--text)]">{totalGiveQty(catSelected, catStacks, catExtraQty)}</div>
+                      <div className="text-[15px] font-mono text-[var(--text)]">{totalQty}</div>
                     </div>
                   </div>
-                ) : (
-                  <label className="space-y-1 block">
-                    <div className="text-[13px] font-mono text-[var(--text-dim)]">Count</div>
-                    <input
-                      type="number"
-                      min={1}
-                      max={MAX_STACK_BATCHES}
-                      value={catExtraQty}
-                      onChange={e => setCatExtraQty(Math.max(1, Math.min(MAX_STACK_BATCHES, Number(e.target.value) || 1)))}
-                      className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] focus:outline-none focus:border-[var(--accent-mid)]"
-                      style={{ fontSize: '16px' }}
-                    />
-                  </label>
-                )}
-                <div className="text-[13px] font-mono text-[var(--text-dim)]">
-                  Per stack: {catSelected.maxStack} · Max batch: {catSelected.maxStack > 1 ? MAX_STACK_BATCHES * catSelected.maxStack : MAX_STACK_BATCHES}
-                </div>
-                <button onClick={giveItem} disabled={catGiving}
-                  className="w-full py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}>
-                  {catGiving ? 'Giving...' : `Give ×${totalGiveQty(catSelected, catStacks, catExtraQty)} ${catSelected.label} → ${selectedPlayer}`}
-                </button>
+                      </div>
+                      <div className="text-[13px] font-mono text-[var(--text-dim)]">
+                        Per stack: {catSelected.maxStack} · Max batch: {catSelected.maxStack > 1 ? MAX_STACK_BATCHES * catSelected.maxStack : MAX_STACK_BATCHES}
+                      </div>
+                      <button onClick={catBatchEntries.length > 0 ? giveBatchItems : giveItem} disabled={catGiving}
+                        className="w-full py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent)' }}>
+                        {catGiving ? 'Giving...' : catBatchEntries.length > 0 ? `Give Queue → ${selectedPlayer}` : `Give ×${totalQty} ${catSelected.label} → ${selectedPlayer}`}
+                      </button>
+                    </>
+                  )
+                })()}
               </div>
             )}
           </>
@@ -1740,7 +2080,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
               </div>
               {selectedInvSlot && (
                 <div className="text-[11px] font-mono text-[var(--text-dim)] px-2 py-1 rounded border border-[var(--accent-mid)] bg-[var(--accent-dim)]">
-                  <span className="text-[var(--accent)]">{selectedInvSlot.label}</span> selected — hold an empty slot for 1s to move, or click selected item to deselect
+                  <span className="text-[var(--accent)]">{selectedInvSlot.label}</span> selected — click an empty slot or matching stack to move, or click the selected item to deselect
                 </div>
               )}
               <div>
@@ -1749,7 +2089,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                   {hotbar.map((item, i) => (
                     <InvSlot key={i} item={item} slotIndex={i}
                       selected={!!item && selectedInvSlot?.slot === item.slot}
-                      moveTarget={!!selectedInvSlot && !item}
+                      moveTarget={!!selectedInvSlot && ((!item) || (item.id === selectedInvSlot.id && item.slot !== selectedInvSlot.slot))}
                       onMoveTargetHold={() => handleInvSlotHoldToMove(invPlayer, item?.slot ?? i, selectedInvSlot)}
                       onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
                       onSlotClick={() => handleInvSlotClick(invPlayer, item, item?.slot ?? i, selectedInvSlot)}
@@ -1767,7 +2107,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                     return (
                       <InvSlot key={i} item={item} slotIndex={s}
                         selected={!!item && selectedInvSlot?.slot === item.slot}
-                        moveTarget={!!selectedInvSlot && !item}
+                        moveTarget={!!selectedInvSlot && ((!item) || (item.id === selectedInvSlot.id && item.slot !== selectedInvSlot.slot))}
                         onMoveTargetHold={() => handleInvSlotHoldToMove(invPlayer, item?.slot ?? s, selectedInvSlot)}
                         onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
                         onSlotClick={() => handleInvSlotClick(invPlayer, item, item?.slot ?? s, selectedInvSlot)}
@@ -1778,7 +2118,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                   <div className="w-px h-8 bg-[var(--border)] mx-1.5" />
                   <InvSlot item={offhand} slotIndex={150}
                     selected={!!offhand && selectedInvSlot?.slot === 150}
-                    moveTarget={!!selectedInvSlot && !offhand}
+                    moveTarget={!!selectedInvSlot && ((!offhand) || (offhand.id === selectedInvSlot.id && offhand.slot !== selectedInvSlot.slot))}
                     onMoveTargetHold={() => handleInvSlotHoldToMove(invPlayer, offhand?.slot ?? 150, selectedInvSlot)}
                     onDelete={offhand ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
                     onSlotClick={() => handleInvSlotClick(invPlayer, offhand, offhand?.slot ?? 150, selectedInvSlot)}
@@ -1792,7 +2132,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                   {main.map((item, i) => (
                     <InvSlot key={i} item={item} slotIndex={i + 9}
                       selected={!!item && selectedInvSlot?.slot === item.slot}
-                      moveTarget={!!selectedInvSlot && !item}
+                      moveTarget={!!selectedInvSlot && ((!item) || (item.id === selectedInvSlot.id && item.slot !== selectedInvSlot.slot))}
                       onMoveTargetHold={() => handleInvSlotHoldToMove(invPlayer, item?.slot ?? (i + 9), selectedInvSlot)}
                       onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(invPlayer, it) } }) : undefined}
                       onSlotClick={() => handleInvSlotClick(invPlayer, item, item?.slot ?? (i + 9), selectedInvSlot)}
