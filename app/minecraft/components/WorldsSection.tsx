@@ -1796,7 +1796,9 @@ export default function WorldsSection({
                 ? structureLoadError
                 : structures.length === 0
                   ? 'No structures found. Check the beacon schematics path or upload a schematic first.'
-                  : `No structures match "${structureSearch.trim()}".`}
+                  : structureSearch.trim()
+                    ? `No structures match "${structureSearch.trim()}" for the current source filter.`
+                    : 'No structures are available in the current source filter.'}
             </div>
           )}
         </CollapsibleCard>
@@ -1931,6 +1933,9 @@ export default function WorldsSection({
               </button>
             ))}
           </div>
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[11px] font-mono text-[var(--text-dim)]">
+            Active source filter: {entitySourceFilter === 'all' ? 'all catalog entries' : entitySourceFilter === 'native' ? 'native bridge or fallback entity catalog only' : 'saved custom preset entries only'}
+          </div>
           <div className="flex gap-1.5 flex-wrap">
             {entityCategories.map(category => (
               <button
@@ -2043,7 +2048,9 @@ export default function WorldsSection({
                 ? entityLoadError
                 : entities.length === 0
                   ? 'No entities available for browsing right now.'
-                  : `No entities match "${entitySearch.trim()}".`}
+                  : entitySearch.trim()
+                    ? `No entities match "${entitySearch.trim()}" for the current source filter.`
+                    : 'No entities are available in the current source filter.'}
             </div>
           )}
         </CollapsibleCard>
