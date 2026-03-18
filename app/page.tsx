@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import Image, { type StaticImageData } from 'next/image'
+import { redirect } from 'next/navigation'
 import loginShot from '@/docs/screenshots/highlights/01-login.png'
 import connectShot from '@/docs/screenshots/highlights/02-connect.png'
 import dashboardShot from '@/docs/screenshots/highlights/03-dashboard.png'
@@ -24,6 +26,11 @@ function demoLaunchHref(returnTo = '/minecraft') {
 export const metadata: Metadata = {
   title: 'Mcraftr',
   description: 'Self-hosted Minecraft admin panel for fast, opinionated server management over RCON.',
+  icons: {
+    icon: '/m.svg',
+    shortcut: '/m.svg',
+    apple: '/m.svg',
+  },
   alternates: {
     canonical: 'https://mcraftr.deployfaith.xyz/',
   },
@@ -158,7 +165,17 @@ const footerLinks = [
   { href: demoLaunchHref(), label: 'Demo', external: true },
 ]
 
-export default function Home() {
+export default async function Home() {
+  const host = (await headers()).get('host')?.toLowerCase() ?? ''
+
+  if (host === 'demo.mcraftr.deployfaith.xyz') {
+    redirect('/demo')
+  }
+
+  if (host === 'mcraftr.mesh') {
+    redirect('/login')
+  }
+
   return (
     <main className="min-h-screen">
       <PublicSiteHeader
