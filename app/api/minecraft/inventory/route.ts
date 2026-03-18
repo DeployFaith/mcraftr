@@ -1,8 +1,17 @@
 import { NextRequest } from 'next/server'
 import { getSessionUserId, rconForRequest, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 import { Rcon } from 'rcon-client'
-import { getActiveServer } from '@/lib/users'
+import { CATALOG } from '@/app/minecraft/items'
+import { getActiveServer, getUserById } from '@/lib/users'
 import { checkRateLimit } from '@/lib/ratelimit'
+import {
+  adjustDemoSyntheticInventorySlot,
+  clearDemoSyntheticInventory,
+  getDemoSyntheticInventory,
+  moveDemoSyntheticInventoryItem,
+} from '@/lib/demo-synthetic-player'
+import { getDemoPlayerActionError } from '@/lib/demo-policy'
+import { getDemoSelfPlayerCookie } from '@/lib/demo-limits'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,6 +31,9 @@ function itemLabel(id: string): string {
 
 const STANDARD_SLOTS = Array.from({ length: 36 }, (_, i) => i)  // 0–35
 const SPECIAL_SLOTS  = [100, 101, 102, 103, 150]
+const MAX_STACK_BY_ID = new Map(
+  CATALOG.flatMap(category => category.items.map(item => [`minecraft:${item.id}`, Math.max(1, item.maxStack)] as const)),
+)
 
 function nbtSlotByte(slot: number): number | null {
   if (slot >= 0 && slot <= 35) return slot
@@ -64,6 +76,14 @@ function parseEnchants(stdout: string): string | undefined {
     .filter(Boolean)
     .join(' · ')
   return result || undefined
+}
+
+function replaceItemCommand(player: string, slot: string, itemId: string, count: number): string {
+  return `minecraft:item replace entity ${player} ${slot} with ${itemId} ${count}`
+}
+
+function getItemMaxStack(itemId: string): number {
+  return MAX_STACK_BY_ID.get(itemId as `minecraft:${string}`) ?? 64
 }
 
 // ── RCON helper scoped to inventory (uses 'inventory' rate-limit bucket) ──────
@@ -110,6 +130,17 @@ export async function GET(req: NextRequest) {
   if (!player) return Response.json({ ok: false, error: 'Missing player' }, { status: 400 })
   if (!/^\.?[a-zA-Z0-9_]{1,16}$/.test(player)) {
     return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
+  }
+  const user = getUserById(userId)
+  const restrictedError = getDemoPlayerActionError(user, player, getDemoSelfPlayerCookie(req))
+  if (restrictedError) return Response.json({ ok: false, error: restrictedError }, { status: 403 })
+
+  const server = getActiveServer(userId)
+  if (!server) return Response.json({ ok: false, error: 'No server configured' }, { status: 400 })
+
+  const synthetic = getDemoSyntheticInventory(userId, server.id, player)
+  if (synthetic) {
+    return Response.json({ ok: true, items: synthetic })
   }
 
   try {
@@ -187,14 +218,85 @@ export async function POST(req: NextRequest) {
     if (!/^\.?[a-zA-Z0-9_]{1,16}$/.test(player)) {
       return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
     }
+    const user = getUserById(userId)
+    const restrictedError = getDemoPlayerActionError(user, player, getDemoSelfPlayerCookie(req))
+    if (restrictedError) return Response.json({ ok: false, error: restrictedError }, { status: 403 })
     const src  = nbtSlotToCommandSlot(Number(fromSlot))
     const dest = nbtSlotToCommandSlot(Number(toSlot))
     if (!src || !dest) {
       return Response.json({ ok: false, error: 'Invalid slot number' }, { status: 400 })
     }
-    const cmd = `minecraft:item replace entity @a[name=${player},limit=1] ${dest} from entity @a[name=${player},limit=1] ${src}`
-    const result = await rconForRequest(req, cmd)
-    if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
+
+    const server = getActiveServer(userId)
+    if (!server) return Response.json({ ok: false, error: 'No server configured' }, { status: 400 })
+    const synthetic = moveDemoSyntheticInventoryItem(userId, server.id, player, Number(fromSlot), Number(toSlot))
+    if (synthetic) {
+      return synthetic.ok
+        ? Response.json({ ok: true })
+        : Response.json({ ok: false, error: synthetic.error }, { status: 400 })
+    }
+
+    const liveProbe = await rconInventory(req, [
+      slotQuery(Number(fromSlot), player, 'id'),
+      slotQuery(Number(fromSlot), player, 'count'),
+      slotQuery(Number(fromSlot), player, 'ench'),
+      slotQuery(Number(toSlot), player, 'id'),
+      slotQuery(Number(toSlot), player, 'count'),
+      slotQuery(Number(toSlot), player, 'ench'),
+    ])
+    if (!liveProbe.ok) {
+      return Response.json({ ok: false, error: liveProbe.error || 'RCON error' }, { status: 502 })
+    }
+
+    const fromIdOut = liveProbe.results[0] ?? ''
+    const fromCountOut = liveProbe.results[1] ?? ''
+    const fromEnchantsOut = liveProbe.results[2] ?? ''
+    const toIdOut = liveProbe.results[3] ?? ''
+    const toCountOut = liveProbe.results[4] ?? ''
+    const toEnchantsOut = liveProbe.results[5] ?? ''
+
+    if (fromIdOut.includes('Found no elements')) {
+      return Response.json({ ok: false, error: 'Source slot is empty' }, { status: 400 })
+    }
+
+    const fromId = parseId(fromIdOut)
+    if (!fromId) {
+      return Response.json({ ok: false, error: 'Could not read source slot' }, { status: 400 })
+    }
+
+    if ((toIdOut ?? '').includes('Found no elements')) {
+      const copyResult = await rconForRequest(req, `minecraft:item replace entity ${player} ${dest} from entity ${player} ${src}`)
+      if (!copyResult.ok) return Response.json({ ok: false, error: copyResult.error || 'RCON error' })
+      const clearResult = await rconForRequest(req, `minecraft:item replace entity ${player} ${src} with air`)
+      if (!clearResult.ok) return Response.json({ ok: false, error: clearResult.error || 'RCON error' })
+      return Response.json({ ok: true })
+    }
+
+    const toId = parseId(toIdOut)
+    if (!toId) {
+      return Response.json({ ok: false, error: 'Could not read destination slot' }, { status: 400 })
+    }
+
+    const fromEnchants = parseEnchants(fromEnchantsOut)
+    const toEnchants = parseEnchants(toEnchantsOut)
+    if (fromId !== toId || fromEnchants || toEnchants) {
+      return Response.json({ ok: false, error: 'Live inventory combining only works for matching plain items right now.' }, { status: 400 })
+    }
+
+    const maxStack = getItemMaxStack(fromId)
+    const fromCount = parseCount(fromCountOut)
+    const toCount = parseCount(toCountOut)
+    const mergedCount = Math.min(maxStack, fromCount + toCount)
+    const remainder = Math.max(0, (fromCount + toCount) - mergedCount)
+
+    const mergeTargetResult = await rconForRequest(req, replaceItemCommand(player, dest, fromId, mergedCount))
+    if (!mergeTargetResult.ok) return Response.json({ ok: false, error: mergeTargetResult.error || 'RCON error' })
+
+    const sourceResult = remainder > 0
+      ? await rconForRequest(req, replaceItemCommand(player, src, fromId, remainder))
+      : await rconForRequest(req, `minecraft:item replace entity ${player} ${src} with air`)
+    if (!sourceResult.ok) return Response.json({ ok: false, error: sourceResult.error || 'RCON error' })
+
     return Response.json({ ok: true })
   } catch (e: unknown) {
     return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Server error' }, { status: 500 })
@@ -216,6 +318,22 @@ export async function DELETE(req: NextRequest) {
     if (!/^\.?[a-zA-Z0-9_]{1,16}$/.test(player)) {
       return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
     }
+    const user = getUserById(userId)
+    const restrictedError = getDemoPlayerActionError(user, player, getDemoSelfPlayerCookie(req))
+    if (restrictedError) return Response.json({ ok: false, error: restrictedError }, { status: 403 })
+    const server = getActiveServer(userId)
+    if (!server) return Response.json({ ok: false, error: 'No server configured' }, { status: 400 })
+    const synthetic = clearDemoSyntheticInventory(userId, server.id, player, {
+      item: typeof item === 'string' ? item : null,
+      count: typeof count === 'number' ? count : null,
+      slot: typeof slot === 'number' ? slot : null,
+    })
+    if (synthetic) {
+      if (!item) return Response.json({ ok: true, message: `Cleared inventory for ${player}` })
+      if (slot != null) return Response.json({ ok: true, message: `Cleared slot ${slot} for ${player}` })
+      return Response.json({ ok: true, message: `Cleared ${item} from ${player}` })
+    }
+
     if (!item) {
       const result = await rconForRequest(req, `minecraft:clear ${player}`)
       if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
@@ -228,7 +346,7 @@ export async function DELETE(req: NextRequest) {
       }
       const result = await rconForRequest(
         req,
-        `minecraft:item replace entity @a[name=${player},limit=1] ${commandSlot} with minecraft:air`
+        `minecraft:item replace entity ${player} ${commandSlot} with air`
       )
       if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
       return Response.json({ ok: true, message: `Cleared slot ${slot} for ${player}` })
@@ -252,6 +370,88 @@ export async function DELETE(req: NextRequest) {
 
     if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
     return Response.json({ ok: true, message: `Cleared ${bareItem} from ${player}` })
+  } catch (e: unknown) {
+    return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Server error' }, { status: 500 })
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  const userId = await getSessionUserId(req)
+  if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_inventory')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
+
+  try {
+    const { player, slot, mode, amount } = await req.json()
+    if (!player || typeof player !== 'string') return Response.json({ ok: false, error: 'Missing player' }, { status: 400 })
+    if (!/^\.?[a-zA-Z0-9_]{1,16}$/.test(player)) return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
+    if (typeof slot !== 'number') return Response.json({ ok: false, error: 'Missing slot' }, { status: 400 })
+    if (!['increment', 'fill', 'duplicate'].includes(mode)) return Response.json({ ok: false, error: 'Invalid inventory action' }, { status: 400 })
+
+    const user = getUserById(userId)
+    const restrictedError = getDemoPlayerActionError(user, player, getDemoSelfPlayerCookie(req))
+    if (restrictedError) return Response.json({ ok: false, error: restrictedError }, { status: 403 })
+
+    const server = getActiveServer(userId)
+    if (!server) return Response.json({ ok: false, error: 'No server configured' }, { status: 400 })
+
+    const synthetic = adjustDemoSyntheticInventorySlot(userId, server.id, player, slot, mode, typeof amount === 'number' ? amount : 1)
+    if (synthetic) {
+      return synthetic.ok
+        ? Response.json({ ok: true, message: synthetic.message })
+        : Response.json({ ok: false, error: synthetic.error }, { status: 400 })
+    }
+
+    const probe = await rconInventory(req, [
+      slotQuery(slot, player, 'id'),
+      slotQuery(slot, player, 'count'),
+      slotQuery(slot, player, 'ench'),
+    ])
+    if (!probe.ok) return Response.json({ ok: false, error: probe.error || 'RCON error' }, { status: 502 })
+    const slotIdOut = probe.results[0] ?? ''
+    if (slotIdOut.includes('Found no elements')) return Response.json({ ok: false, error: 'Selected slot is empty' }, { status: 400 })
+    const slotId = parseId(slotIdOut)
+    if (!slotId) return Response.json({ ok: false, error: 'Could not read selected slot' }, { status: 400 })
+    const slotCount = parseCount(probe.results[1] ?? '')
+    const slotEnchants = parseEnchants(probe.results[2] ?? '')
+    const maxStack = getItemMaxStack(slotId)
+    const commandSlot = nbtSlotToCommandSlot(slot)
+    if (!commandSlot) return Response.json({ ok: false, error: 'Unsupported slot' }, { status: 400 })
+
+    if (mode === 'duplicate') {
+      const allSlots = [...STANDARD_SLOTS, ...SPECIAL_SLOTS]
+      const idCmds = allSlots.map(current => slotQuery(current, player, 'id'))
+      const occupied = await rconInventory(req, idCmds)
+      if (!occupied.ok) return Response.json({ ok: false, error: occupied.error || 'RCON error' }, { status: 502 })
+      const emptySlot = allSlots.find((current, index) => (occupied.results[index] ?? '').includes('Found no elements'))
+      if (emptySlot == null) return Response.json({ ok: false, error: 'No empty inventory slot is available for duplication' }, { status: 400 })
+      const emptyCommandSlot = nbtSlotToCommandSlot(emptySlot)
+      if (!emptyCommandSlot) return Response.json({ ok: false, error: 'No compatible slot is available for duplication' }, { status: 400 })
+      const result = await rconForRequest(req, `minecraft:item replace entity ${player} ${emptyCommandSlot} from entity ${player} ${commandSlot}`)
+      if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' }, { status: 502 })
+      return Response.json({ ok: true, message: `Duplicated ${itemLabel(slotId)} into slot ${emptySlot}` })
+    }
+
+    if (maxStack <= 1) {
+      return Response.json({ ok: false, error: 'This item cannot be stacked further' }, { status: 400 })
+    }
+    if (slotEnchants) {
+      return Response.json({ ok: false, error: 'Stack size adjustments are only supported for plain items right now.' }, { status: 400 })
+    }
+
+    const nextCount = mode === 'fill'
+      ? maxStack
+      : Math.min(maxStack, slotCount + Math.max(1, Number(amount) || 1))
+    if (nextCount === slotCount) {
+      return Response.json({ ok: false, error: `${itemLabel(slotId)} is already at the stack limit` }, { status: 400 })
+    }
+
+    const result = await rconForRequest(req, replaceItemCommand(player, commandSlot, slotId, nextCount))
+    if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' }, { status: 502 })
+    return Response.json({ ok: true, message: `Updated ${itemLabel(slotId)} to ${nextCount}` })
   } catch (e: unknown) {
     return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Server error' }, { status: 500 })
   }

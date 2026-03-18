@@ -198,10 +198,12 @@ function PlayerPanel({
   player,
   joinedAtMs,
   onClose,
+  collapseAllActive,
 }: {
   player: string
   joinedAtMs: number | null
   onClose: () => void
+  collapseAllActive: boolean
 }) {
   type FeatureFlags = Record<FeatureKey, boolean>
   const [stats, setStats]         = useState<PlayerStats | null>(null)
@@ -211,6 +213,7 @@ function PlayerPanel({
   const [invLoading, setInvLoading]     = useState(true)
   const [statsError, setStatsError]     = useState<string | null>(null)
   const [deletingSlot, setDeletingSlot] = useState<number | null>(null)
+  const [inventoryActionBusy, setInventoryActionBusy] = useState<string | null>(null)
   const [deleteError, setDeleteError]   = useState<string | null>(null)
   const [refreshing, setRefreshing]     = useState(false)
   const [invOpen, setInvOpen]           = useState(true)
@@ -287,10 +290,26 @@ function PlayerPanel({
       .finally(() => setInvLoading(false))
   }, [player, canInventory, canEffects, canLocation, canSession, canVitals])
 
+  const refreshInventory = useCallback(async () => {
+    const response = await fetch(`/api/minecraft/inventory?player=${encodeURIComponent(player)}`)
+    const payload = await response.json()
+    if (payload.ok) setInventory(payload.items ?? [])
+  }, [player])
+
   useEffect(() => {
     if (!featuresLoaded) return
     refresh()
   }, [refresh, featuresLoaded])
+
+  useEffect(() => {
+    setSectionsOpen({
+      session: !collapseAllActive,
+      vitals: !collapseAllActive,
+      effects: !collapseAllActive,
+      location: !collapseAllActive,
+    })
+    setInvOpen(!collapseAllActive)
+  }, [collapseAllActive])
 
   const deleteItem = async (item: InvItem) => {
     setDeletingSlot(item.slot)
@@ -302,7 +321,7 @@ function PlayerPanel({
       })
       const d = await r.json()
       if (d.ok) {
-        setInventory(prev => prev.filter(i => i.slot !== item.slot))
+        await refreshInventory()
       } else {
         setDeleteError(d.error || 'Failed to clear item')
         setTimeout(() => setDeleteError(null), 4000)
@@ -323,10 +342,7 @@ function PlayerPanel({
       })
       const d = await r.json()
       if (d.ok) {
-        // Refresh inventory to reflect server state
-        const ri = await fetch(`/api/minecraft/inventory?player=${encodeURIComponent(player)}`)
-        const di = await ri.json()
-        if (di.ok) setInventory(di.items ?? [])
+        await refreshInventory()
       } else {
         setDeleteError(d.error || 'Failed to move item')
         setTimeout(() => setDeleteError(null), 4000)
@@ -337,12 +353,40 @@ function PlayerPanel({
     }
   }
 
-  // Slot click handler — click selects/deselects; moving to empty slot uses hold gesture
+  const adjustSelectedItem = async (mode: 'increment' | 'fill' | 'duplicate', amount = 1) => {
+    if (!selectedSlot) return
+    setInventoryActionBusy(mode)
+    try {
+      const response = await fetch('/api/minecraft/inventory', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player, slot: selectedSlot.slot, mode, amount }),
+      })
+      const payload = await response.json()
+      if (payload.ok) {
+        await refreshInventory()
+      } else {
+        setDeleteError(payload.error || 'Failed to update item stack')
+        setTimeout(() => setDeleteError(null), 4000)
+      }
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Failed to update item stack')
+      setTimeout(() => setDeleteError(null), 4000)
+    } finally {
+      setInventoryActionBusy(null)
+    }
+  }
+
+  // Slot click handler — click selects/deselects; clicking an empty slot moves there.
   const handleSlotClick = (clickedItem: InvItem | undefined, clickedSlotIndex: number | undefined, currentSelected: InvItem | null) => {
     if (clickedSlotIndex === undefined) return
     if (currentSelected) {
       if (clickedItem && clickedItem.slot === currentSelected.slot) {
         setSelectedSlot(null)
+      } else if (clickedItem && clickedItem.id === currentSelected.id) {
+        moveItem(currentSelected.slot, clickedSlotIndex)
+      } else if (!clickedItem) {
+        moveItem(currentSelected.slot, clickedSlotIndex)
       } else if (clickedItem) {
         // Switch selected source item
         setSelectedSlot(clickedItem)
@@ -541,8 +585,44 @@ function PlayerPanel({
           ) : (
             <div className="space-y-3">
               {selectedSlot && (
-                <div className="text-[11px] font-mono text-[var(--text-dim)] px-2 py-1 rounded border border-[var(--accent-mid)] bg-[var(--accent-dim)]">
-                  <span className="text-[var(--accent)]">{selectedSlot.label}</span> selected — hold an empty slot for 1s to move, or click selected item to deselect
+                <div className="space-y-2 rounded border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-2 py-2 text-[11px] font-mono text-[var(--text-dim)]">
+                  <div>
+                    <span className="text-[var(--accent)]">{selectedSlot.label}</span> selected — click an empty slot or matching stack to move, or click the selected item to deselect
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void adjustSelectedItem('increment', 1)}
+                      disabled={inventoryActionBusy !== null}
+                      className="rounded border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--text)] disabled:opacity-40"
+                    >
+                      {inventoryActionBusy === 'increment' ? '…' : '+1'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void adjustSelectedItem('increment', 8)}
+                      disabled={inventoryActionBusy !== null}
+                      className="rounded border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--text)] disabled:opacity-40"
+                    >
+                      +8
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void adjustSelectedItem('fill')}
+                      disabled={inventoryActionBusy !== null}
+                      className="rounded border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--text)] disabled:opacity-40"
+                    >
+                      Fill Stack
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void adjustSelectedItem('duplicate')}
+                      disabled={inventoryActionBusy !== null}
+                      className="rounded border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--text)] disabled:opacity-40"
+                    >
+                      Duplicate Stack
+                    </button>
+                  </div>
                 </div>
               )}
               {deleteError && (
@@ -556,7 +636,7 @@ function PlayerPanel({
                   {hotbar.map((item, i) => (
                     <InvSlot key={i} item={item} slotIndex={i}
                       selected={!!item && selectedSlot?.slot === item.slot}
-                      moveTarget={!!selectedSlot && !item}
+                      moveTarget={!!selectedSlot && ((!item) || (item.id === selectedSlot.id && item.slot !== selectedSlot.slot))}
                       onMoveTargetHold={() => handleSlotHoldToMove(item?.slot ?? i, selectedSlot)}
                       onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
                       onSlotClick={() => handleSlotClick(item, item?.slot ?? i, selectedSlot)}
@@ -574,7 +654,7 @@ function PlayerPanel({
                     return (
                       <InvSlot key={i} item={item} slotIndex={s}
                         selected={!!item && selectedSlot?.slot === item.slot}
-                        moveTarget={!!selectedSlot && !item}
+                        moveTarget={!!selectedSlot && ((!item) || (item.id === selectedSlot.id && item.slot !== selectedSlot.slot))}
                         onMoveTargetHold={() => handleSlotHoldToMove(item?.slot ?? s, selectedSlot)}
                         onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
                         onSlotClick={() => handleSlotClick(item, item?.slot ?? s, selectedSlot)}
@@ -585,7 +665,7 @@ function PlayerPanel({
                   <div className="w-px h-8 bg-[var(--border)] mx-1.5" />
                   <InvSlot item={offhand} slotIndex={150}
                     selected={!!offhand && selectedSlot?.slot === 150}
-                    moveTarget={!!selectedSlot && !offhand}
+                    moveTarget={!!selectedSlot && ((!offhand) || (offhand.id === selectedSlot.id && offhand.slot !== selectedSlot.slot))}
                     onMoveTargetHold={() => handleSlotHoldToMove(offhand?.slot ?? 150, selectedSlot)}
                     onDelete={offhand ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
                     onSlotClick={() => handleSlotClick(offhand, offhand?.slot ?? 150, selectedSlot)}
@@ -599,7 +679,7 @@ function PlayerPanel({
                   {main.map((item, i) => (
                     <InvSlot key={i} item={item} slotIndex={i + 9}
                       selected={!!item && selectedSlot?.slot === item.slot}
-                      moveTarget={!!selectedSlot && !item}
+                      moveTarget={!!selectedSlot && ((!item) || (item.id === selectedSlot.id && item.slot !== selectedSlot.slot))}
                       onMoveTargetHold={() => handleSlotHoldToMove(item?.slot ?? (i + 9), selectedSlot)}
                       onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
                       onSlotClick={() => handleSlotClick(item, item?.slot ?? (i + 9), selectedSlot)}
@@ -767,6 +847,7 @@ export default function PlayersSection({ onPlayersChange }: Props) {
           player={selectedPlayer}
           joinedAtMs={data.sessionStarts?.[selectedPlayer] ?? null}
           onClose={() => setSelected(null)}
+          collapseAllActive={collapseAllActive}
         />
       )}
 

@@ -18,6 +18,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const access = await requireTerminalAccess(req)
   if (!access.ok) return access.response
+  if (access.context.readOnly) {
+    return Response.json({ ok: false, error: 'Public demo terminal access is read-only.' }, { status: 403 })
+  }
 
   const body = await req.json().catch(() => ({}))
   const command = typeof body.command === 'string' ? body.command : ''

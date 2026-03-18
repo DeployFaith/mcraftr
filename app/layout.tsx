@@ -6,6 +6,7 @@ import BackToTopButton from './components/BackToTopButton'
 import BackgroundMusicProvider from './components/BackgroundMusicProvider'
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://mcraftr.deployfaith.xyz'),
   title: 'Mcraftr',
   description: 'Minecraft server admin panel',
   icons: {

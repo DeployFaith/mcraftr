@@ -36,6 +36,7 @@ type WorkspaceProps = {
   initialMode?: TerminalMode
   standalone?: boolean
   fullPage?: boolean
+  readOnly?: boolean
 }
 
 type WizardTabId = NonNullable<TerminalState['activeInspectorTab']>
@@ -118,6 +119,7 @@ export default function AdminTerminalWorkspace({
   initialMode = 'embedded',
   standalone = false,
   fullPage = false,
+  readOnly = false,
 }: WorkspaceProps) {
   const transcriptRef = useRef<HTMLDivElement | null>(null)
   const commandInputRef = useRef<HTMLInputElement | null>(null)
@@ -202,6 +204,7 @@ export default function AdminTerminalWorkspace({
   }, [initialMode, standalone])
 
   useEffect(() => {
+    if (readOnly) return
     if (!hydrated) return
     const timer = window.setTimeout(async () => {
       try {
@@ -213,7 +216,7 @@ export default function AdminTerminalWorkspace({
       } catch {}
     }, 250)
     return () => window.clearTimeout(timer)
-  }, [hydrated, state])
+  }, [hydrated, readOnly, state])
 
   useEffect(() => {
     if (!commandDraft.trim()) {
@@ -401,6 +404,10 @@ export default function AdminTerminalWorkspace({
   }
 
   const persistFavorite = async () => {
+    if (readOnly) {
+      appendLocalEntry(':favorites', 'Public demo terminal access is read-only.', false)
+      return
+    }
     if (!commandDraft.trim()) return
     setFavoriteBusy(true)
     try {
@@ -435,6 +442,10 @@ export default function AdminTerminalWorkspace({
   }
 
   const deleteFavorite = async (id: string) => {
+    if (readOnly) {
+      appendLocalEntry(':favorites', 'Public demo terminal access is read-only.', false)
+      return
+    }
     try {
       const response = await fetch(`/api/minecraft/terminal/favorites/${id}`, { method: 'DELETE' })
       const data = await response.json()
@@ -453,6 +464,10 @@ export default function AdminTerminalWorkspace({
   }
 
   const runServerCommand = async (command: string, meta?: { source?: 'manual' | 'wizard' | 'favorite'; wizardId?: string | null; favoriteId?: string | null }) => {
+    if (readOnly) {
+      appendLocalEntry(command, 'Public demo terminal access is read-only.', false)
+      return
+    }
     setExecuting(true)
     setSuggestions([])
     setSuggestionIndex(0)
@@ -749,7 +764,8 @@ export default function AdminTerminalWorkspace({
               <button
                 type="button"
                 onClick={() => void submitCommand(`/${selectedCatalogEntry.name}`)}
-                className="flex-1 rounded-2xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-[var(--accent)] transition-all"
+                disabled={readOnly}
+                className="flex-1 rounded-2xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-[var(--accent)] transition-all disabled:cursor-not-allowed disabled:opacity-40"
               >
                 RUN
               </button>
@@ -875,7 +891,7 @@ export default function AdminTerminalWorkspace({
               <button
                 type="button"
                 onClick={() => void submitCommand(wizardCommand, { source: 'wizard', wizardId: currentWizardId })}
-                disabled={!wizardCommand}
+                disabled={readOnly || !wizardCommand}
                 className="flex-1 rounded-2xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-[var(--accent)] transition-all disabled:cursor-not-allowed disabled:opacity-40"
               >
                 RUN
@@ -905,7 +921,7 @@ export default function AdminTerminalWorkspace({
           <button
             type="button"
             onClick={() => void persistFavorite()}
-            disabled={!commandDraft.trim() || favoriteBusy}
+            disabled={readOnly || !commandDraft.trim() || favoriteBusy}
             className="w-full rounded-2xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-[var(--accent)] transition-all disabled:cursor-not-allowed disabled:opacity-40"
           >
             {favoriteBusy ? 'SAVING…' : favoriteId ? 'UPDATE FAVORITE' : 'SAVE FAVORITE'}
@@ -933,7 +949,8 @@ export default function AdminTerminalWorkspace({
                 <button
                   type="button"
                   onClick={() => void deleteFavorite(favorite.id)}
-                  className="rounded-2xl border border-[var(--border)] p-2 text-[var(--text-dim)] transition-all hover:border-red-500/50 hover:text-red-300"
+                  disabled={readOnly}
+                  className="rounded-2xl border border-[var(--border)] p-2 text-[var(--text-dim)] transition-all hover:border-red-500/50 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label={`Delete favorite ${favorite.label}`}
                 >
                   <Trash2 size={14} strokeWidth={1.8} />
@@ -955,7 +972,8 @@ export default function AdminTerminalWorkspace({
                 <button
                   type="button"
                   onClick={() => void submitCommand(favorite.command, { source: 'favorite', favoriteId: favorite.id })}
-                  className="flex-1 rounded-2xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-[var(--accent)] transition-all"
+                  disabled={readOnly}
+                  className="flex-1 rounded-2xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-[var(--accent)] transition-all disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   RUN
                 </button>
@@ -1002,6 +1020,11 @@ export default function AdminTerminalWorkspace({
               {loading ? 'Connecting to server command surface…' : loadingError ? loadingError : catalogWarning ? catalogWarning : 'Live command catalog, transcript, docs, and favorites.'}
             </div>
           </div>
+          {readOnly && (
+            <div className="rounded-full border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-1 font-mono text-[10px] tracking-[0.16em] text-[var(--accent)]">
+              READ ONLY
+            </div>
+          )}
           <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
             <button
               type="button"
@@ -1077,7 +1100,7 @@ export default function AdminTerminalWorkspace({
                 <button
                   type="button"
                   onClick={() => void persistFavorite()}
-                  disabled={!commandDraft.trim() || favoriteBusy}
+                  disabled={readOnly || !commandDraft.trim() || favoriteBusy}
                   className="tap-target rounded-2xl border px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-[var(--accent)] transition-all hover:border-[var(--accent-mid)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {favoriteBusy ? 'SAVING…' : favoriteId ? 'UPDATE FAVORITE' : 'SAVE FAVORITE'}
@@ -1090,7 +1113,8 @@ export default function AdminTerminalWorkspace({
                     setFavoriteDescription('')
                     updateState({ activeInspectorTab: 'favorites', inspectorOpen: true })
                   }}
-                  className="tap-target rounded-2xl border px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-[var(--text-dim)] transition-all hover:border-[var(--accent-mid)] hover:text-[var(--text)]"
+                  disabled={readOnly}
+                  className="tap-target rounded-2xl border px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-[var(--text-dim)] transition-all hover:border-[var(--accent-mid)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   NEW FAVORITE
                 </button>
@@ -1116,6 +1140,11 @@ export default function AdminTerminalWorkspace({
               {!loading && !loadingError && catalogWarning && (
                 <div className="rounded-[22px] border border-[var(--border)] bg-black/10 px-4 py-4 font-mono text-[13px] text-[var(--text-dim)]">
                   {setupHint ?? catalogWarning}
+                </div>
+              )}
+              {readOnly && (
+                <div className="rounded-[22px] border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-4 py-4 font-mono text-[13px] text-[var(--accent)]">
+                  Public demo terminal access is read-only. You can inspect the catalog, transcript, docs, wizards, and favorites, but command execution and edits are disabled.
                 </div>
               )}
               {!loading && visibleEntries.length === 0 && (
@@ -1178,6 +1207,7 @@ export default function AdminTerminalWorkspace({
                     ref={commandInputRef}
                     type="text"
                     value={state.commandDraft}
+                    disabled={readOnly}
                     onChange={event => {
                       setHistoryIndex(-1)
                       setState(prev => ({ ...prev, commandDraft: event.target.value }))
@@ -1190,7 +1220,7 @@ export default function AdminTerminalWorkspace({
                   <button
                     type="button"
                     onClick={() => void submitCommand()}
-                    disabled={!state.commandDraft.trim() || executing}
+                    disabled={readOnly || !state.commandDraft.trim() || executing}
                     className="tap-target rounded-2xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-4 py-2 font-mono text-[11px] tracking-[0.16em] text-[var(--accent)] transition-all disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {executing ? 'RUNNING…' : 'RUN'}

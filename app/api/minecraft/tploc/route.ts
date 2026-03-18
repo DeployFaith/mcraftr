@@ -1,5 +1,8 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
+import { getDemoSyntheticCommandError } from '@/lib/demo-synthetic-player'
+import { getUserById } from '@/lib/users'
+import { getDemoPlayerActionError } from '@/lib/demo-policy'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -25,6 +28,14 @@ export async function POST(req: NextRequest) {
     if (!Number.isFinite(nx) || !Number.isFinite(ny) || !Number.isFinite(nz)) {
       return Response.json({ ok: false, error: 'Coordinates must be numbers' }, { status: 400 })
     }
+
+    const user = getUserById(userId)
+    const selfCookie = req.cookies.get('mcraftr.demo-self-player')?.value ?? null
+    const restrictedError = getDemoPlayerActionError(user, player, selfCookie)
+    if (restrictedError) return Response.json({ ok: false, error: restrictedError }, { status: 403 })
+
+    const syntheticError = getDemoSyntheticCommandError(userId, player, 'Teleport')
+    if (syntheticError) return Response.json({ ok: false, error: syntheticError }, { status: 400 })
 
     const result = await rconForRequest(req, `tp ${player} ${nx} ${ny} ${nz}`)
     if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })

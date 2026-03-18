@@ -5,6 +5,8 @@ import { useTheme, ACCENTS, FONTS, FONT_SIZES, type ThemePack } from '@/app/comp
 import { FEATURE_DEFS, FEATURE_CATEGORIES, type FeatureKey, type FeatureCategory } from '@/lib/features'
 import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
 import ColorPickerModal from './ColorPickerModal'
+import McraftrSwitch from './McraftrSwitch'
+import { sanitizeBridgePrefix, sanitizeBridgeProviderLabel } from '@/lib/public-branding'
 import { BUILTIN_MUSIC, BUILTIN_SOUNDS, DEFAULT_MUSIC_SETTINGS, DEFAULT_SOUND_SETTINGS, cleanupUnusedUploadedMedia, describeSource, loadMusicSettings, loadSoundSettings, playMediaSource, registerUploadedMediaIds, saveMusicSettings, saveSoundSettings, type MediaSource, type SoundEffectKey, type SoundSettings, type MusicSettings } from '@/app/components/soundfx'
 import { saveUploadedFiles } from '@/app/components/mediaLibrary'
 
@@ -87,6 +89,79 @@ type SavedServerSummary = {
   }
 }
 
+type PluginStackData = {
+  ok: boolean
+  bridge: {
+    ok?: boolean
+    error?: string
+    serverVersion?: string | null
+  }
+  sidecar: {
+    ok?: boolean
+    error?: string
+    capabilities?: string[]
+  }
+}
+
+const THEME_PACK_DOCS_URL = '/theme-packs'
+
+function normalizeMediaSourceInput(value: unknown, kind: 'sound' | 'music', fallback: MediaSource): MediaSource {
+  if (!value || typeof value !== 'object' || !('type' in value)) return fallback
+  const source = value as { type?: unknown; id?: unknown; url?: unknown; label?: unknown; assetId?: unknown }
+  if (source.type === 'builtin') {
+    const id = String(source.id ?? '')
+    if (kind === 'sound' && id in BUILTIN_SOUNDS) return { type: 'builtin', id: id as keyof typeof BUILTIN_SOUNDS }
+    if (kind === 'music' && id in BUILTIN_MUSIC) return { type: 'builtin', id: id as keyof typeof BUILTIN_MUSIC }
+    return fallback
+  }
+  if (source.type === 'url' && typeof source.url === 'string' && /^https?:\/\/\S+/i.test(source.url.trim())) {
+    return { type: 'url', url: source.url.trim(), label: typeof source.label === 'string' ? source.label : source.url.trim() }
+  }
+  if (source.type === 'upload' && typeof source.assetId === 'string' && source.assetId.trim()) {
+    return { type: 'upload', assetId: source.assetId.trim(), label: typeof source.label === 'string' ? source.label : 'Uploaded audio' }
+  }
+  return fallback
+}
+
+function normalizeThemePackSoundSettings(input: ThemePack['soundEffects'] | undefined): SoundSettings | null {
+  if (!input) return null
+  return {
+    masterEnabled: input.masterEnabled !== false,
+    volume: typeof input.volume === 'number' ? Math.min(1, Math.max(0, input.volume)) : DEFAULT_SOUND_SETTINGS.volume,
+    effects: {
+      uiClick: {
+        enabled: input.effects?.uiClick?.enabled !== false,
+        source: normalizeMediaSourceInput(input.effects?.uiClick?.source, 'sound', DEFAULT_SOUND_SETTINGS.effects.uiClick.source),
+      },
+      success: {
+        enabled: input.effects?.success?.enabled !== false,
+        source: normalizeMediaSourceInput(input.effects?.success?.source, 'sound', DEFAULT_SOUND_SETTINGS.effects.success.source),
+      },
+      notify: {
+        enabled: input.effects?.notify?.enabled !== false,
+        source: normalizeMediaSourceInput(input.effects?.notify?.source, 'sound', DEFAULT_SOUND_SETTINGS.effects.notify.source),
+      },
+      error: {
+        enabled: input.effects?.error?.enabled !== false,
+        source: normalizeMediaSourceInput(input.effects?.error?.source, 'sound', DEFAULT_SOUND_SETTINGS.effects.error.source),
+      },
+    },
+  }
+}
+
+function normalizeThemePackMusicSettings(input: ThemePack['backgroundMusic'] | undefined): MusicSettings | null {
+  if (!input) return null
+  const tracks = Array.isArray(input.tracks)
+    ? input.tracks.map(track => normalizeMediaSourceInput(track, 'music', DEFAULT_MUSIC_SETTINGS.tracks[0]))
+    : DEFAULT_MUSIC_SETTINGS.tracks
+  return {
+    enabled: input.enabled === true,
+    volume: typeof input.volume === 'number' ? Math.min(1, Math.max(0, input.volume)) : DEFAULT_MUSIC_SETTINGS.volume,
+    shuffle: input.shuffle !== false,
+    tracks: tracks.length > 0 ? tracks : DEFAULT_MUSIC_SETTINGS.tracks,
+  }
+}
+
 type AccountAvatar = {
   type: 'none' | 'builtin' | 'upload'
   value: string | null
@@ -113,6 +188,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
   const { data: session, update: updateSession } = useSession()
   const [servers, setServers] = useState<SavedServerSummary[]>([])
   const [activeServerId, setActiveServerId] = useState<string | null>(null)
+  const [pluginStack, setPluginStack] = useState<PluginStackData | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
   const { theme, setTheme, accent, setAccent, customAccent, setCustomAccent, themePack, setThemePack, font, setFont, fontSize, setFontSize } = useTheme()
   const [customAccentInput, setCustomAccentInput] = useState(customAccent)
@@ -270,6 +346,13 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
         setActiveServerId(d.activeServerId ?? null)
       }
     }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/minecraft/plugin-stack', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => setPluginStack(d))
+      .catch(() => {})
   }, [])
 
   const disconnectServer = async () => {
@@ -462,6 +545,16 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
     const raw = await file.text()
     const parsed = JSON.parse(raw) as ThemePack
     setThemePack(parsed)
+    const nextSounds = normalizeThemePackSoundSettings(parsed.soundEffects)
+    if (nextSounds) {
+      setSoundSettings(nextSounds)
+      saveSoundSettings(nextSounds)
+    }
+    const nextMusic = normalizeThemePackMusicSettings(parsed.backgroundMusic)
+    if (nextMusic) {
+      setMusicSettings(nextMusic)
+      saveMusicSettings(nextMusic)
+    }
   }
 
   const exportThemePack = () => {
@@ -469,6 +562,8 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
       name: themePack?.name || 'Mcraftr Theme',
       vars: themePack?.vars || {},
       accent: themePack?.accent || (accent === 'custom' ? customAccent : undefined),
+      soundEffects: soundSettings,
+      backgroundMusic: musicSettings,
     }
     const blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -756,7 +851,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
         <div className="rounded-2xl border p-4 space-y-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--panel) 84%, transparent)' }}>
           <div>
             <div className="text-[13px] font-mono tracking-widest text-[var(--text)]">CUSTOM THEME PACK</div>
-            <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1">Upload a JSON theme pack to reskin the app, or export the current custom pack.</div>
+            <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1">Upload a JSON theme pack to reskin the app, bundle custom sound effects/background music, or export the current pack.</div>
           </div>
           <div className="flex flex-wrap gap-2">
             <label className="rounded-xl border px-4 py-3 text-[12px] font-mono tracking-widest cursor-pointer" style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}>
@@ -778,6 +873,9 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
             <button type="button" onClick={() => setThemePack(null)} className="rounded-xl border px-4 py-3 text-[12px] font-mono tracking-widest" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}>
               Clear Theme
             </button>
+            <a href={THEME_PACK_DOCS_URL} target="_blank" rel="noreferrer" className="rounded-xl border px-4 py-3 text-[12px] font-mono tracking-widest" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}>
+              Theme Pack Docs
+            </a>
           </div>
           <div className="text-[11px] font-mono text-[var(--text-dim)]">
             {themePack ? `Loaded theme pack: ${themePack.name || 'Custom Theme'}` : 'No custom theme pack loaded.'}
@@ -792,16 +890,14 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
               <div className="text-[13px] font-mono tracking-widest text-[var(--text)]">ALL SOUND FX</div>
               <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1">Master mute plus per-effect custom sources. Built-in Minecraft-style effects are included by default.</div>
             </div>
-            <button
-              type="button"
-              onClick={() => toggleAllSounds(!soundSettings.masterEnabled)}
-              className="rounded-full border px-4 py-2 text-[11px] font-mono tracking-widest transition-all"
-              style={soundSettings.masterEnabled
-                ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
-                : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
-            >
-              {soundSettings.masterEnabled ? 'ON' : 'OFF'}
-            </button>
+            <div className="w-full max-w-[16rem]">
+              <McraftrSwitch
+                checked={soundSettings.masterEnabled}
+                onCheckedChange={toggleAllSounds}
+                label="Sound FX"
+                description="Turn interface sound effects on or off."
+              />
+            </div>
           </div>
 
           <label className="space-y-1.5 block">
@@ -857,16 +953,14 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
                     <div className="text-[12px] font-mono tracking-widest text-[var(--text)]">{label}</div>
                     <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1">{desc}</div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => toggleSoundEffect(key, !soundSettings.effects[key].enabled)}
-                    className="rounded-full border px-4 py-2 text-[11px] font-mono tracking-widest transition-all"
-                    style={soundSettings.effects[key].enabled
-                      ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
-                      : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
-                  >
-                    {soundSettings.effects[key].enabled ? 'ON' : 'OFF'}
-                  </button>
+                  <div className="w-full max-w-[13rem]">
+                    <McraftrSwitch
+                      checked={soundSettings.effects[key].enabled}
+                      onCheckedChange={(next) => toggleSoundEffect(key, next)}
+                      label=""
+                      description=""
+                    />
+                  </div>
                 </div>
                 <div className="text-[11px] font-mono text-[var(--text-dim)]">Source: {describeSource(soundSettings.effects[key].source)}</div>
                 <div className="grid gap-2">
@@ -914,16 +1008,14 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
               <div className="text-[13px] font-mono tracking-widest text-[var(--text)]">MUSIC PLAYER</div>
               <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1">Loop gentle Minecraft music in the background or use your own tracks.</div>
             </div>
-            <button
-              type="button"
-              onClick={() => updateMusic({ ...musicSettings, enabled: !musicSettings.enabled })}
-              className="rounded-full border px-4 py-2 text-[11px] font-mono tracking-widest transition-all"
-              style={musicSettings.enabled
-                ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
-                : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
-            >
-              {musicSettings.enabled ? 'ON' : 'OFF'}
-            </button>
+            <div className="w-full max-w-[16rem]">
+              <McraftrSwitch
+                checked={musicSettings.enabled}
+                onCheckedChange={(next) => updateMusic({ ...musicSettings, enabled: next })}
+                label="Music"
+                description="Enable the background music player."
+              />
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -935,16 +1027,14 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
               <input type="range" min={0} max={100} value={Math.round(musicSettings.volume * 100)} onChange={e => updateMusic({ ...musicSettings, volume: Number(e.target.value) / 100 })} className="w-full" />
             </label>
             <div className="flex items-end">
-              <button
-                type="button"
-                onClick={() => updateMusic({ ...musicSettings, shuffle: !musicSettings.shuffle })}
-                className="rounded-full border px-4 py-2 text-[11px] font-mono tracking-widest transition-all"
-                style={musicSettings.shuffle
-                  ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
-                  : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
-              >
-                {musicSettings.shuffle ? 'SHUFFLE ON' : 'SHUFFLE OFF'}
-              </button>
+              <div className="w-full max-w-[16rem]">
+                <McraftrSwitch
+                  checked={musicSettings.shuffle}
+                  onCheckedChange={(next) => updateMusic({ ...musicSettings, shuffle: next })}
+                  label="Shuffle"
+                  description="Mix track order during playback."
+                />
+              </div>
             </div>
           </div>
 
@@ -1038,25 +1128,15 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
                             ? 'border-[var(--accent-mid)] text-[var(--accent)]'
                             : 'border-[var(--border)] text-[var(--text-dim)]'
                       }`}>{status}</span>
-                      <button
-                        onClick={() => toggleCategory(cat.id, !allOn)}
-                        disabled={featuresSaving}
-                        className={`w-12 h-6 rounded-full transition-all border ${
-                          allOn
-                            ? 'border-[var(--accent-mid)] bg-[var(--accent-dim)]'
-                            : mixed
-                              ? 'border-[var(--accent-mid)] bg-[var(--panel)]'
-                              : 'border-[var(--border)] bg-[var(--bg)]'
-                        }`}
-                        title={allOn ? 'Turn all off' : 'Turn all on'}
-                      >
-                        <div
-                          className={`w-5 h-5 rounded-full transition-all shadow-sm ${
-                            allOn ? 'translate-x-6' : mixed ? 'translate-x-3' : 'translate-x-0.5'
-                          }`}
-                          style={{ background: allOn || mixed ? 'var(--accent)' : 'var(--text-dim)' }}
+                      <div className="w-[13.5rem]">
+                        <McraftrSwitch
+                          checked={allOn || mixed}
+                          onCheckedChange={() => toggleCategory(cat.id, !allOn)}
+                          disabled={featuresSaving}
+                          label=""
+                          description={mixed ? 'Some features in this category are enabled.' : `Toggle all ${cat.label.toLowerCase()} features.`}
                         />
-                      </button>
+                      </div>
                       <button
                         onClick={() => setExpandedCategories(prev => ({ ...prev, [cat.id]: !prev[cat.id] }))}
                         className="text-[11px] font-mono text-[var(--text-dim)] px-1"
@@ -1074,26 +1154,14 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
                             <div className="text-[13px] font-mono text-[var(--text)]">{f.label}</div>
                             <div className="text-[11px] font-mono text-[var(--text-dim)]">{f.desc}</div>
                           </div>
-                          <button
-                            onClick={() => toggleFeature(f.key)}
-                            disabled={featuresSaving}
-                            className={`w-12 h-6 rounded-full transition-all border ${
-                              features?.[f.key]
-                                ? 'border-[var(--accent-mid)] bg-[var(--accent-dim)]'
-                                : 'border-[var(--border)] bg-[var(--bg)]'
-                            }`}
-                          >
-                            <div
-                              className={`w-5 h-5 rounded-full transition-all shadow-sm ${
-                                features?.[f.key]
-                                  ? 'translate-x-6'
-                                  : 'translate-x-0.5'
-                              }`}
-                              style={{
-                                background: features?.[f.key] ? 'var(--accent)' : 'var(--text-dim)',
-                              }}
+                          <div className="w-[13.5rem]">
+                            <McraftrSwitch
+                              checked={Boolean(features?.[f.key])}
+                              onCheckedChange={() => toggleFeature(f.key)}
+                              disabled={featuresSaving}
+                              label=""
                             />
-                          </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1132,7 +1200,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
           <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-3">
             <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">ACTIVE BRIDGE</div>
             <div className="text-[13px] font-mono text-[var(--text)] break-all">
-              {activeServer.bridge.providerLabel || activeServer.bridge.commandPrefix}
+              {activeServer.bridge.providerLabel ? sanitizeBridgeProviderLabel(activeServer.bridge.providerLabel) : sanitizeBridgePrefix(activeServer.bridge.commandPrefix)}
             </div>
             <div className="text-[11px] font-mono text-[var(--text-dim)] mt-1">
               {(activeServer.bridge.capabilities ?? []).length > 0
@@ -1159,6 +1227,28 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
             </div>
           </div>
         )}
+        {pluginStack && (
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4">
+              <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">BRIDGE STATUS</div>
+              <div className="text-[13px] font-mono text-[var(--text)]">
+                {pluginStack.bridge?.ok === false ? pluginStack.bridge.error : 'Connected'}
+              </div>
+              <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">
+                {pluginStack.bridge?.serverVersion ? `Paper ${pluginStack.bridge.serverVersion}` : 'Server version unavailable'}
+              </div>
+            </div>
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4">
+              <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">BEACON STATUS</div>
+              <div className="text-[13px] font-mono text-[var(--text)]">
+                {pluginStack.sidecar?.ok === false ? pluginStack.sidecar.error : 'Connected'}
+              </div>
+              <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">
+                {(pluginStack.sidecar?.capabilities ?? []).length > 0 ? (pluginStack.sidecar?.capabilities ?? []).join(', ') : 'No beacon capabilities reported'}
+              </div>
+            </div>
+          </div>
+        )}
         {servers.length > 0 && (
           <div className="space-y-2">
             {servers.map(server => {
@@ -1174,7 +1264,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
                     </div>
                     {server.bridge?.enabled && (
                       <div className="text-[10px] font-mono text-[var(--text-dim)] truncate mt-1">
-                        bridge · {server.bridge.commandPrefix}{server.bridge.providerLabel ? ` · ${server.bridge.providerLabel}` : ''}{server.bridge.lastSeen ? ` · seen ${new Date(server.bridge.lastSeen * 1000).toLocaleString()}` : ''}
+                        bridge · {sanitizeBridgePrefix(server.bridge.commandPrefix)}{server.bridge.providerLabel ? ` · ${sanitizeBridgeProviderLabel(server.bridge.providerLabel)}` : ''}{server.bridge.lastSeen ? ` · seen ${new Date(server.bridge.lastSeen * 1000).toLocaleString()}` : ''}
                       </div>
                     )}
                     {server.bridge?.enabled && server.bridge.lastError && (

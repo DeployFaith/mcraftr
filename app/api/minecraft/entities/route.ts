@@ -199,7 +199,10 @@ export async function GET(req: NextRequest) {
   let nativeSource: 'bridge' | 'fallback' = 'fallback'
 
   if (!bridge.ok) {
-    warnings.push(`Native entity catalog fallback in use: ${bridge.error}`)
+    const message = bridge.code === 'bridge_json_parse_failed'
+      ? 'Native entity catalog fallback in use: Bridge catalog response was truncated, so Mcraftr is using the built-in entity catalog.'
+      : `Native entity catalog fallback in use: ${bridge.error}`
+    warnings.push(message)
   } else if (bridge.data.ok === false) {
     warnings.push(`Native entity catalog fallback in use: ${bridge.data.error || 'Bridge integration returned an error'}`)
   } else {
@@ -230,6 +233,8 @@ export async function GET(req: NextRequest) {
     warnings.push(sidecar.data.scan.warnings[0])
   }
 
+  const dedupedWarnings = Array.from(new Set(warnings.filter(Boolean)))
+
   return Response.json({
     ok: true,
     entities: (await Promise.all([...nativeEntities, ...customEntities]
@@ -254,6 +259,6 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => a.label.localeCompare(b.label)),
     fallback: nativeSource !== 'bridge',
     scan: sidecar.ok && sidecar.data.ok !== false ? sidecar.data.scan ?? null : null,
-    warning: warnings.length > 0 ? warnings.join(' ') : null,
+    warning: dedupedWarnings.length > 0 ? dedupedWarnings.join(' ') : null,
   })
 }

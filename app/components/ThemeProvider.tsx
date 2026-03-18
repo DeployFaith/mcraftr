@@ -22,10 +22,25 @@ export const DEFAULT_CUSTOM_ACCENT = '#7df9ff'
 export type FontId = 'system' | 'operator' | 'minecraft' | 'pixel' | 'terminal'
 export type FontSizeId = 'sm' | 'md' | 'lg' | 'xl'
 export type ThemePackVars = Partial<Record<'--bg' | '--bg2' | '--panel' | '--border' | '--text' | '--text-dim' | '--red', string>>
+export type ThemePackSoundEffect = {
+  enabled?: boolean
+  source?: unknown
+}
 export type ThemePack = {
   name?: string
   vars: ThemePackVars
   accent?: string
+  soundEffects?: {
+    masterEnabled?: boolean
+    volume?: number
+    effects?: Partial<Record<'uiClick' | 'success' | 'notify' | 'error', ThemePackSoundEffect>>
+  }
+  backgroundMusic?: {
+    enabled?: boolean
+    volume?: number
+    shuffle?: boolean
+    tracks?: unknown[]
+  }
 }
 
 export const FONTS: { id: FontId; label: string; sample: string }[] = [
@@ -91,7 +106,13 @@ function normalizeHexColor(value: string | null | undefined): string {
 
 function normalizeThemePack(value: unknown): ThemePack | null {
   if (!value || typeof value !== 'object') return null
-  const raw = value as { name?: unknown; vars?: Record<string, unknown>; accent?: unknown }
+  const raw = value as {
+    name?: unknown
+    vars?: Record<string, unknown>
+    accent?: unknown
+    soundEffects?: unknown
+    backgroundMusic?: unknown
+  }
   const vars = Object.fromEntries(
     Object.entries(raw.vars ?? {}).filter(([key, val]) =>
       ['--bg', '--bg2', '--panel', '--border', '--text', '--text-dim', '--red'].includes(key) &&
@@ -105,6 +126,8 @@ function normalizeThemePack(value: unknown): ThemePack | null {
     name: typeof raw.name === 'string' ? raw.name.slice(0, 80) : undefined,
     vars,
     accent,
+    soundEffects: typeof raw.soundEffects === 'object' && raw.soundEffects ? raw.soundEffects as ThemePack['soundEffects'] : undefined,
+    backgroundMusic: typeof raw.backgroundMusic === 'object' && raw.backgroundMusic ? raw.backgroundMusic as ThemePack['backgroundMusic'] : undefined,
   }
 }
 

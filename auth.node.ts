@@ -2,6 +2,7 @@ import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { getUserByEmail, getUserById, validatePassword } from '@/lib/users'
 import { authConfig } from '@/auth'
+import { isDemoRestrictedUser } from '@/lib/demo-policy'
 
 // This file is Node.js only — it uses static imports of lib/users which
 // depends on fs, crypto, better-sqlite3, etc. It must NEVER be imported
@@ -53,6 +54,7 @@ export const { handlers, auth: nodeAuth, signIn, signOut } = NextAuth({
         token.role = u?.role ?? 'user'
         token.activeServerId = u?.activeServerId ?? null
         token.activeServerLabel = u?.serverLabel ?? null
+        token.demoReadOnly = u ? isDemoRestrictedUser(u) : false
       }
       return token
     },

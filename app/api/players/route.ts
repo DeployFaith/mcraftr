@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionActiveServerId, getSessionUserId } from '@/lib/rcon'
 import { getDb } from '@/lib/db'
+import { appendDemoSyntheticPlayer } from '@/lib/demo-synthetic-player'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -74,6 +75,11 @@ export async function GET(req: NextRequest) {
     }
 
     const sessionStarts = getSessionStarts(userId, serverId, playerList)
+    const synthetic = appendDemoSyntheticPlayer(userId, serverId, playerList)
+    playerList = synthetic.players
+    if (synthetic.playerName && synthetic.joinedAt) {
+      sessionStarts[synthetic.playerName] = synthetic.joinedAt
+    }
 
     // Update player directory — upsert last_seen for all currently online players
     if (playerList.length > 0) {
@@ -89,7 +95,7 @@ export async function GET(req: NextRequest) {
     }
 
     return Response.json({
-      count,
+      count: playerList.length,
       players: playerList.join(', '),
       ts:      Date.now(),
       sessionStarts,  // { [playerName]: joinedAtMs }

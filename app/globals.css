@@ -91,6 +91,168 @@ html {
   scroll-behavior: smooth;
 }
 
+.hero-proof-cluster {
+  position: relative;
+  isolation: isolate;
+}
+
+.hero-proof-cluster__liquid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hero-proof-cluster__goo {
+  position: absolute;
+  inset: 0;
+  filter: url(#hero-chip-goo);
+  opacity: 0.92;
+}
+
+.hero-proof-cluster__blob {
+  position: absolute;
+  display: block;
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+  border-radius: 999px;
+  transition: left 220ms ease, width 220ms ease, top 220ms ease, height 220ms ease, transform 220ms ease, opacity 220ms ease;
+}
+
+.hero-proof-cluster__blob--chip {
+  left: var(--hero-proof-left, 0px);
+  top: 0;
+  width: var(--hero-proof-width, 120px);
+  height: 34px;
+  opacity: 0.9;
+}
+
+.hero-proof-cluster__blob--stem {
+  left: calc(var(--hero-proof-left, 0px) + (var(--hero-proof-width, 120px) / 2) - 22px);
+  top: calc(var(--hero-proof-bottom, 38px) - 12px);
+  width: 44px;
+  height: calc(var(--hero-proof-panel-top, 92px) - var(--hero-proof-bottom, 38px) + 26px);
+  opacity: 0.8;
+}
+
+.hero-proof-cluster__blob--panel {
+  left: 0;
+  top: calc(var(--hero-proof-panel-top, 92px) - 10px);
+  width: min(100%, 33rem);
+  height: 90px;
+  opacity: 0.78;
+}
+
+.hero-proof-chip {
+  position: relative;
+  z-index: 2;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 94%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  padding: 0.54rem 0.92rem;
+  color: var(--text-dim);
+  font-size: 0.77rem;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  transition: border-color 180ms ease, color 180ms ease, transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.hero-proof-chip__surface {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 20% 50%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 54%),
+    radial-gradient(circle at 76% 48%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 48%);
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 180ms ease, transform 220ms ease;
+}
+
+.hero-proof-chip:hover,
+.hero-proof-chip:focus-visible,
+.hero-proof-chip.is-active {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  color: var(--text);
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent), 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+.hero-proof-chip:hover .hero-proof-chip__surface,
+.hero-proof-chip:focus-visible .hero-proof-chip__surface,
+.hero-proof-chip.is-active .hero-proof-chip__surface {
+  opacity: 1;
+  transform: scale(1.04);
+}
+
+.hero-proof-chip:focus-visible {
+  outline: none;
+}
+
+.hero-proof-chip__label {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-proof-panel {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.hero-proof-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 36%),
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 7%, transparent), transparent 44%);
+  pointer-events: none;
+}
+
+.hero-proof-panel__eyebrow {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 0.45rem;
+  color: var(--accent);
+  font-family: var(--app-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.hero-proof-panel__copy {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.93rem;
+  line-height: 1.65;
+}
+
+@media (max-width: 639px) {
+  .hero-proof-cluster__liquid {
+    display: none;
+  }
+
+  .hero-proof-chip {
+    padding: 0.62rem 0.9rem;
+    font-size: 0.72rem;
+  }
+
+  .hero-proof-panel__eyebrow {
+    font-size: 0.64rem;
+    letter-spacing: 0.14em;
+  }
+
+  .hero-proof-panel__copy {
+    font-size: 0.89rem;
+    line-height: 1.55;
+  }
+}
+
 [data-font="system"] {
   --app-font-sans: system-ui, sans-serif;
   --app-font-mono: system-ui, sans-serif;

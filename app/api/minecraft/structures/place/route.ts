@@ -3,6 +3,7 @@ import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUser
 import { logAudit } from '@/lib/audit'
 import { createStructurePlacement } from '@/lib/structure-placements'
 import { callSidecarForRequest, runBridgeJson } from '@/lib/server-bridge'
+import { enforceDemoGuardrails } from '@/lib/demo-limits'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -42,6 +43,8 @@ function boundsFromDimensions(origin: { x: number; y: number; z: number }, rotat
 }
 
 export async function POST(req: NextRequest) {
+  const userId = await getSessionUserId(req)
+  const serverId = await getSessionActiveServerId(req)
   const features = await getUserFeatureFlags(req)
   if (!checkFeatureAccess(features, 'enable_structure_catalog')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
@@ -73,6 +76,9 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: 'World and coordinates are required' }, { status: 400 })
   }
 
+  const demoGuard = await enforceDemoGuardrails(userId, serverId, 'structure_place', 1)
+  if (demoGuard) return demoGuard
+
   if (placementKind === 'native-worldgen' || placementKind === 'native-template') {
     const vanillaCommand = placementKind === 'native-worldgen'
       ? (locationMode === 'player'
@@ -86,8 +92,6 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, error: placed.error || 'Failed to place native structure' }, { status: 502 })
     }
 
-    const userId = await getSessionUserId(req)
-    const serverId = await getSessionActiveServerId(req)
     if (placementKind === 'native-template' && userId && serverId && locationMode === 'coords') {
       const metadata = await callSidecarForRequest<{ ok: boolean; dimensions?: { width: number | null; height: number | null; length: number | null } | null }>(
         req,
@@ -132,8 +136,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (locationMode === 'coords') {
-      const userId = await getSessionUserId(req)
-      const serverId = await getSessionActiveServerId(req)
       if (userId) {
         logAudit(userId, 'structure_place', structureLabel, `${world} @ ${x},${y},${z}`, serverId)
       }
@@ -155,8 +157,6 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || 'Failed to place structure' : bridge.error }, { status: 502 })
   }
 
-  const userId = await getSessionUserId(req)
-  const serverId = await getSessionActiveServerId(req)
   if (userId && serverId && bridge.data.world && bridge.data.origin && bridge.data.bounds) {
     const placementId = createStructurePlacement({
       userId,

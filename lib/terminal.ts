@@ -13,6 +13,7 @@ import {
   type TerminalState,
   type TerminalStructuredOutput,
 } from './terminal-shared'
+import { sanitizePublicText } from './public-branding'
 
 type TerminalHistoryRow = {
   id: string
@@ -319,16 +320,16 @@ export function mapTerminalCatalogEntries(raw: unknown): TerminalCatalogEntry[] 
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue
     const row = item as Record<string, unknown>
-    const name = typeof row.name === 'string' ? row.name.trim() : ''
+    const name = sanitizePublicText(typeof row.name === 'string' ? row.name.trim() : '') || ''
     if (!name) continue
     entries.push({
       name,
-      namespacedName: typeof row.namespacedName === 'string' && row.namespacedName.trim() ? row.namespacedName.trim() : null,
-      aliases: Array.isArray(row.aliases) ? row.aliases.filter((entry): entry is string => typeof entry === 'string').map(entry => entry.trim()).filter(Boolean) : [],
-      description: typeof row.description === 'string' && row.description.trim() ? row.description.trim() : null,
+      namespacedName: typeof row.namespacedName === 'string' && row.namespacedName.trim() ? sanitizePublicText(row.namespacedName.trim()) : null,
+      aliases: Array.isArray(row.aliases) ? row.aliases.filter((entry): entry is string => typeof entry === 'string').map(entry => sanitizePublicText(entry.trim()) || '').filter(Boolean) : [],
+      description: typeof row.description === 'string' && row.description.trim() ? sanitizePublicText(row.description.trim()) : null,
       usage: typeof row.usage === 'string' && row.usage.trim() ? row.usage.trim() : null,
       permission: typeof row.permission === 'string' && row.permission.trim() ? row.permission.trim() : null,
-      source: typeof row.source === 'string' && row.source.trim() ? row.source.trim() : null,
+      source: typeof row.source === 'string' && row.source.trim() ? sanitizePublicText(row.source.trim()) : null,
       riskLevel: classifyCommandRisk(name),
       wizardId: wizardIdForCommand(name),
     })

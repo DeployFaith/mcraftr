@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
 import { logAudit } from '@/lib/audit'
 import { runBridgeJson } from '@/lib/server-bridge'
+import { enforceDemoGuardrails } from '@/lib/demo-limits'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,6 +19,8 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await getSessionUserId(req)
+  const serverId = await getSessionActiveServerId(req)
   const features = await getUserFeatureFlags(req)
   if (!checkFeatureAccess(features, 'enable_world_spawn_tools')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
@@ -42,13 +45,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     command += ` coords ${x} ${y} ${z}`
   }
 
+  const demoGuard = await enforceDemoGuardrails(userId, serverId, 'world_spawn', 1)
+  if (demoGuard) return demoGuard
+
   const bridge = await runBridgeJson<BridgeResponse>(req, command)
   if (!bridge.ok || bridge.data.ok === false) {
     return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || 'Failed to update world spawn' : bridge.error }, { status: 502 })
   }
 
-  const userId = await getSessionUserId(req)
-  const serverId = await getSessionActiveServerId(req)
   if (userId) {
     logAudit(userId, 'world_spawn', id, locationMode === 'player' ? `player=${body.player}` : `coords=${body.x},${body.y},${body.z}`, serverId)
   }

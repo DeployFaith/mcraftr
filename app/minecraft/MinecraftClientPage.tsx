@@ -44,9 +44,10 @@ function normalizeTab(raw: string | null | undefined): TabId {
   return VALID_TABS.includes(raw as TabId) ? (raw as TabId) : 'dashboard'
 }
 
-export default function MinecraftClientPage({ initialTab, initialRole, initialStackMode }: { initialTab: TabId; initialRole?: string; initialStackMode: ServerStackMode }) {
+export default function MinecraftClientPage({ initialTab, initialRole, initialStackMode, initialDemoReadOnly = false }: { initialTab: TabId; initialRole?: string; initialStackMode: ServerStackMode; initialDemoReadOnly?: boolean }) {
   const { data: session } = useSession()
   const role = session?.role ?? initialRole
+  const demoReadOnly = session?.demoReadOnly ?? initialDemoReadOnly
   const pathname = usePathname()
 
   const [activeTab, setActiveTab] = useState<TabId>(initialTab)
@@ -145,14 +146,14 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
       if (!hasAnyWorldFeature) return false
     }
     if (t.id === 'terminal') {
-      if (role !== 'admin') return false
+      if (role !== 'admin' && !demoReadOnly) return false
       if (features && !features.enable_rcon) return false
     }
     if (t.id === 'admin') {
-      if (role !== 'admin') return false
+      if (role !== 'admin' && !demoReadOnly) return false
       if (features && !features.enable_admin) return false
     }
-    return !t.adminOnly || role === 'admin'
+    return !t.adminOnly || role === 'admin' || demoReadOnly
   })
   const visibleTab = tabs.find(t => t.id === activeTab) ? activeTab : 'dashboard'
 
@@ -169,7 +170,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
   return (
     <div className="flex flex-col min-h-[calc(100vh-48px)]">
       <nav className="hidden md:flex sticky top-14 z-30 border-b border-[var(--border)] backdrop-blur-md" style={{ background: 'rgba(10,10,15,0.88)' }}>
-        <div className="max-w-5xl mx-auto flex w-full gap-2 px-4 py-3">
+        <div className="mx-auto flex w-full max-w-6xl justify-center gap-2 px-4 py-3">
           {tabs.map(({ id, label, Icon }) => {
             const active = visibleTab === id
             return (
@@ -321,19 +322,19 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
             />
           </div>
         )}
-        {role === 'admin' && shouldRenderTab('admin') && (
+        {(role === 'admin' || demoReadOnly) && shouldRenderTab('admin') && (
           <div className={visibleTab === 'admin' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'admin'}>
-            <AdminSection players={players} />
+            <AdminSection players={players} readOnly={demoReadOnly} />
           </div>
         )}
-        {role === 'admin' && shouldRenderTab('terminal') && (
+        {(role === 'admin' || demoReadOnly) && shouldRenderTab('terminal') && (
           <div className={visibleTab === 'terminal' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'terminal'}>
             <div className="space-y-3">
               <div className="px-1">
                 <div className="font-mono text-[12px] tracking-[0.18em] text-[var(--text-dim)]">TERMINAL</div>
                 <div className="text-[13px] text-[var(--text-dim)]">Dedicated server terminal with transcript, command catalog, docs, wizards, and favorites.</div>
               </div>
-              <AdminTerminalWorkspace fullPage />
+              <AdminTerminalWorkspace fullPage readOnly={demoReadOnly} />
             </div>
           </div>
         )}

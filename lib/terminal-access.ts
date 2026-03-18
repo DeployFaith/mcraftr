@@ -1,10 +1,12 @@
 import type { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags } from './rcon'
 import { getUserById } from './users'
+import { isDemoRestrictedUser } from './demo-policy'
 
 export type TerminalAccessContext = {
   userId: string
   serverId: string
+  readOnly: boolean
 }
 
 export async function requireTerminalAccess(req: NextRequest): Promise<
@@ -27,12 +29,15 @@ export async function requireTerminalAccess(req: NextRequest): Promise<
   }
 
   const user = getUserById(userId)
-  if (!user || user.role !== 'admin') {
+  if (!user) {
+    return { ok: false, response: Response.json({ ok: false, error: 'Admin access required' }, { status: 403 }) }
+  }
+  if (user.role !== 'admin' && !isDemoRestrictedUser(user)) {
     return { ok: false, response: Response.json({ ok: false, error: 'Admin access required' }, { status: 403 }) }
   }
 
   return {
     ok: true,
-    context: { userId, serverId },
+    context: { userId, serverId, readOnly: user.role !== 'admin' },
   }
 }

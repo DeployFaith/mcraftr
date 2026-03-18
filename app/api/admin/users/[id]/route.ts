@@ -1,23 +1,22 @@
 import { NextRequest } from 'next/server'
-import { getToken } from 'next-auth/jwt'
 import { getUserById, getUserFeatures, setUserRole, deleteUser, updatePassword } from '@/lib/users'
 import { logAudit } from '@/lib/audit'
+import { getDemoReadonlyAccess, rejectDemoReadonlyWrite } from '@/lib/demo-readonly'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 async function requireAdmin(req: NextRequest): Promise<string | null> {
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET, cookieName: 'authjs.session-token' })
-  const userId = token?.id as string | undefined
-  if (!userId) return null
-  const user = getUserById(userId)
-  if (!user || user.role !== 'admin') return null
-  return userId
+  const access = await getDemoReadonlyAccess(req)
+  return access?.isAdmin ? access.userId : null
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const adminId = await requireAdmin(req)
-  if (!adminId) return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })
+  const access = await getDemoReadonlyAccess(req)
+  if (!access || !access.isAdmin) return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })
+  const readOnlyResponse = rejectDemoReadonlyWrite(access)
+  if (readOnlyResponse) return readOnlyResponse
+  const adminId = access.userId
 
   const features = getUserFeatures(adminId)
   if (!features.enable_admin_user_management) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
@@ -55,8 +54,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const adminId = await requireAdmin(req)
-  if (!adminId) return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })
+  const access = await getDemoReadonlyAccess(req)
+  if (!access || !access.isAdmin) return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })
+  const readOnlyResponse = rejectDemoReadonlyWrite(access)
+  if (readOnlyResponse) return readOnlyResponse
+  const adminId = access.userId
 
   const { id } = await params
 

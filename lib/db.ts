@@ -87,6 +87,8 @@ export function getDb(): Database.Database {
       email        TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       role         TEXT NOT NULL DEFAULT 'user',
+      is_temporary INTEGER NOT NULL DEFAULT 0,
+      temporary_last_used_at INTEGER,
       avatar_type  TEXT,
       avatar_value TEXT,
       use_sidecar  INTEGER NOT NULL DEFAULT 0,
@@ -114,6 +116,25 @@ export function getDb(): Database.Database {
       player_name TEXT NOT NULL,
       last_seen   INTEGER NOT NULL DEFAULT (unixepoch()),
       PRIMARY KEY (user_id, server_id, player_name)
+    );
+
+    CREATE TABLE IF NOT EXISTS demo_synthetic_players (
+      server_id   TEXT NOT NULL,
+      player_name TEXT NOT NULL,
+      joined_at   INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at  INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (server_id, player_name)
+    );
+
+    CREATE TABLE IF NOT EXISTS demo_synthetic_inventory (
+      server_id   TEXT NOT NULL,
+      player_name TEXT NOT NULL,
+      slot        INTEGER NOT NULL,
+      item_id     TEXT NOT NULL,
+      count       INTEGER NOT NULL,
+      enchants    TEXT,
+      updated_at  INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (server_id, player_name, slot)
     );
 
     CREATE TABLE IF NOT EXISTS chat_log (
@@ -311,6 +332,8 @@ export function getDb(): Database.Database {
   `)
 
   ensureColumn(_db, 'users', 'active_server_id', 'active_server_id TEXT')
+  ensureColumn(_db, 'users', 'is_temporary', 'is_temporary INTEGER NOT NULL DEFAULT 0')
+  ensureColumn(_db, 'users', 'temporary_last_used_at', 'temporary_last_used_at INTEGER')
   ensureColumn(_db, 'users', 'avatar_type', 'avatar_type TEXT')
   ensureColumn(_db, 'users', 'avatar_value', 'avatar_value TEXT')
   ensureColumn(_db, 'saved_servers', 'bridge_enabled', 'bridge_enabled INTEGER')

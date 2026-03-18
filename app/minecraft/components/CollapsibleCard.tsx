@@ -31,9 +31,10 @@ export default function CollapsibleCard({
   groupKey,
 }: Props) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen)
+  const [groupOverride, setGroupOverride] = useState<boolean | null>(null)
   const stateKey = `mcraftr:section:${storageKey}`
   const isControlled = open !== undefined
-  const isOpen = isControlled ? open : internalOpen
+  const isOpen = groupOverride ?? (isControlled ? open : internalOpen)
 
   useEffect(() => {
     if (isControlled) return
@@ -55,7 +56,8 @@ export default function CollapsibleCard({
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<{ groupKey?: string; open?: boolean }>).detail
       if (!detail || detail.groupKey !== groupKey || typeof detail.open !== 'boolean') return
-      setInternalOpen(detail.open)
+      setGroupOverride(detail.open)
+      if (!isControlled) setInternalOpen(detail.open)
     }
     window.addEventListener(COLLAPSIBLE_GROUP_EVENT, handler as EventListener)
     return () => window.removeEventListener(COLLAPSIBLE_GROUP_EVENT, handler as EventListener)
@@ -63,6 +65,7 @@ export default function CollapsibleCard({
 
   const handleToggle = () => {
     const next = !isOpen
+    setGroupOverride(null)
     if (!isControlled) setInternalOpen(next)
     onOpenChange?.(next)
   }

@@ -13,6 +13,17 @@ type Props = {
   className?: string
 }
 
+// Keep this code-only so artwork can be turned back on per catalog later.
+export const CATALOG_ARTWORK_ENABLED: Record<Props['kind'], boolean> = {
+  structure: false,
+  entity: false,
+  item: true,
+}
+
+export function isCatalogArtworkEnabled(kind: Props['kind']) {
+  return CATALOG_ARTWORK_ENABLED[kind]
+}
+
 function encodeSvg(svg: string) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }
@@ -147,22 +158,37 @@ export default function CatalogArtwork({
   )
   const primaryUrl = art?.url ?? imageUrl ?? null
   const [src, setSrc] = useState(primaryUrl || fallback)
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     setSrc(primaryUrl || fallback)
+    setLoaded(false)
   }, [primaryUrl, fallback])
 
   return (
-    <img
-      src={src}
-      alt={`${label} preview`}
-      className={className}
+    <div
+      className={`relative overflow-hidden ${className}`}
       data-art-class={art?.class ?? kind}
       data-art-strategy={art?.strategy ?? 'fallback-card'}
-      loading="lazy"
-      onError={() => {
-        if (src !== fallback) setSrc(fallback)
-      }}
-    />
+    >
+      {!loaded && (
+        <div className="absolute inset-0 animate-pulse bg-[linear-gradient(120deg,rgba(255,255,255,0.04),rgba(255,255,255,0.12),rgba(255,255,255,0.04))]" />
+      )}
+      <img
+        src={src}
+        alt={`${label} preview`}
+        className={`h-full w-full object-contain transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        loading="lazy"
+        onLoad={() => setLoaded(true)}
+        onError={() => {
+          if (src !== fallback) {
+            setSrc(fallback)
+            setLoaded(false)
+            return
+          }
+          setLoaded(true)
+        }}
+      />
+    </div>
   )
 }
