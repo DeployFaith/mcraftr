@@ -581,6 +581,11 @@ export default function AdminSection({ players, readOnly = false }: Props) {
         <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[12px] font-mono text-[var(--text-dim)]">
           Review and adjust the most important server-wide rules here: difficulty, survival-safety gamerules, and lifecycle actions like saving or stopping the server.
         </div>
+        {readOnly && (
+          <div className="rounded-xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-4 py-3 text-[12px] font-mono text-[var(--accent)]">
+            Demo mode can inspect these server rules and controls, but all admin changes remain read-only here.
+          </div>
+        )}
 
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
           <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3">
@@ -622,7 +627,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
               const colors: Record<string, string> = { peaceful: '#4ade80', easy: '#60a5fa', normal: '#f59e0b', hard: '#f87171' }
               const active = difficulty === d
               return (
-                <button key={d} onClick={() => setDifficultyCmd(d)} disabled={!!difficultyBusy}
+                <button key={d} onClick={() => setDifficultyCmd(d)} disabled={readOnly || !!difficultyBusy}
                   className="py-2 rounded-lg font-mono text-[13px] tracking-widest border transition-all disabled:opacity-40"
                   style={active ? { borderColor: colors[d], background: colors[d] + '20', color: colors[d] }
                     : { borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
@@ -659,7 +664,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
                 return (
                   <div key={rule} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--panel)] border border-[var(--border)]">
                     <span className="text-[13px] font-mono text-[var(--text)]">{labels[rule] ?? rule}</span>
-                    <button onClick={() => val !== undefined && toggleGamerule(rule, val)} disabled={busy || val === undefined}
+                    <button onClick={() => val !== undefined && toggleGamerule(rule, val)} disabled={readOnly || busy || val === undefined}
                       className={`text-[13px] font-mono px-3 py-1 rounded border transition-all disabled:opacity-40 ${
                         isOn ? 'border-[var(--accent-mid)] text-[var(--accent)] bg-[var(--accent-dim)]' : 'border-[var(--border)] text-[var(--text-dim)]'
                       }`}>
@@ -681,7 +686,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
               const r = await fetch('/api/minecraft/server-ctrl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: 'save-all' }) })
               const d = await r.json()
               addToast(d.ok ? 'ok' : 'error', d.ok ? 'World saved' : (d.error || 'Save failed'))
-            }} className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] transition-all">
+            }} disabled={readOnly} className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
               <span className="flex items-center justify-center gap-1.5"><Save size={13} strokeWidth={1.5} />Save World</span>
             </button>
             <button onClick={() => setConfirmModal({
@@ -695,7 +700,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
                 const d = await r.json()
                 addToast(d.ok ? 'ok' : 'error', d.ok ? 'Server stopping…' : (d.error || 'Stop failed'))
               },
-            })} className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest border border-red-900 text-red-400 hover:border-red-700 transition-all">
+            })} disabled={readOnly} className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest border border-red-900 text-red-400 hover:border-red-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
               <span className="flex items-center justify-center gap-1.5"><Square size={13} strokeWidth={1.5} />Stop Server</span>
             </button>
           </div>
@@ -709,6 +714,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
       {/* ── MODERATION ── */}
       {canModeration && (
       <CollapsibleCard title="MODERATION" storageKey="admin:moderation" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
+        {readOnly && <div className="text-[12px] font-mono text-[var(--text-dim)]">Moderation tools are visible here for demo review, but mutations stay disabled.</div>}
 
         <div>
           <SectionLabel>TARGET PLAYER</SectionLabel>
@@ -717,22 +723,22 @@ export default function AdminSection({ players, readOnly = false }: Props) {
 
         <div>
           <SectionLabel>REASON (OPTIONAL)</SectionLabel>
-          <input type="text" placeholder="e.g. Breaking rules" value={modReason} onChange={e => setModReason(e.target.value)}
+          <input type="text" placeholder="e.g. Breaking rules" value={modReason} onChange={e => setModReason(e.target.value)} disabled={readOnly}
             className="w-full bg-[var(--panel)] border border-[var(--border)] rounded-lg px-3 py-2 text-[15px] font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-mid)]"
             style={{ fontSize: '16px' }} />
         </div>
 
         <div className="flex items-center gap-2">
-          <input type="checkbox" id="mod-ban-ip" checked={modBanIp} onChange={e => setModBanIp(e.target.checked)} className="accent-[var(--accent)]" />
+          <input type="checkbox" id="mod-ban-ip" checked={modBanIp} onChange={e => setModBanIp(e.target.checked)} disabled={readOnly} className="accent-[var(--accent)]" />
           <label htmlFor="mod-ban-ip" className="text-[13px] font-mono text-[var(--text-dim)] cursor-pointer">Also ban IP address</label>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <button onClick={kickPlayer} disabled={!modTarget || !!modBusy}
+          <button onClick={kickPlayer} disabled={readOnly || !modTarget || !!modBusy}
             className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-yellow-800 text-yellow-400 hover:border-yellow-600">
             {modBusy === 'kick' ? 'Kicking…' : 'Kick'}
           </button>
-          <button onClick={banPlayer} disabled={!modTarget || !!modBusy}
+          <button onClick={banPlayer} disabled={readOnly || !modTarget || !!modBusy}
             className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-red-900 text-red-400 hover:border-red-700">
             {modBusy === 'ban' ? 'Banning…' : 'Ban'}
           </button>
@@ -741,10 +747,10 @@ export default function AdminSection({ players, readOnly = false }: Props) {
         <div className="border-t border-[var(--border)] pt-3 space-y-3">
           <SectionLabel>PARDON (UNBAN)</SectionLabel>
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="mod-pardon-ip" checked={modPardonIp} onChange={e => setModPardonIp(e.target.checked)} className="accent-[var(--accent)]" />
+            <input type="checkbox" id="mod-pardon-ip" checked={modPardonIp} onChange={e => setModPardonIp(e.target.checked)} disabled={readOnly} className="accent-[var(--accent)]" />
             <label htmlFor="mod-pardon-ip" className="text-[13px] font-mono text-[var(--text-dim)] cursor-pointer">Also pardon IP address</label>
           </div>
-          <button onClick={pardonPlayer} disabled={!modTarget || !!modBusy}
+          <button onClick={pardonPlayer} disabled={readOnly || !modTarget || !!modBusy}
             className="w-full py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] hover:text-[var(--accent)]">
             {modBusy === 'pardon' ? 'Pardoning…' : 'Pardon'}
           </button>
@@ -780,6 +786,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
       {/* ── WHITELIST ── */}
       {canWhitelist && (
       <CollapsibleCard title="WHITELIST" storageKey="admin:whitelist" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
+        {readOnly && <div className="text-[12px] font-mono text-[var(--text-dim)]">Whitelist reads are available in demo mode, but entry changes remain disabled.</div>}
         <div className="flex items-center justify-between">
           <button onClick={fetchWhitelist} disabled={wlLoading}
             className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
@@ -801,7 +808,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
                   {wlPlayers.map(p => (
                     <div key={p} className="flex items-center gap-1 px-2 py-1 rounded border border-[var(--border)] bg-[var(--panel)]">
                       <span className="text-[13px] font-mono text-[var(--text)]">{p}</span>
-                      <button onClick={() => wlAction(p, 'remove')} disabled={wlBusy === p + 'remove'}
+                      <button onClick={() => wlAction(p, 'remove')} disabled={readOnly || wlBusy === p + 'remove'}
                         className="text-[13px] font-mono text-red-400 opacity-60 hover:opacity-100 ml-1 disabled:opacity-20" title="Remove from whitelist">✕</button>
                     </div>
                   ))}
@@ -812,7 +819,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
               <SectionLabel>ADD PLAYER</SectionLabel>
               <PlayerPicker online={players} selected={wlTarget} onSelect={setWlTarget} placeholder="Or type player name…" />
               <button onClick={() => { const p = wlTarget.trim(); if (p) wlAction(p, 'add') }}
-                disabled={!wlTarget.trim() || !!wlBusy}
+                disabled={readOnly || !wlTarget.trim() || !!wlBusy}
                 className="mt-2 w-full px-4 py-2 rounded-lg font-mono text-[13px] tracking-widest border border-[var(--border)] text-[var(--accent)] hover:border-[var(--accent-mid)] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 {wlBusy?.endsWith('add') ? '…' : 'Add to Whitelist'}
               </button>
@@ -825,16 +832,17 @@ export default function AdminSection({ players, readOnly = false }: Props) {
       {/* ── OPERATOR ── */}
       {canOperator && (
       <CollapsibleCard title="OPERATOR" storageKey="admin:operator" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
+        {readOnly && <div className="text-[12px] font-mono text-[var(--text-dim)]">Operator controls are visible for review only in the public demo.</div>}
         <div>
           <SectionLabel>SELECT PLAYER</SectionLabel>
           <PlayerPicker online={players} selected={opTarget} onSelect={setOpTarget} placeholder="Or type player name…" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <button onClick={() => opAction('op')} disabled={!opTarget || !!opBusy}
+          <button onClick={() => opAction('op')} disabled={readOnly || !opTarget || !!opBusy}
             className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]">
             {opBusy === 'op' ? '…' : <span className="flex items-center justify-center gap-1.5"><Star size={13} strokeWidth={1.5} />Op</span>}
           </button>
-          <button onClick={() => opAction('deop')} disabled={!opTarget || !!opBusy}
+          <button onClick={() => opAction('deop')} disabled={readOnly || !opTarget || !!opBusy}
             className="py-2.5 rounded-lg font-mono text-[13px] tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] hover:text-[var(--accent)]">
             {opBusy === 'deop' ? '…' : <span className="flex items-center justify-center gap-1.5"><X size={13} strokeWidth={1.5} />Deop</span>}
           </button>
