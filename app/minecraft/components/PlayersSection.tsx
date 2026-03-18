@@ -1,10 +1,12 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import InvSlot, { slotLabel, buildInventoryLayout } from './InvSlot'
+import CatalogArtwork from './CatalogArtwork'
 import type { InvItem } from '../../api/minecraft/inventory/route'
 import ConfirmModal from './ConfirmModal'
 import type { ConfirmModalProps } from './ConfirmModal'
 import type { FeatureKey } from '@/lib/features'
+import { CATALOG } from '@/app/minecraft/items'
 import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -60,6 +62,24 @@ const DIMENSION_COLORS: Record<string, string> = {
   'The End':   '#a78bfa',
 }
 const PLAYERS_COLLAPSIBLE_GROUP = 'players-tab'
+const INVENTORY_ITEM_LOOKUP = new Map<string, {
+  categoryLabel: string
+  maxStack: number
+  imageUrl: string | null
+  art: NonNullable<(typeof CATALOG)[number]['items'][number]['art']> | null
+}>(
+  CATALOG.flatMap(category =>
+    category.items.map(item => [
+      `minecraft:${item.id}`,
+      {
+        categoryLabel: category.label,
+        maxStack: item.maxStack,
+        imageUrl: item.imageUrl ?? null,
+        art: item.art ?? null,
+      },
+    ] as const)
+  )
+)
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -311,6 +331,23 @@ function PlayerPanel({
     setInvOpen(!collapseAllActive)
   }, [collapseAllActive])
 
+  useEffect(() => {
+    if (!selectedSlot) return
+    const refreshedSelection = inventory.find(item => item.slot === selectedSlot.slot)
+    if (!refreshedSelection) {
+      setSelectedSlot(null)
+      return
+    }
+    if (
+      refreshedSelection.id !== selectedSlot.id ||
+      refreshedSelection.count !== selectedSlot.count ||
+      refreshedSelection.enchants !== selectedSlot.enchants ||
+      refreshedSelection.label !== selectedSlot.label
+    ) {
+      setSelectedSlot(refreshedSelection)
+    }
+  }, [inventory, selectedSlot])
+
   const deleteItem = async (item: InvItem) => {
     setDeletingSlot(item.slot)
     try {
@@ -402,6 +439,7 @@ function PlayerPanel({
   }
 
   const { hotbar, main, armor, offhand } = buildInventoryLayout(inventory)
+  const selectedInventoryItemMeta = selectedSlot ? INVENTORY_ITEM_LOOKUP.get(selectedSlot.id) ?? null : null
 
   const uuid = stats?.uuid ?? null
   // Bedrock players (Geyser) have offline UUIDs that don't resolve on Craftatar.
@@ -585,43 +623,87 @@ function PlayerPanel({
           ) : (
             <div className="space-y-3">
               {selectedSlot && (
-                <div className="space-y-2 rounded border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-2 py-2 text-[11px] font-mono text-[var(--text-dim)]">
-                  <div>
-                    <span className="text-[var(--accent)]">{selectedSlot.label}</span> selected — click an empty slot or matching stack to move, or click the selected item to deselect
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+                  <div className="space-y-2 rounded border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-2 py-2 text-[11px] font-mono text-[var(--text-dim)]">
+                    <div>
+                      <span className="text-[var(--accent)]">{selectedSlot.label}</span> selected — click an empty slot or matching stack to move, or click the selected item to deselect
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void adjustSelectedItem('increment', 1)}
+                        disabled={inventoryActionBusy !== null}
+                        className="rounded border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--text)] disabled:opacity-40"
+                      >
+                        {inventoryActionBusy === 'increment' ? '…' : '+1'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void adjustSelectedItem('increment', 8)}
+                        disabled={inventoryActionBusy !== null}
+                        className="rounded border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--text)] disabled:opacity-40"
+                      >
+                        +8
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void adjustSelectedItem('fill')}
+                        disabled={inventoryActionBusy !== null}
+                        className="rounded border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--text)] disabled:opacity-40"
+                      >
+                        Fill Stack
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void adjustSelectedItem('duplicate')}
+                        disabled={inventoryActionBusy !== null}
+                        className="rounded border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--text)] disabled:opacity-40"
+                      >
+                        Duplicate Stack
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void adjustSelectedItem('increment', 1)}
-                      disabled={inventoryActionBusy !== null}
-                      className="rounded border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--text)] disabled:opacity-40"
-                    >
-                      {inventoryActionBusy === 'increment' ? '…' : '+1'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void adjustSelectedItem('increment', 8)}
-                      disabled={inventoryActionBusy !== null}
-                      className="rounded border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--text)] disabled:opacity-40"
-                    >
-                      +8
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void adjustSelectedItem('fill')}
-                      disabled={inventoryActionBusy !== null}
-                      className="rounded border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--text)] disabled:opacity-40"
-                    >
-                      Fill Stack
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void adjustSelectedItem('duplicate')}
-                      disabled={inventoryActionBusy !== null}
-                      className="rounded border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--text)] disabled:opacity-40"
-                    >
-                      Duplicate Stack
-                    </button>
+
+                  <div className="rounded-[24px] border border-[var(--accent-mid)] bg-[linear-gradient(180deg,rgba(82,190,255,0.14),rgba(8,11,16,0.94))] p-3 shadow-[0_18px_42px_rgba(0,0,0,0.28)]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-[10px] font-mono tracking-[0.35em] text-[var(--accent)]">ITEM CARD</div>
+                        <div className="mt-1 text-[16px] font-mono text-[var(--text)]">{selectedSlot.label}</div>
+                      </div>
+                      <span className="rounded-full border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-2 py-1 text-[10px] font-mono tracking-widest text-[var(--accent)]">
+                        {selectedInventoryItemMeta?.categoryLabel ?? 'Inventory'}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 rounded-[20px] border border-white/10 bg-black/15 p-2">
+                      <CatalogArtwork
+                        kind="item"
+                        label={selectedSlot.label}
+                        category={selectedInventoryItemMeta?.categoryLabel ?? 'Inventory'}
+                        imageUrl={selectedInventoryItemMeta?.imageUrl}
+                        art={selectedInventoryItemMeta?.art}
+                        className="h-40 w-full rounded-[16px] border border-white/10 object-contain"
+                      />
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {[
+                          ['Id', selectedSlot.id],
+                          ['Slot', slotLabel(selectedSlot.slot)],
+                          ['Count', String(selectedSlot.count)],
+                          ['Per Stack', String(selectedInventoryItemMeta?.maxStack ?? 64)],
+                        ].map(([label, value]) => (
+                          <div key={label} className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                            <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">{label}</div>
+                            <div className="mt-1 break-all text-[12px] font-mono text-[var(--text)]">{value}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {selectedSlot.enchants && (
+                        <div className="mt-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                          <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">Enchants</div>
+                          <div className="mt-1 text-[12px] font-mono text-[var(--accent)]">{selectedSlot.enchants}</div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
