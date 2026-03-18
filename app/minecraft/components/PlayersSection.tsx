@@ -1,12 +1,12 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import InvSlot, { slotLabel, buildInventoryLayout } from './InvSlot'
 import CatalogArtwork from './CatalogArtwork'
 import type { InvItem } from '../../api/minecraft/inventory/route'
 import ConfirmModal from './ConfirmModal'
 import type { ConfirmModalProps } from './ConfirmModal'
 import type { FeatureKey } from '@/lib/features'
-import { CATALOG } from '@/app/minecraft/items'
+import { CATALOG, hydrateCatalogWithArt } from '@/app/minecraft/items'
 import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -35,6 +35,7 @@ type PlayerStats = {
 
 type Props = {
   onPlayersChange?: (players: string[]) => void
+  minecraftVersion?: string | null
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -62,24 +63,26 @@ const DIMENSION_COLORS: Record<string, string> = {
   'The End':   '#a78bfa',
 }
 const PLAYERS_COLLAPSIBLE_GROUP = 'players-tab'
-const INVENTORY_ITEM_LOOKUP = new Map<string, {
-  categoryLabel: string
-  maxStack: number
-  imageUrl: string | null
-  art: NonNullable<(typeof CATALOG)[number]['items'][number]['art']> | null
-}>(
-  CATALOG.flatMap(category =>
-    category.items.map(item => [
-      `minecraft:${item.id}`,
-      {
-        categoryLabel: category.label,
-        maxStack: item.maxStack,
-        imageUrl: item.imageUrl ?? null,
-        art: item.art ?? null,
-      },
-    ] as const)
+function buildInventoryItemLookup(minecraftVersion: string | null | undefined) {
+  return new Map<string, {
+    categoryLabel: string
+    maxStack: number
+    imageUrl: string | null
+    art: NonNullable<(typeof CATALOG)[number]['items'][number]['art']> | null
+  }>(
+    hydrateCatalogWithArt(minecraftVersion, CATALOG).flatMap(category =>
+      category.items.map(item => [
+        `minecraft:${item.id}`,
+        {
+          categoryLabel: category.label,
+          maxStack: item.maxStack,
+          imageUrl: item.imageUrl ?? null,
+          art: item.art ?? null,
+        },
+      ] as const)
+    )
   )
-)
+}
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -219,11 +222,13 @@ function PlayerPanel({
   joinedAtMs,
   onClose,
   collapseAllActive,
+  minecraftVersion,
 }: {
   player: string
   joinedAtMs: number | null
   onClose: () => void
   collapseAllActive: boolean
+  minecraftVersion?: string | null
 }) {
   type FeatureFlags = Record<FeatureKey, boolean>
   const [stats, setStats]         = useState<PlayerStats | null>(null)
@@ -439,7 +444,8 @@ function PlayerPanel({
   }
 
   const { hotbar, main, armor, offhand } = buildInventoryLayout(inventory)
-  const selectedInventoryItemMeta = selectedSlot ? INVENTORY_ITEM_LOOKUP.get(selectedSlot.id) ?? null : null
+  const inventoryItemLookup = useMemo(() => buildInventoryItemLookup(minecraftVersion), [minecraftVersion])
+  const selectedInventoryItemMeta = selectedSlot ? inventoryItemLookup.get(selectedSlot.id) ?? null : null
 
   const uuid = stats?.uuid ?? null
   // Bedrock players (Geyser) have offline UUIDs that don't resolve on Craftatar.
@@ -790,7 +796,7 @@ function PlayerPanel({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function PlayersSection({ onPlayersChange }: Props) {
+export default function PlayersSection({ onPlayersChange, minecraftVersion }: Props) {
   const [data, setData]               = useState<PlayerListData>({ count: 0, players: '' })
   const [loading, setLoading]         = useState(true)
   const [selectedPlayer, setSelected] = useState<string | null>(null)
@@ -925,12 +931,13 @@ export default function PlayersSection({ onPlayersChange }: Props) {
       </CollapsibleCard>
 
       {selectedPlayer && (
-        <PlayerPanel
-          player={selectedPlayer}
-          joinedAtMs={data.sessionStarts?.[selectedPlayer] ?? null}
-          onClose={() => setSelected(null)}
-          collapseAllActive={collapseAllActive}
-        />
+                <PlayerPanel
+                  player={selectedPlayer}
+                  joinedAtMs={data.sessionStarts?.[selectedPlayer] ?? null}
+                  onClose={() => setSelected(null)}
+                  collapseAllActive={collapseAllActive}
+                  minecraftVersion={minecraftVersion}
+                />
       )}
 
       {data.ts && !data.error && (
