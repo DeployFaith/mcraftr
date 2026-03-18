@@ -50,7 +50,7 @@ const DEMO_RESTRICTED_SERVER_MESSAGE = 'The public demo is locked to the shared 
 function ConnectForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const wantsEdit = searchParams.get('edit') === '1'
+  const wantsEdit = searchParams?.get('edit') === '1'
   const { status, update: updateSession } = useSession()
 
   const [label, setLabel] = useState('')
