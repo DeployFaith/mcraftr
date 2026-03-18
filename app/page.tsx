@@ -13,11 +13,15 @@ import adminShot from '@/docs/screenshots/highlights/08-admin.png'
 import chatShot from '@/docs/screenshots/highlights/09-chat.png'
 import settingsShot from '@/docs/screenshots/highlights/10-settings.png'
 import HeroProofChips from './components/HeroProofChips'
+import ProgressiveScreenshot from './components/ProgressiveScreenshot'
 import { PublicSiteFooter, PublicSiteHeader } from './components/PublicSiteChrome'
 
 const SUPPORT_URL = 'https://buymeacoffee.com/deployfaith'
+const REPO_URL = 'https://github.com/deployfaith/mcraftr'
 const DEMO_APP_URL = 'https://demo.mcraftr.deployfaith.xyz'
 const DEMO_LAUNCH_URL = `${DEMO_APP_URL}/demo`
+const README_URL = `${REPO_URL}/blob/main/README.md`
+const INSTALL_URL = `${REPO_URL}/blob/main/INSTALL.md`
 
 function demoLaunchHref(returnTo = '/minecraft') {
   return `${DEMO_LAUNCH_URL}?returnTo=${encodeURIComponent(returnTo)}`
@@ -91,29 +95,29 @@ const galleryHighlights = [
     src: dashboardShot,
     alt: 'Mcraftr dashboard overview',
     title: 'Dashboard',
-    desc: 'Get the state of the server first, then move straight to the section that matters.',
-    href: demoLaunchHref('/minecraft?tab=dashboard'),
+    desc: 'Current server status, online player count, TPS, weather, and time snapshot.',
+    href: `${README_URL}#dashboard`,
   },
   {
     src: playersShot,
     alt: 'Mcraftr players view',
     title: 'Players',
-    desc: 'Player actions stay inside the main admin flow instead of getting split into a separate tool.',
-    href: demoLaunchHref('/minecraft?tab=players'),
+    desc: 'Live player list, vitals, effects, location, and inventory inspection.',
+    href: `${README_URL}#players`,
   },
   {
     src: worldsShot,
     alt: 'Mcraftr worlds view',
     title: 'Worlds',
-    desc: 'World-aware tooling gives you more context than a plain command box.',
-    href: demoLaunchHref('/minecraft?tab=worlds'),
+    desc: 'Full Stack setup for worlds, structures, entities, maps, and richer workflows.',
+    href: `${INSTALL_URL}#option-3-full-mcraftr-stack-with-docker-compose`,
   },
   {
     src: terminalShot,
     alt: 'Mcraftr terminal view',
     title: 'Terminal',
-    desc: 'Direct command access is there when you need it and out of the way when you do not.',
-    href: demoLaunchHref('/minecraft?tab=terminal'),
+    desc: 'Server terminal inside Admin, alongside schedules, audit history, and user controls.',
+    href: `${README_URL}#admin`,
   },
 ]
 
@@ -317,18 +321,17 @@ export default async function Home() {
                   className="group overflow-hidden rounded-[1.4rem] border border-[var(--border)] bg-[var(--panel)] transition-all duration-200 hover:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--bg2)]"
                 >
                   <div className="relative aspect-[16/10] overflow-hidden border-b border-[var(--border)] bg-[var(--bg)]/50">
-                    <Image
+                    <ProgressiveScreenshot
                       src={highlight.src}
                       alt={highlight.alt}
-                      fill
                       sizes="(max-width: 1024px) 100vw, 50vw"
-                      className="h-full w-full scale-[1.12] object-cover object-top transition-transform duration-300 group-hover:scale-[1.15]"
+                      className="h-full w-full scale-[1.12] object-cover object-top group-hover:scale-[1.15]"
                     />
                   </div>
                   <div className="space-y-2 px-5 py-5">
                     <div className="flex flex-col items-start justify-between gap-1.5 sm:flex-row sm:items-center sm:gap-3">
                       <span className="text-base font-semibold text-[var(--accent)]">{highlight.title}</span>
-                      <span className="text-[0.68rem] uppercase tracking-[0.14em] text-[var(--text-dim)]">Open in Demo</span>
+                      <span className="text-[0.68rem] uppercase tracking-[0.14em] text-[var(--text-dim)]">Open docs on GitHub</span>
                     </div>
                     <p className="max-w-[34ch] text-sm leading-6 text-[var(--text-dim)]">{highlight.desc}</p>
                   </div>

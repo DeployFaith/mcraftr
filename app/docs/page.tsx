@@ -1,10 +1,10 @@
 import type { Metadata } from 'next'
-import Image from 'next/image'
 import dashboardShot from '@/docs/screenshots/highlights/03-dashboard.png'
 import playersShot from '@/docs/screenshots/highlights/04-players.png'
 import worldsShot from '@/docs/screenshots/highlights/06-worlds.png'
 import terminalShot from '@/docs/screenshots/highlights/07-terminal.png'
 import settingsShot from '@/docs/screenshots/highlights/10-settings.png'
+import ProgressiveScreenshot from '@/app/components/ProgressiveScreenshot'
 import { PublicSiteFooter, PublicSiteHeader } from '@/app/components/PublicSiteChrome'
 
 const SUPPORT_URL = 'https://buymeacoffee.com/deployfaith'
@@ -113,31 +113,36 @@ const screenshots = [
     src: dashboardShot,
     alt: 'Mcraftr dashboard overview',
     title: 'Dashboard view',
-    desc: 'Start from current state instead of digging through server console output first.',
+    desc: 'Current server status, online player count, TPS, weather, and time snapshot.',
+    href: `${REPO_URL}/blob/main/README.md#dashboard`,
   },
   {
     src: playersShot,
     alt: 'Mcraftr players panel',
     title: 'Player context',
-    desc: 'Inspect player state and jump directly into operator actions.',
+    desc: 'Live player list, vitals, effects, location, and inventory inspection.',
+    href: `${REPO_URL}/blob/main/README.md#players`,
   },
   {
     src: worldsShot,
     alt: 'Mcraftr worlds panel',
     title: 'World-aware tools',
-    desc: 'The full stack gives the app more Minecraft-side context than plain RCON can expose.',
+    desc: 'Full Stack setup for worlds, structures, entities, maps, and richer workflows.',
+    href: `${REPO_URL}/blob/main/INSTALL.md#option-3-full-mcraftr-stack-with-docker-compose`,
   },
   {
     src: terminalShot,
     alt: 'Mcraftr server terminal',
     title: 'Terminal workspace',
-    desc: 'Keep raw command power available without making it the whole product.',
+    desc: 'Server terminal inside Admin, alongside schedules, audit history, and user controls.',
+    href: `${REPO_URL}/blob/main/README.md#admin`,
   },
   {
     src: settingsShot,
     alt: 'Mcraftr settings screen',
     title: 'Personalization',
-    desc: 'Tune the interface and export theme packs for portable custom setups.',
+    desc: 'Dark or light mode, theme packs, colors, fonts, sounds, and profile avatars.',
+    href: `${REPO_URL}/blob/main/README.md#personalization`,
   },
 ]
 
@@ -412,24 +417,23 @@ export default function DocsPage() {
 
           <div className="mt-12 grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
             {screenshots.map((shot, index) => (
-              <div key={shot.title} className={`group overflow-hidden rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel)] transition-all duration-200 hover:border-[var(--accent)] ${index === 0 ? 'xl:col-span-2' : ''}`}>
+              <a key={shot.title} href={shot.href} target="_blank" rel="noopener noreferrer" className={`group overflow-hidden rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel)] transition-all duration-200 hover:border-[var(--accent)] ${index === 0 ? 'xl:col-span-2' : ''}`}>
                 <div className="relative aspect-[16/10] overflow-hidden border-b border-[var(--border)] bg-[var(--bg)]/45">
-                  <Image
+                  <ProgressiveScreenshot
                     src={shot.src}
                     alt={shot.alt}
-                    fill
                     sizes={index === 0 ? '(max-width: 1280px) 100vw, 66vw' : '(max-width: 1280px) 100vw, 33vw'}
-                    className="h-full w-full scale-[1.12] object-cover object-top transition-transform duration-300 group-hover:scale-[1.15]"
+                    className="h-full w-full scale-[1.12] object-cover object-top group-hover:scale-[1.15]"
                   />
                 </div>
                 <div className="space-y-2 px-5 py-5">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="text-base font-semibold text-[var(--accent)]">{shot.title}</h3>
-                    <span className="text-[0.68rem] uppercase tracking-[0.14em] text-[var(--text-dim)]">Repo asset</span>
+                    <span className="text-[0.68rem] uppercase tracking-[0.14em] text-[var(--text-dim)]">Open docs on GitHub</span>
                   </div>
                   <p className="text-sm leading-6 text-[var(--text-dim)]">{shot.desc}</p>
                 </div>
-              </div>
+              </a>
             ))}
           </div>
         </div>
