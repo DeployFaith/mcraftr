@@ -300,7 +300,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
         )}
         {shouldRenderTab('players') && (
           <div className={visibleTab === 'players' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'players'}>
-            <PlayersSection onPlayersChange={handlePlayersChange} />
+            <PlayersSection onPlayersChange={handlePlayersChange} minecraftVersion={minecraftVersion?.resolved ?? null} />
           </div>
         )}
         {shouldRenderTab('actions') && (
