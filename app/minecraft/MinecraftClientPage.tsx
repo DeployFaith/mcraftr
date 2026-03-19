@@ -31,9 +31,9 @@ const ALL_TABS: {
   { id: 'players', label: 'Players', Icon: Users },
   { id: 'actions', label: 'Actions', Icon: Zap },
   { id: 'worlds', label: 'Worlds', Icon: Trees },
-  { id: 'terminal', label: 'Terminal', Icon: SquareTerminal, adminOnly: true },
-  { id: 'admin', label: 'Admin', Icon: Shield, adminOnly: true },
   { id: 'chat', label: 'Chat', Icon: MessageSquare },
+  { id: 'admin', label: 'Admin', Icon: Shield, adminOnly: true },
+  { id: 'terminal', label: 'Terminal', Icon: SquareTerminal, adminOnly: true },
   { id: 'settings', label: 'Settings', Icon: Settings },
 ]
 

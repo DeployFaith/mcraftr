@@ -627,8 +627,7 @@ function PlayerPanel({
           {invOpen && (invLoading ? (
             <div className="text-[13px] font-mono text-[var(--text-dim)] animate-pulse">Loading inventory…</div>
           ) : (
-            <div className={selectedSlot ? 'grid gap-3 xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-start' : 'space-y-3'}>
-              <div className="space-y-3">
+            <div className="space-y-3">
                 {selectedSlot && (
                   <div className="space-y-2 rounded border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-2 py-2 text-[11px] font-mono text-[var(--text-dim)]">
                     <div>
@@ -667,6 +666,50 @@ function PlayerPanel({
                       >
                         Duplicate Stack
                       </button>
+                    </div>
+                  </div>
+                )}
+
+                {selectedSlot && (
+                  <div className="rounded-[24px] border border-[var(--accent-mid)] bg-[linear-gradient(180deg,rgba(82,190,255,0.14),rgba(8,11,16,0.94))] p-3 shadow-[0_18px_42px_rgba(0,0,0,0.28)] lg:max-w-[30rem]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-[10px] font-mono tracking-[0.35em] text-[var(--accent)]">ITEM CARD</div>
+                        <div className="mt-1 text-[16px] font-mono text-[var(--text)]">{selectedSlot.label}</div>
+                      </div>
+                      <span className="rounded-full border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-2 py-1 text-[10px] font-mono tracking-widest text-[var(--accent)]">
+                        {selectedInventoryItemMeta?.categoryLabel ?? 'Inventory'}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 rounded-[20px] border border-white/10 bg-black/15 p-2">
+                      <CatalogArtwork
+                        kind="item"
+                        label={selectedSlot.label}
+                        category={selectedInventoryItemMeta?.categoryLabel ?? 'Inventory'}
+                        imageUrl={selectedInventoryItemMeta?.imageUrl}
+                        art={selectedInventoryItemMeta?.art}
+                        className="h-40 w-full rounded-[16px] border border-white/10 object-contain"
+                      />
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {[
+                          ['Id', selectedSlot.id],
+                          ['Slot', slotLabel(selectedSlot.slot)],
+                          ['Count', String(selectedSlot.count)],
+                          ['Per Stack', String(selectedInventoryItemMeta?.maxStack ?? 64)],
+                        ].map(([label, value]) => (
+                          <div key={label} className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                            <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">{label}</div>
+                            <div className="mt-1 break-all text-[12px] font-mono text-[var(--text)]">{value}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {selectedSlot.enchants && (
+                        <div className="mt-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                          <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">Enchants</div>
+                          <div className="mt-1 text-[12px] font-mono text-[var(--accent)]">{selectedSlot.enchants}</div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -737,51 +780,6 @@ function PlayerPanel({
                 {inventory.length === 0 && (
                   <div className="text-[13px] font-mono text-[var(--text-dim)]">Pockets empty — nothing to see here</div>
                 )}
-              </div>
-
-              {selectedSlot && (
-                <div className="rounded-[24px] border border-[var(--accent-mid)] bg-[linear-gradient(180deg,rgba(82,190,255,0.14),rgba(8,11,16,0.94))] p-3 shadow-[0_18px_42px_rgba(0,0,0,0.28)] xl:sticky xl:top-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-[10px] font-mono tracking-[0.35em] text-[var(--accent)]">ITEM CARD</div>
-                        <div className="mt-1 text-[16px] font-mono text-[var(--text)]">{selectedSlot.label}</div>
-                      </div>
-                      <span className="rounded-full border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-2 py-1 text-[10px] font-mono tracking-widest text-[var(--accent)]">
-                        {selectedInventoryItemMeta?.categoryLabel ?? 'Inventory'}
-                      </span>
-                    </div>
-
-                    <div className="mt-3 rounded-[20px] border border-white/10 bg-black/15 p-2">
-                      <CatalogArtwork
-                        kind="item"
-                        label={selectedSlot.label}
-                        category={selectedInventoryItemMeta?.categoryLabel ?? 'Inventory'}
-                        imageUrl={selectedInventoryItemMeta?.imageUrl}
-                        art={selectedInventoryItemMeta?.art}
-                        className="h-40 w-full rounded-[16px] border border-white/10 object-contain"
-                      />
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        {[
-                          ['Id', selectedSlot.id],
-                          ['Slot', slotLabel(selectedSlot.slot)],
-                          ['Count', String(selectedSlot.count)],
-                          ['Per Stack', String(selectedInventoryItemMeta?.maxStack ?? 64)],
-                        ].map(([label, value]) => (
-                          <div key={label} className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
-                            <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">{label}</div>
-                            <div className="mt-1 break-all text-[12px] font-mono text-[var(--text)]">{value}</div>
-                          </div>
-                        ))}
-                      </div>
-                      {selectedSlot.enchants && (
-                        <div className="mt-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
-                          <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">Enchants</div>
-                          <div className="mt-1 text-[12px] font-mono text-[var(--accent)]">{selectedSlot.enchants}</div>
-                        </div>
-                      )}
-                    </div>
-                </div>
-              )}
             </div>
           ))}
         </div>
