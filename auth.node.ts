@@ -4,6 +4,13 @@ import { getUserByEmail, getUserById, validatePassword } from '@/lib/users'
 import { authConfig } from '@/auth'
 import { isDemoRestrictedUser } from '@/lib/demo-policy'
 
+function resolveDemoAdminAlias(username: string, host: string | null) {
+  if (username.trim() !== '_Dadmin') return username
+  const normalizedHost = host?.trim().toLowerCase() ?? ''
+  if (normalizedHost !== 'demo.mcraftr.deployfaith.xyz') return username
+  return process.env.MCRAFTR_ADMIN_USER?.trim() || username
+}
+
 // This file is Node.js only — it uses static imports of lib/users which
 // depends on fs, crypto, better-sqlite3, etc. It must NEVER be imported
 // by middleware.ts or any other Edge-bundled file.
@@ -20,9 +27,13 @@ export const { handlers, auth: nodeAuth, signIn, signOut } = NextAuth({
         username: { label: 'Email', type: 'text' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.username || !credentials?.password) return null
-        const user = getUserByEmail(credentials.username as string)
+        const username = resolveDemoAdminAlias(
+          credentials.username as string,
+          request.headers.get('host'),
+        )
+        const user = getUserByEmail(username)
         if (!user) return null
         if (!validatePassword(user, credentials.password as string)) return null
         return { id: user.id, name: user.email, email: user.email }
