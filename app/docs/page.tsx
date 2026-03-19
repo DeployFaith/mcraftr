@@ -1,10 +1,4 @@
 import type { Metadata } from 'next'
-import dashboardShot from '@/docs/screenshots/highlights/03-dashboard.png'
-import playersShot from '@/docs/screenshots/highlights/04-players.png'
-import worldsShot from '@/docs/screenshots/highlights/06-worlds.png'
-import terminalShot from '@/docs/screenshots/highlights/07-terminal.png'
-import settingsShot from '@/docs/screenshots/highlights/10-settings.png'
-import ProgressiveScreenshot from '@/app/components/ProgressiveScreenshot'
 import { PublicSiteFooter, PublicSiteHeader } from '@/app/components/PublicSiteChrome'
 
 const SUPPORT_URL = 'https://buymeacoffee.com/deployfaith'
@@ -40,7 +34,6 @@ export const metadata: Metadata = {
 
 const topNav = [
   { href: '#features', label: 'Features' },
-  { href: '#screenshots', label: 'Screenshots' },
   { href: '#modes', label: 'Modes' },
   { href: '#install', label: 'Install' },
   { href: '#faq', label: 'FAQ' },
@@ -105,44 +98,6 @@ const featureGroups = [
         desc: 'Theme packs, accent colors, fonts, sound effects, background music, avatars, and saved-server preferences.',
       },
     ],
-  },
-]
-
-const screenshots = [
-  {
-    src: dashboardShot,
-    alt: 'Mcraftr dashboard',
-    title: 'Dashboard',
-    desc: 'Server status, player activity, TPS, weather, and time in one view.',
-    href: `${REPO_URL}/blob/main/README.md#dashboard`,
-  },
-  {
-    src: playersShot,
-    alt: 'Mcraftr players',
-    title: 'Players',
-    desc: 'Live players, effects, location, vitals, and inventory inspection.',
-    href: `${REPO_URL}/blob/main/README.md#players`,
-  },
-  {
-    src: worldsShot,
-    alt: 'Mcraftr worlds',
-    title: 'Worlds',
-    desc: 'World views, structures, entities, maps, and richer workflows with Full Stack.',
-    href: `${REPO_URL}/blob/main/INSTALL.md#option-3-full-mcraftr-stack-with-docker-compose`,
-  },
-  {
-    src: terminalShot,
-    alt: 'Mcraftr terminal',
-    title: 'Terminal',
-    desc: 'Direct RCON access, plus admin workflows tied to schedules, audits, and controls.',
-    href: `${REPO_URL}/blob/main/README.md#admin`,
-  },
-  {
-    src: settingsShot,
-    alt: 'Mcraftr settings screen',
-    title: 'Personalization',
-    desc: 'Dark or light mode, theme packs, colors, fonts, sounds, and profile avatars.',
-    href: `${REPO_URL}/blob/main/README.md#personalization`,
   },
 ]
 
@@ -355,50 +310,6 @@ export default function DocsPage() {
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="screenshots" className="scroll-mt-24 border-y border-[var(--border)] bg-[var(--bg2)] px-4 py-24 sm:px-6 lg:py-28">
-        <div className="mx-auto max-w-7xl">
-          <SectionEyebrow>Screenshots</SectionEyebrow>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-2xl font-bold sm:text-3xl lg:text-[2.45rem]">Screenshots that lead somewhere useful</h2>
-              <p className="mt-4 max-w-2xl text-[1rem] leading-7 text-[var(--text-dim)]">
-                Each image links to the closest matching GitHub doc so you can go deeper fast.
-              </p>
-            </div>
-            <a
-              href={`${REPO_URL}/tree/main/docs/screenshots/highlights`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-[var(--text-dim)] transition-colors hover:text-[var(--accent)]"
-            >
-              Browse screenshot source on GitHub
-            </a>
-          </div>
-
-          <div className="mt-12 grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-            {screenshots.map((shot, index) => (
-              <a key={shot.title} href={shot.href} target="_blank" rel="noopener noreferrer" className={`group flex flex-col overflow-hidden rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel)] transition-all duration-200 hover:border-[var(--accent)] ${index === 0 ? 'xl:col-span-2' : ''}`}>
-                <div className="relative shrink-0 aspect-[16/10] overflow-hidden border-b border-[var(--border)] bg-[var(--bg)]/45">
-                  <ProgressiveScreenshot
-                    src={shot.src}
-                    alt={shot.alt}
-                    sizes={index === 0 ? '(max-width: 1280px) 100vw, 66vw' : '(max-width: 1280px) 100vw, 33vw'}
-                    className="h-full w-full scale-[1.12] object-cover object-top group-hover:scale-[1.15]"
-                  />
-                </div>
-                <div className="relative z-[1] space-y-2 px-5 pb-5 pt-[60px]">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-base font-semibold text-[var(--accent)]">{shot.title}</h3>
-                    <span className="text-[0.68rem] uppercase tracking-[0.14em] text-[var(--text-dim)]">Open docs on GitHub</span>
-                  </div>
-                  <p className="text-sm leading-6 text-[var(--text-dim)]">{shot.desc}</p>
-                </div>
-              </a>
-            ))}
           </div>
         </div>
       </section>
