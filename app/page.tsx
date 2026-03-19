@@ -16,7 +16,7 @@ import HeroProofChips from './components/HeroProofChips'
 import ProgressiveScreenshot from './components/ProgressiveScreenshot'
 import { PublicSiteFooter, PublicSiteHeader } from './components/PublicSiteChrome'
 
-const SUPPORT_URL = 'https://buymeacoffee.com/deployfaith'
+const COFFEE_URL = 'https://buymeacoffee.com/deployfaith'
 const REPO_URL = 'https://github.com/deployfaith/mcraftr'
 const DEMO_APP_URL = 'https://demo.mcraftr.deployfaith.xyz'
 const DEMO_LAUNCH_URL = `${DEMO_APP_URL}/demo`
@@ -160,7 +160,8 @@ const navLinks = [
 const headerActions = [
   { href: 'https://github.com/deployfaith/mcraftr', label: 'GitHub', external: true },
   { href: demoLaunchHref(), label: 'Demo', external: true },
-  { href: SUPPORT_URL, label: 'Support', external: true },
+  { href: COFFEE_URL, label: 'Coffee', external: true },
+  { href: '/support', label: 'Support' },
 ]
 
 const footerLinks = [

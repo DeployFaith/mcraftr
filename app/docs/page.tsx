@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { PublicSiteFooter, PublicSiteHeader } from '@/app/components/PublicSiteChrome'
 
-const SUPPORT_URL = 'https://buymeacoffee.com/deployfaith'
+const COFFEE_URL = 'https://buymeacoffee.com/deployfaith'
 const REPO_URL = 'https://github.com/deployfaith/mcraftr'
 const DEMO_APP_URL = 'https://demo.mcraftr.deployfaith.xyz'
 const DEMO_LAUNCH_URL = `${DEMO_APP_URL}/demo`
@@ -47,7 +47,8 @@ const docsHeaderNavLinks = [
 const docsHeaderActions = [
   { href: REPO_URL, label: 'GitHub', external: true },
   { href: demoLaunchHref(), label: 'Demo', external: true },
-  { href: SUPPORT_URL, label: 'Support', external: true },
+  { href: COFFEE_URL, label: 'Coffee', external: true },
+  { href: '/support', label: 'Support' },
 ]
 
 const docsFooterLinks = [
@@ -450,12 +451,12 @@ export default function DocsPage() {
               Open GitHub Repo
             </a>
             <a
-              href={SUPPORT_URL}
+              href={COFFEE_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="rounded-lg border border-[var(--border)] px-5 py-3 text-sm font-semibold text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
             >
-              Support Mcraftr
+              Coffee
             </a>
           </div>
         </div>
