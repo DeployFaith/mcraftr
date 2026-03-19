@@ -26,7 +26,7 @@ export const FEATURE_DEFS = [
   { key: 'enable_world_inventory', label: 'World Inventory', desc: 'Allow browsing world and integration inventory', category: 'actions' },
   { key: 'enable_world_build_tools', label: 'World Build Tools', desc: 'Allow curated WorldEdit and world actions', category: 'actions' },
   { key: 'enable_world_maps', label: 'World Maps', desc: 'Allow viewing linked map surfaces and map URLs', category: 'actions' },
-  { key: 'enable_plugin_stack_status', label: 'Integration Status', desc: 'Allow viewing bridge and sidecar health and versions', category: 'actions' },
+  { key: 'enable_plugin_stack_status', label: 'Integration Status', desc: 'Allow viewing bridge and beacon health and versions', category: 'actions' },
   { key: 'enable_world_spawn_tools', label: 'World Spawn Tools', desc: 'Allow resetting world spawn from coords or player location', category: 'actions' },
   { key: 'enable_structure_catalog', label: 'Structure Catalog', desc: 'Allow browsing, placing, and removing structures', category: 'actions' },
   { key: 'enable_entity_catalog', label: 'Entity Catalog', desc: 'Allow browsing and spawning entities', category: 'actions' },

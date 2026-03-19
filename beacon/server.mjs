@@ -9,9 +9,9 @@ import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 const nbt = require('prismarine-nbt')
 
-const PORT = parseInt(process.env.MCRAFTR_SIDECAR_PORT || '9419', 10)
-const HOST = process.env.MCRAFTR_SIDECAR_HOST || '0.0.0.0'
-const AUTH_TOKEN = process.env.MCRAFTR_SIDECAR_TOKEN || ''
+const PORT = parseInt(process.env.MCRAFTR_BEACON_PORT || process.env.MCRAFTR_SIDECAR_PORT || '9419', 10)
+const HOST = process.env.MCRAFTR_BEACON_HOST || process.env.MCRAFTR_SIDECAR_HOST || '0.0.0.0'
+const AUTH_TOKEN = process.env.MCRAFTR_BEACON_TOKEN || process.env.MCRAFTR_SIDECAR_TOKEN || ''
 const PLUGINS_DIR = process.env.MCRAFTR_PLUGINS_DIR || '/data/plugins'
 const WORLDS_DIR = process.env.MCRAFTR_WORLDS_DIR || '/data'
 const SCHEMATICS_DIRS = resolveSchematicDirs(process.env.MCRAFTR_SCHEMATICS_DIR)

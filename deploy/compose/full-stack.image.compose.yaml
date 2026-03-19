@@ -20,11 +20,11 @@ services:
     restart: unless-stopped
     entrypoint:
       - node
-      - sidecar/server.mjs
+      - beacon/server.mjs
     environment:
-      MCRAFTR_SIDECAR_HOST: 0.0.0.0
-      MCRAFTR_SIDECAR_PORT: 9419
-      MCRAFTR_SIDECAR_TOKEN: ${MCRAFTR_SIDECAR_TOKEN:-}
+      MCRAFTR_BEACON_HOST: 0.0.0.0
+      MCRAFTR_BEACON_PORT: 9419
+      MCRAFTR_BEACON_TOKEN: ${MCRAFTR_BEACON_TOKEN:-}
       MCRAFTR_PLUGINS_DIR: /data/plugins
       MCRAFTR_WORLDS_DIR: /data
       MCRAFTR_SCHEMATICS_DIR: ${MCRAFTR_SCHEMATICS_DIR:-}

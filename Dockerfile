@@ -26,7 +26,7 @@ RUN apk add --no-cache su-exec && addgroup -S -g 101 mcraftr && adduser -S -u 10
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/sidecar ./sidecar
+COPY --from=builder /app/beacon ./beacon
 COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 # Copy node_modules from deps stage (compiled for Alpine musl, not host glibc)
 # This ensures better-sqlite3 native addon runs correctly

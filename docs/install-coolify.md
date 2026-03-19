@@ -58,7 +58,7 @@ For the full product:
 - run Beacon as a second process/container using the same image with:
 
 ```text
-node sidecar/server.mjs
+npm run beacon
 ```
 
 - mount Minecraft server data read-only into Beacon at `/data`
