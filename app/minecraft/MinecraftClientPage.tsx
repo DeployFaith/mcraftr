@@ -165,7 +165,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
       (id: TabId) => visibleTab === id || visitedTabs.includes(id),
       [visibleTab, visitedTabs])
 
-  const mobileRailWidth = mobileNavOpen ? '13.5rem' : '4.75rem'
+  const mobileRailWidth = mobileNavOpen ? '12rem' : '3.75rem'
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-48px)]">
@@ -213,6 +213,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
           top: 'calc(3.5rem + env(safe-area-inset-top))',
           width: mobileRailWidth,
           background: 'rgba(10,10,15,0.94)',
+          boxShadow: mobileNavOpen ? '18px 0 40px rgba(0,0,0,0.28)' : 'none',
         }}
         aria-label="Mobile section navigation"
       >
@@ -288,8 +289,8 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
           visibleTab === 'terminal' ? 'max-w-[1600px]' : 'max-w-4xl'
         } ${
           mobileNavOpen
-            ? 'pl-[calc(13.5rem+0.75rem)] pr-3 sm:pr-4 md:pl-4 md:pr-4'
-            : 'pl-[calc(4.75rem+0.75rem)] pr-3 sm:pr-4 md:pl-4 md:pr-4'
+            ? 'pl-[calc(3.75rem+0.75rem)] pr-3 sm:pr-4 md:pl-4 md:pr-4'
+            : 'pl-[calc(3.75rem+0.75rem)] pr-3 sm:pr-4 md:pl-4 md:pr-4'
         }`}
         style={{ paddingBottom: '1rem' }}
       >
