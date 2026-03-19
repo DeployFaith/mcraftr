@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
-import { ChevronDown, LogOut, Menu, Plus, Server, UserRound } from 'lucide-react'
+import { ChevronDown, LogOut, Plus, Server, UserRound, X } from 'lucide-react'
 import { FONTS, FONT_SIZES, useTheme } from '@/app/components/ThemeProvider'
 import { loadMusicSettings, loadSoundSettings, saveMusicSettings, saveSoundSettings } from '@/app/components/soundfx'
 
@@ -278,20 +278,37 @@ export default function HeaderControls() {
         >
           <ChevronDown size={16} strokeWidth={2} className={`transition-transform ${open ? 'rotate-180' : 'rotate-0'}`} />
         </span>
-        <span className="sm:hidden" style={{ color: open ? 'var(--accent)' : 'var(--text-dim)' }}>
-          <Menu size={16} strokeWidth={2} />
-        </span>
       </button>
 
       {open && (
-        <div
-          className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4rem)] max-h-[calc(100dvh-env(safe-area-inset-top)-5rem-env(safe-area-inset-bottom))] overflow-y-auto overscroll-contain rounded-[24px] border p-4 shadow-[0_24px_64px_rgba(0,0,0,0.32)] backdrop-blur-2xl touch-pan-y [-webkit-overflow-scrolling:touch] sm:absolute sm:inset-x-auto sm:right-[-0.4rem] sm:top-[calc(100%+0.75rem)] sm:max-h-[min(82vh,42rem)] sm:w-[min(88vw,320px)]"
-          style={{
-            borderColor: 'var(--accent-mid)',
-            background: 'color-mix(in srgb, var(--panel) 92%, transparent)',
-          }}
-        >
+        <>
+          <button
+            type="button"
+            aria-label="Close account menu overlay"
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] sm:hidden"
+          />
+          <div
+            className="fixed inset-x-0 bottom-0 top-[calc(env(safe-area-inset-top)+3.5rem)] z-50 overflow-y-auto overscroll-contain rounded-t-[28px] border border-b-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[0_-24px_64px_rgba(0,0,0,0.42)] backdrop-blur-2xl touch-pan-y [-webkit-overflow-scrolling:touch] sm:absolute sm:inset-x-auto sm:right-[-0.4rem] sm:top-[calc(100%+0.75rem)] sm:z-40 sm:max-h-[min(82vh,42rem)] sm:w-[min(88vw,320px)] sm:rounded-[24px] sm:border-b"
+            style={{
+              borderColor: 'var(--accent-mid)',
+              background: 'color-mix(in srgb, var(--panel) 96%, transparent)',
+            }}
+          >
           <div className="space-y-4">
+            <div className="flex items-center justify-between sm:hidden">
+              <div>
+                <div className="text-[10px] font-mono uppercase tracking-[0.16em] text-[var(--accent)]">Account menu</div>
+                <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">Account, server, and quick preferences in one place.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="grid h-10 w-10 place-items-center rounded-2xl border border-[var(--border)] bg-[var(--panel)] text-[var(--text-dim)]"
+              >
+                <X size={16} strokeWidth={2} />
+              </button>
+            </div>
             <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg2) 74%, transparent)' }}>
               <div className="flex items-center gap-3">
                 {avatarSrc ? (
@@ -390,6 +407,7 @@ export default function HeaderControls() {
                 >
                   <option value="cyan">Cyan</option>
                   <option value="blue">Blue</option>
+                  <option value="green">Green</option>
                   <option value="purple">Purple</option>
                   <option value="pink">Pink</option>
                   <option value="orange">Orange</option>
@@ -502,7 +520,8 @@ export default function HeaderControls() {
               </button>
             </div>
           </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
   )

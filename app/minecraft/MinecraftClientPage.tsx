@@ -248,12 +248,12 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
                 <button
                   key={id}
                   onClick={() => handleTabChange(id)}
-                  className="tap-target flex items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-all"
-                  style={active
-                    ? {
-                        borderColor: 'var(--accent-mid)',
-                        background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--panel) 88%, transparent))',
-                        color: 'var(--accent)',
+                className="tap-target flex items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-all"
+                style={active
+                  ? {
+                        borderColor: 'transparent',
+                        background: 'var(--accent)',
+                        color: 'var(--bg)',
                       }
                     : {
                         borderColor: 'transparent',
@@ -266,7 +266,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
                   <span
                     className="grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-all"
                     style={active
-                      ? { background: 'var(--accent-dim)', color: 'var(--accent)' }
+                      ? { background: 'color-mix(in srgb, var(--bg) 16%, transparent)', color: 'var(--bg)' }
                       : { background: 'color-mix(in srgb, var(--panel) 74%, transparent)', color: 'var(--text-dim)' }}
                   >
                     <Icon size={18} color="currentColor" strokeWidth={1.9} />
