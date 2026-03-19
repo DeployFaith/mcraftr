@@ -35,14 +35,14 @@ export default function McraftrSwitch({
         className,
       )}
       style={{
-        borderColor: checked ? 'var(--accent-mid)' : 'var(--border)',
-        background: checked ? 'color-mix(in srgb, var(--accent-dim) 72%, transparent)' : 'var(--panel)',
+        borderColor: 'var(--border)',
+        background: 'var(--panel)',
       }}
     >
       {(label || description) && (
         <div className="min-w-0">
           {label && (
-            <div className="text-[12px] font-mono tracking-widest" style={{ color: checked ? 'var(--accent)' : 'var(--text)' }}>
+            <div className="text-[12px] font-mono tracking-widest" style={{ color: 'var(--text)' }}>
               {label}
             </div>
           )}
