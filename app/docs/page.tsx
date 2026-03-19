@@ -470,7 +470,7 @@ export default function DocsPage() {
               </div>
 
               <div className="mt-8 rounded-[1.6rem] border border-[var(--border)] bg-[var(--panel)] p-6">
-                <p className="text-[0.72rem] uppercase tracking-[0.16em] text-[var(--accent)]">Core environment variables</p>
+                <p className="text-[0.72rem] uppercase tracking-[0.16em] text-[var(--accent)]">Core env vars</p>
                 <div className="mt-4 flex flex-wrap gap-3">
                   {envVars.map((item) => (
                     <code key={item} className="rounded-full border border-[var(--border)] bg-[var(--bg)]/45 px-3 py-2 text-[0.78rem] text-[var(--text-dim)]">
