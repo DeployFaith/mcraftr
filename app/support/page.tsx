@@ -46,7 +46,7 @@ export default function SupportPage() {
               Discord support is coming soon.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-[var(--text-dim)] sm:text-lg">
-              This is a placeholder support page for a future Discord invite. For now, you can use the demo, browse the repo docs, or grab a Coffee link if you want to support the project directly.
+              This is a placeholder page for the future Discord invite. For now, use GitHub for docs and the demo if you want to explore the product.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -65,15 +65,6 @@ export default function SupportPage() {
                 className="rounded-lg border border-[var(--border)] bg-[var(--bg2)] px-6 py-3 text-sm font-semibold text-[var(--text)] transition-all hover:border-[var(--accent)]"
               >
                 Demo
-              </a>
-              <a
-                href={COFFEE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-lg px-6 py-3 text-sm font-semibold"
-                style={{ backgroundColor: 'var(--accent)', color: 'var(--bg)' }}
-              >
-                Coffee
               </a>
             </div>
           </div>
