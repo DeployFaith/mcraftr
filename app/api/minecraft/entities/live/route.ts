@@ -32,6 +32,8 @@ type LiveEntityResponse = {
   error?: string
 }
 
+const MAX_LIVE_ENTITIES = 200
+
 export async function GET(req: NextRequest) {
   const features = await getUserFeatureFlags(req)
   if (!checkFeatureAccess(features, 'enable_entity_catalog')) {
@@ -48,5 +50,16 @@ export async function GET(req: NextRequest) {
     }, { status: 502 })
   }
 
-  return Response.json({ ok: true, entities: bridge.data.entities ?? [] })
+  const entities = Array.isArray(bridge.data.entities) ? bridge.data.entities : []
+  const limitedEntities = entities.slice(0, MAX_LIVE_ENTITIES)
+
+  return Response.json({
+    ok: true,
+    entities: limitedEntities,
+    totalEntities: entities.length,
+    truncated: entities.length > limitedEntities.length,
+    warning: entities.length > limitedEntities.length
+      ? `Showing the first ${limitedEntities.length} live entities out of ${entities.length}.`
+      : null,
+  })
 }
