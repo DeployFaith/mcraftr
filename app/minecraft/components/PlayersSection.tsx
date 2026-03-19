@@ -627,9 +627,9 @@ function PlayerPanel({
           {invOpen && (invLoading ? (
             <div className="text-[13px] font-mono text-[var(--text-dim)] animate-pulse">Loading inventory…</div>
           ) : (
-            <div className="space-y-3">
-              {selectedSlot && (
-                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+            <div className={selectedSlot ? 'grid gap-3 xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-start' : 'space-y-3'}>
+              <div className="space-y-3">
+                {selectedSlot && (
                   <div className="space-y-2 rounded border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-2 py-2 text-[11px] font-mono text-[var(--text-dim)]">
                     <div>
                       <span className="text-[var(--accent)]">{selectedSlot.label}</span> selected — click an empty slot or matching stack to move, or click the selected item to deselect
@@ -669,11 +669,81 @@ function PlayerPanel({
                       </button>
                     </div>
                   </div>
+                )}
 
-                  <div className="rounded-[24px] border border-[var(--accent-mid)] bg-[linear-gradient(180deg,rgba(82,190,255,0.14),rgba(8,11,16,0.94))] p-3 shadow-[0_18px_42px_rgba(0,0,0,0.28)]">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-[10px] font-mono tracking-[0.35em] text-[var(--accent)]">ITEM CARD</div>
+                {deleteError && (
+                  <div className="text-[13px] font-mono text-red-400 px-2 py-1 rounded border border-red-900/50 bg-red-950/30">
+                    ✗ {deleteError}
+                  </div>
+                )}
+                <div>
+                  <div className="text-[13px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">HOTBAR</div>
+                  <div className="flex flex-wrap gap-1">
+                    {hotbar.map((item, i) => (
+                      <InvSlot key={i} item={item} slotIndex={i}
+                        selected={!!item && selectedSlot?.slot === item.slot}
+                        moveTarget={!!selectedSlot && ((!item) || (item.id === selectedSlot.id && item.slot !== selectedSlot.slot))}
+                        onMoveTargetHold={() => handleSlotHoldToMove(item?.slot ?? i, selectedSlot)}
+                        onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
+                        onSlotClick={() => handleSlotClick(item, item?.slot ?? i, selectedSlot)}
+                        deleting={item ? deletingSlot === item.slot : false}
+                       />
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[13px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">ARMOR / OFFHAND</div>
+                  <div className="flex gap-1 flex-wrap items-center">
+                    {armor.map((item, i) => {
+                      const armorSlots = [103, 102, 101, 100]
+                      const s = armorSlots[i]
+                      return (
+                        <InvSlot key={i} item={item} slotIndex={s}
+                          selected={!!item && selectedSlot?.slot === item.slot}
+                          moveTarget={!!selectedSlot && ((!item) || (item.id === selectedSlot.id && item.slot !== selectedSlot.slot))}
+                          onMoveTargetHold={() => handleSlotHoldToMove(item?.slot ?? s, selectedSlot)}
+                          onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
+                          onSlotClick={() => handleSlotClick(item, item?.slot ?? s, selectedSlot)}
+                          deleting={item ? deletingSlot === item.slot : false}
+                        />
+                      )
+                    })}
+                    <div className="w-px h-8 bg-[var(--border)] mx-1.5" />
+                    <InvSlot item={offhand} slotIndex={150}
+                      selected={!!offhand && selectedSlot?.slot === 150}
+                      moveTarget={!!selectedSlot && ((!offhand) || (offhand.id === selectedSlot.id && offhand.slot !== selectedSlot.slot))}
+                      onMoveTargetHold={() => handleSlotHoldToMove(offhand?.slot ?? 150, selectedSlot)}
+                      onDelete={offhand ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
+                      onSlotClick={() => handleSlotClick(offhand, offhand?.slot ?? 150, selectedSlot)}
+                      deleting={offhand ? deletingSlot === 150 : false}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[13px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">MAIN</div>
+                  <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(9, 2.5rem)' }}>
+                    {main.map((item, i) => (
+                      <InvSlot key={i} item={item} slotIndex={i + 9}
+                        selected={!!item && selectedSlot?.slot === item.slot}
+                        moveTarget={!!selectedSlot && ((!item) || (item.id === selectedSlot.id && item.slot !== selectedSlot.slot))}
+                        onMoveTargetHold={() => handleSlotHoldToMove(item?.slot ?? (i + 9), selectedSlot)}
+                        onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
+                        onSlotClick={() => handleSlotClick(item, item?.slot ?? (i + 9), selectedSlot)}
+                        deleting={item ? deletingSlot === item.slot : false}
+                      />
+                    ))}
+                  </div>
+                </div>
+                {inventory.length === 0 && (
+                  <div className="text-[13px] font-mono text-[var(--text-dim)]">Pockets empty — nothing to see here</div>
+                )}
+              </div>
+
+              {selectedSlot && (
+                <div className="rounded-[24px] border border-[var(--accent-mid)] bg-[linear-gradient(180deg,rgba(82,190,255,0.14),rgba(8,11,16,0.94))] p-3 shadow-[0_18px_42px_rgba(0,0,0,0.28)] xl:sticky xl:top-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[10px] font-mono tracking-[0.35em] text-[var(--accent)]">ITEM CARD</div>
                         <div className="mt-1 text-[16px] font-mono text-[var(--text)]">{selectedSlot.label}</div>
                       </div>
                       <span className="rounded-full border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-2 py-1 text-[10px] font-mono tracking-widest text-[var(--accent)]">
@@ -710,74 +780,7 @@ function PlayerPanel({
                         </div>
                       )}
                     </div>
-                  </div>
                 </div>
-              )}
-              {deleteError && (
-                <div className="text-[13px] font-mono text-red-400 px-2 py-1 rounded border border-red-900/50 bg-red-950/30">
-                  ✗ {deleteError}
-                </div>
-              )}
-              <div>
-                <div className="text-[13px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">HOTBAR</div>
-                <div className="flex flex-wrap gap-1">
-                  {hotbar.map((item, i) => (
-                    <InvSlot key={i} item={item} slotIndex={i}
-                      selected={!!item && selectedSlot?.slot === item.slot}
-                      moveTarget={!!selectedSlot && ((!item) || (item.id === selectedSlot.id && item.slot !== selectedSlot.slot))}
-                      onMoveTargetHold={() => handleSlotHoldToMove(item?.slot ?? i, selectedSlot)}
-                      onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
-                      onSlotClick={() => handleSlotClick(item, item?.slot ?? i, selectedSlot)}
-                      deleting={item ? deletingSlot === item.slot : false}
-                     />
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="text-[13px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">ARMOR / OFFHAND</div>
-                <div className="flex gap-1 flex-wrap items-center">
-                  {armor.map((item, i) => {
-                    const armorSlots = [103, 102, 101, 100]
-                    const s = armorSlots[i]
-                    return (
-                      <InvSlot key={i} item={item} slotIndex={s}
-                        selected={!!item && selectedSlot?.slot === item.slot}
-                        moveTarget={!!selectedSlot && ((!item) || (item.id === selectedSlot.id && item.slot !== selectedSlot.slot))}
-                        onMoveTargetHold={() => handleSlotHoldToMove(item?.slot ?? s, selectedSlot)}
-                        onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
-                        onSlotClick={() => handleSlotClick(item, item?.slot ?? s, selectedSlot)}
-                        deleting={item ? deletingSlot === item.slot : false}
-                      />
-                    )
-                  })}
-                  <div className="w-px h-8 bg-[var(--border)] mx-1.5" />
-                  <InvSlot item={offhand} slotIndex={150}
-                    selected={!!offhand && selectedSlot?.slot === 150}
-                    moveTarget={!!selectedSlot && ((!offhand) || (offhand.id === selectedSlot.id && offhand.slot !== selectedSlot.slot))}
-                    onMoveTargetHold={() => handleSlotHoldToMove(offhand?.slot ?? 150, selectedSlot)}
-                    onDelete={offhand ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
-                    onSlotClick={() => handleSlotClick(offhand, offhand?.slot ?? 150, selectedSlot)}
-                    deleting={offhand ? deletingSlot === 150 : false}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="text-[13px] font-mono text-[var(--text-dim)] mb-1.5 tracking-widest">MAIN</div>
-                <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(9, 2.5rem)' }}>
-                  {main.map((item, i) => (
-                    <InvSlot key={i} item={item} slotIndex={i + 9}
-                      selected={!!item && selectedSlot?.slot === item.slot}
-                      moveTarget={!!selectedSlot && ((!item) || (item.id === selectedSlot.id && item.slot !== selectedSlot.slot))}
-                      onMoveTargetHold={() => handleSlotHoldToMove(item?.slot ?? (i + 9), selectedSlot)}
-                      onDelete={item ? (it) => setConfirmModal({ title: 'Clear item?', body: it.label, confirmLabel: 'Clear', destructive: true, onConfirm: () => { setConfirmModal(null); deleteItem(it) } }) : undefined}
-                      onSlotClick={() => handleSlotClick(item, item?.slot ?? (i + 9), selectedSlot)}
-                      deleting={item ? deletingSlot === item.slot : false}
-                    />
-                  ))}
-                </div>
-              </div>
-              {inventory.length === 0 && (
-                <div className="text-[13px] font-mono text-[var(--text-dim)]">Pockets empty — nothing to see here</div>
               )}
             </div>
           ))}
