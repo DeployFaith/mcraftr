@@ -498,6 +498,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
       const payload = await response.json()
       if (payload.ok) {
         setLiveEntities(Array.isArray(payload.entities) ? payload.entities as LiveEntity[] : [])
+        if (payload.warning) addToast('error', payload.warning)
       } else {
         addToast('error', payload.error || 'Failed to load live entities')
       }
