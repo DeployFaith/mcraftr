@@ -86,25 +86,25 @@ function safeJoin(root, name) {
   return full
 }
 
-function resolveSchematicDirs(raw) {
-  const fallback = [
-    '/data/plugins/FastAsyncWorldEdit/schematics',
-    '/data/plugins/WorldEdit/schematics',
-  ]
+function resolveConfiguredDirs(raw, fallback) {
   const values = (raw || '')
     .split(/[,:]/)
     .map(value => value.trim())
     .filter(Boolean)
-  return Array.from(new Set((values.length > 0 ? values : fallback).map(value => path.resolve(value))))
+  return Array.from(new Set((values.length > 0 ? values : fallback).map(value => (
+    path.isAbsolute(value) ? path.resolve(value) : safeJoin(WORLDS_DIR, value)
+  ))))
+}
+
+function resolveSchematicDirs(raw) {
+  return resolveConfiguredDirs(raw, [
+    '/data/plugins/FastAsyncWorldEdit/schematics',
+    '/data/plugins/WorldEdit/schematics',
+  ])
 }
 
 function resolveEntityPresetDirs(raw) {
-  const fallback = ['/data/mcraftr/entity-presets']
-  const values = (raw || '')
-    .split(/[,:]/)
-    .map(value => value.trim())
-    .filter(Boolean)
-  return Array.from(new Set((values.length > 0 ? values : fallback).map(value => path.resolve(value))))
+  return resolveConfiguredDirs(raw, ['/data/mcraftr/entity-presets'])
 }
 
 function displayPath(value) {
