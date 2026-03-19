@@ -18,7 +18,7 @@ function demoLaunchHref(returnTo = '/minecraft') {
 
 export const metadata: Metadata = {
   title: 'Mcraftr Docs',
-  description: 'Docs for Mcraftr, the self-hosted Minecraft admin panel for fast, opinionated server management over RCON.',
+  description: 'The fast path to understanding Mcraftr.',
   alternates: {
     canonical: 'https://mcraftr.deployfaith.xyz/docs',
   },
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     type: 'website',
     url: 'https://mcraftr.deployfaith.xyz/docs',
     title: 'Mcraftr Docs',
-    description: 'Product docs, install guidance, setup modes, screenshots, and repo links for Mcraftr.',
+    description: 'Everything you need to learn the product, choose a setup path, and jump into the right GitHub docs.',
     images: [
       {
         url: 'https://mcraftr.deployfaith.xyz/social-card-v2.png',
@@ -69,19 +69,19 @@ const featureGroups = [
     items: [
       {
         name: 'Dashboard',
-        desc: 'Current server status, player count, TPS, time, weather, and quick paths into the sections you actually use.',
+        desc: 'See server status, player count, TPS, weather, and key actions at a glance.',
       },
       {
         name: 'Players',
-        desc: 'Live player list, recent player context, vitals, effects, inventory inspection, and moderation tools.',
+        desc: 'Inspect live players, view vitals and inventory, and handle moderation faster.',
       },
       {
         name: 'Actions',
-        desc: 'High-frequency server commands, weather and time controls, teleport flows, kits, items, and routine admin shortcuts.',
+        desc: 'Run common admin actions for time, weather, kits, teleporting, and more.',
       },
       {
         name: 'Worlds',
-        desc: 'World-aware workflows instead of a flat command box, with richer context when you run the full stack.',
+        desc: 'Unlock world-aware workflows when running the full Mcraftr stack.',
       },
     ],
   },
@@ -90,11 +90,11 @@ const featureGroups = [
     items: [
       {
         name: 'Terminal',
-        desc: 'Raw RCON when you need direct control, with command discovery and docs-oriented flows built around it.',
+        desc: 'Use raw RCON directly when you want full manual control.',
       },
       {
         name: 'Admin',
-        desc: 'Moderation, schedules, audit history, server controls, user management, and feature policy controls in one place.',
+        desc: 'Manage policies, schedules, audit history, users, and server controls.',
       },
       {
         name: 'Chat',
@@ -111,30 +111,30 @@ const featureGroups = [
 const screenshots = [
   {
     src: dashboardShot,
-    alt: 'Mcraftr dashboard overview',
-    title: 'Dashboard view',
-    desc: 'Current server status, online player count, TPS, weather, and time snapshot.',
+    alt: 'Mcraftr dashboard',
+    title: 'Dashboard',
+    desc: 'Server status, player activity, TPS, weather, and time in one view.',
     href: `${REPO_URL}/blob/main/README.md#dashboard`,
   },
   {
     src: playersShot,
-    alt: 'Mcraftr players panel',
-    title: 'Player context',
-    desc: 'Live player list, vitals, effects, location, and inventory inspection.',
+    alt: 'Mcraftr players',
+    title: 'Players',
+    desc: 'Live players, effects, location, vitals, and inventory inspection.',
     href: `${REPO_URL}/blob/main/README.md#players`,
   },
   {
     src: worldsShot,
-    alt: 'Mcraftr worlds panel',
-    title: 'World-aware tools',
-    desc: 'Full Stack setup for worlds, structures, entities, maps, and richer workflows.',
+    alt: 'Mcraftr worlds',
+    title: 'Worlds',
+    desc: 'World views, structures, entities, maps, and richer workflows with Full Stack.',
     href: `${REPO_URL}/blob/main/INSTALL.md#option-3-full-mcraftr-stack-with-docker-compose`,
   },
   {
     src: terminalShot,
-    alt: 'Mcraftr server terminal',
-    title: 'Terminal workspace',
-    desc: 'Server terminal inside Admin, alongside schedules, audit history, and user controls.',
+    alt: 'Mcraftr terminal',
+    title: 'Terminal',
+    desc: 'Direct RCON access, plus admin workflows tied to schedules, audits, and controls.',
     href: `${REPO_URL}/blob/main/README.md#admin`,
   },
   {
@@ -149,31 +149,31 @@ const screenshots = [
 const modeCards = [
   {
     title: 'Quick Connect',
-    eyebrow: 'Fastest path',
-    desc: 'RCON-only compatibility mode for the fastest setup and broad support. Best when you just want a better server operations UI in front of the server you already run.',
+    eyebrow: 'Fastest setup',
+    desc: 'RCON-only setup',
     bullets: [
-      'Requires a reachable RCON endpoint and the normal app stack',
-      'No Bridge or Beacon required',
-      'Best for broad compatibility and shortest setup time',
+      'RCON-only setup',
+      'No extra Mcraftr-side services required',
+      'Best for getting started quickly',
     ],
   },
   {
     title: 'Full Mcraftr Stack',
-    eyebrow: 'Recommended path',
-    desc: 'Adds Bridge and Beacon to unlock richer world-aware operations, structure and entity catalogs, previews, and filesystem-backed Minecraft context.',
+    eyebrow: 'Recommended experience',
+    desc: 'Adds world-aware workflows and richer server context',
     bullets: [
-      'RCON still handles normal command execution',
-      'Bridge exposes Minecraft-side workflows plain RCON cannot model cleanly',
-      'Beacon gives Mcraftr access to Minecraft-side data paths for richer context',
+      'Adds world-aware workflows and richer server context',
+      'Unlocks structures, entities, previews, and deeper tooling',
+      'Best for the full Mcraftr experience',
     ],
   },
 ]
 
 const installSteps = [
-  'Clone the repo and run `npm run setup:env` to generate a working `.env`.',
-  'Review at least `NEXTAUTH_URL`, `MCRAFTR_ADMIN_USER`, and `MCRAFTR_ADMIN_PASS`.',
-  'Start Mcraftr with `docker compose up -d --build`.',
-  'Open `http://localhost:3054`, sign in, and add your server with Quick Connect or Full Mcraftr Stack.',
+  'Run `npm run setup:env`',
+  'Review `NEXTAUTH_URL`, `MCRAFTR_ADMIN_USER`, and `MCRAFTR_ADMIN_PASS`',
+  'Start the app with `docker compose up -d --build`',
+  'Open `http://localhost:3054` and choose Quick Connect or Full Stack',
 ]
 
 const envVars = [
@@ -183,20 +183,13 @@ const envVars = [
   'MCRAFTR_ADMIN_PASS',
   'MCRAFTR_ENC_KEY',
   'REDIS_URL',
-  'DATA_DIR',
-  'ALLOW_REGISTRATION',
 ]
 
 const platformGuides = [
   {
-    title: 'Coolify',
-    desc: 'Run Mcraftr as one app service with Redis and a persistent `/app/data` volume. Expose port `3050` and add Beacon if you want the full stack.',
-    href: `${REPO_URL}/blob/main/docs/install-coolify.md`,
-  },
-  {
-    title: 'Portainer',
-    desc: 'Use the shipped compose files as stack templates for local build, Quick Connect image deploys, or full-stack image deploys.',
-    href: `${REPO_URL}/blob/main/docs/install-portainer.md`,
+    title: 'Deploy',
+    desc: 'Docker Compose, prebuilt image, Dokploy, Coolify, and Portainer self-hosting paths.',
+    href: `${REPO_URL}/blob/main/INSTALL.md#platform-notes`,
   },
   {
     title: 'Theme packs',
@@ -206,40 +199,32 @@ const platformGuides = [
 ]
 
 const repoDocs = [
-  { label: 'GitHub repo', href: REPO_URL },
-  { label: 'README', href: `${REPO_URL}/blob/main/README.md` },
-  { label: 'Install guide', href: `${REPO_URL}/blob/main/INSTALL.md` },
-  { label: 'Theme packs', href: `${REPO_URL}/blob/main/docs/theme-packs.md` },
-  { label: 'Coolify install', href: `${REPO_URL}/blob/main/docs/install-coolify.md` },
-  { label: 'Portainer install', href: `${REPO_URL}/blob/main/docs/install-portainer.md` },
-  { label: 'Roadmap', href: `${REPO_URL}/blob/main/ROADMAP.md` },
-  { label: 'Contributing', href: `${REPO_URL}/blob/main/CONTRIBUTING.md` },
+  { label: 'GitHub repo', href: REPO_URL, desc: 'Project source, documentation, and release history in one place.' },
+  { label: 'README', href: `${REPO_URL}/blob/main/README.md`, desc: 'Product overview, feature set, and quick start.' },
+  { label: 'Install Guide', href: `${REPO_URL}/blob/main/INSTALL.md`, desc: 'Setup steps for Quick Connect and Full Stack.' },
+  { label: 'Deploy', href: `${REPO_URL}/blob/main/INSTALL.md#platform-notes`, desc: 'Docker Compose, prebuilt image, Dokploy, Coolify, and Portainer.' },
 ]
 
 const faq = [
   {
     q: 'What is Mcraftr?',
-    a: 'Mcraftr is a self-hosted Minecraft admin panel for fast server management over RCON, with an optional richer full-stack mode when you want more Minecraft-side context.',
+    a: 'Mcraftr is a self-hosted Minecraft admin panel built for fast server management over RCON.',
   },
   {
     q: 'Do I need to change hosts?',
-    a: 'No. Mcraftr is built to sit in front of the server you already run as long as the app can reach it over RCON.',
+    a: 'No. Mcraftr is built to work with the server you already run.',
   },
   {
-    q: 'What is the difference between Quick Connect and Full Mcraftr Stack?',
-    a: 'Quick Connect is the shortest RCON-first path. Full Mcraftr Stack adds Bridge and Beacon for richer world-aware workflows, previews, and filesystem-backed context.',
+    q: 'Quick Connect or Full Stack?',
+    a: 'Use Quick Connect for the fastest setup. Use Full Stack for the full feature set and deeper workflows.',
   },
   {
-    q: 'What does Mcraftr need at runtime?',
-    a: 'The app needs a Mcraftr app runtime, Redis, persistent storage for `/app/data`, and a reachable RCON endpoint. Full Stack additionally needs Bridge and Beacon.',
+    q: 'What does it need?',
+    a: 'At minimum, a reachable RCON endpoint. Full Stack adds extra services for richer context.',
   },
   {
-    q: 'Can I try it before I install it?',
-    a: 'Yes. The public demo creates or reuses a temporary demo account in your browser. It is shared, resets every 12 hours, and is meant for trying the real interface quickly.',
-  },
-  {
-    q: 'Is the docs page the only source of truth?',
-    a: 'No. This page is a landing-friendly summary. The GitHub repo docs are linked throughout this page so you can jump straight to the full source documentation.',
+    q: 'Can I try it first?',
+    a: 'Yes. Open the demo to explore the interface before installing.',
   },
 ]
 
@@ -279,14 +264,12 @@ export default function DocsPage() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,color-mix(in_srgb,var(--accent)_15%,transparent),transparent_38%),linear-gradient(180deg,color-mix(in_srgb,var(--bg2)_82%,transparent),transparent_100%)]" />
         <div className="relative mx-auto grid max-w-7xl gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] lg:items-start lg:gap-12">
           <div className="max-w-3xl">
-            <SectionEyebrow>Mcraftr docs</SectionEyebrow>
+            <SectionEyebrow>Mcraftr Docs</SectionEyebrow>
             <h1 className="max-w-3xl text-[2.6rem] font-bold leading-[0.94] sm:text-5xl lg:text-[4.2rem] lg:tracking-[-0.05em]" style={{ fontFamily: 'var(--font-operator)' }}>
-              The landing-page version of the docs,
-              <br />
-              <span className="text-[var(--accent)]">with the repo one click away.</span>
+              The fast path to understanding Mcraftr.
             </h1>
             <p className="mt-6 max-w-2xl text-[1rem] leading-7 text-[var(--text-dim)] sm:text-[1.08rem] sm:leading-8">
-              This page pulls together the important product, setup, and installation guidance already living in the repository. It is built for scanning quickly on the public site, while still linking back to the GitHub docs for the full source material.
+              Everything you need to learn the product, choose a setup path, and jump into the right GitHub docs.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -306,7 +289,7 @@ export default function DocsPage() {
                 className="rounded-lg border px-6 py-3.5 text-sm font-semibold transition-all duration-200 hover:border-[var(--accent)] hover:text-[var(--accent)]"
                 style={{ borderColor: 'var(--border)' }}
               >
-                View Repo Docs
+                Browse Repo Docs
               </a>
               <a
                 href={REPO_URL}
@@ -319,24 +302,12 @@ export default function DocsPage() {
               </a>
             </div>
 
-            <div className="mt-10 grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-[var(--border)] bg-[color:color-mix(in_srgb,var(--panel)_88%,transparent)] p-4">
-                <p className="text-[0.7rem] uppercase tracking-[0.16em] text-[var(--accent)]">Quick Connect</p>
-                <p className="mt-2 text-sm leading-6 text-[var(--text-dim)]">RCON-only path for the shortest install and the broadest compatibility.</p>
-              </div>
-              <div className="rounded-2xl border border-[var(--border)] bg-[color:color-mix(in_srgb,var(--panel)_88%,transparent)] p-4">
-                <p className="text-[0.7rem] uppercase tracking-[0.16em] text-[var(--accent)]">Full Stack</p>
-                <p className="mt-2 text-sm leading-6 text-[var(--text-dim)]">Bridge and Beacon unlock richer world-aware operations and Minecraft-side context.</p>
-              </div>
-              <div className="rounded-2xl border border-[var(--border)] bg-[color:color-mix(in_srgb,var(--panel)_88%,transparent)] p-4">
-                <p className="text-[0.7rem] uppercase tracking-[0.16em] text-[var(--accent)]">Repo-backed</p>
-                <p className="mt-2 text-sm leading-6 text-[var(--text-dim)]">Every major section on this page includes direct links back to the source docs on GitHub.</p>
-              </div>
-            </div>
           </div>
 
           <div className="rounded-[1.75rem] border border-[var(--border)] bg-[color:color-mix(in_srgb,var(--panel)_92%,transparent)] p-5 shadow-2xl">
-            <p className="text-[0.72rem] uppercase tracking-[0.18em] text-[var(--accent)]">Docs index</p>
+            <p className="text-[0.72rem] uppercase tracking-[0.18em] text-[var(--accent)]">Core docs</p>
+            <h2 className="mt-3 text-xl font-semibold text-[var(--text)]">Start with the source of truth</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-dim)]">Go straight to the repo for the full picture, from setup to deployment.</p>
             <div className="mt-4 grid gap-3">
               {repoDocs.map((item) => (
                 <a
@@ -350,6 +321,7 @@ export default function DocsPage() {
                     <span className="text-sm font-medium text-[var(--text)]">{item.label}</span>
                     <span className="text-[0.68rem] uppercase tracking-[0.14em] text-[var(--text-dim)] transition-colors group-hover:text-[var(--accent)]">GitHub</span>
                   </div>
+                  <p className="mt-1 text-sm leading-6 text-[var(--text-dim)]">{item.desc}</p>
                 </a>
               ))}
             </div>
@@ -362,18 +334,10 @@ export default function DocsPage() {
           <SectionEyebrow>Features</SectionEyebrow>
           <div className="grid gap-10 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
             <div>
-              <h2 className="text-2xl font-bold sm:text-3xl lg:text-[2.45rem]">What the product actually covers</h2>
+              <h2 className="text-2xl font-bold sm:text-3xl lg:text-[2.45rem]">The core surfaces</h2>
               <p className="mt-4 max-w-xl text-[1rem] leading-7 text-[var(--text-dim)]">
-                Mcraftr is built for people who already have a Minecraft server and want a cleaner operations panel in front of it. It is not trying to become a generic hosting controller, file manager, plugin installer, or Docker host panel.
+                Mcraftr is built to help you run the Minecraft server you already have, not replace your entire stack.
               </p>
-              <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--bg2)] p-5">
-                <p className="text-[0.72rem] uppercase tracking-[0.16em] text-[var(--accent)]">Source docs</p>
-                <div className="mt-3 flex flex-wrap gap-3 text-sm">
-                  <a href={`${REPO_URL}/blob/main/README.md#why-mcraftr`} target="_blank" rel="noopener noreferrer" className="text-[var(--text-dim)] transition-colors hover:text-[var(--accent)]">Why Mcraftr</a>
-                  <a href={`${REPO_URL}/blob/main/README.md#main-features`} target="_blank" rel="noopener noreferrer" className="text-[var(--text-dim)] transition-colors hover:text-[var(--accent)]">Main Features</a>
-                  <a href={`${REPO_URL}/blob/main/README.md#what-mcraftr-is-not`} target="_blank" rel="noopener noreferrer" className="text-[var(--text-dim)] transition-colors hover:text-[var(--accent)]">What it is not</a>
-                </div>
-              </div>
             </div>
 
             <div className="grid gap-5 xl:grid-cols-2">
@@ -400,9 +364,9 @@ export default function DocsPage() {
           <SectionEyebrow>Screenshots</SectionEyebrow>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-2xl font-bold sm:text-3xl lg:text-[2.45rem]">Real product screens from the repo</h2>
+              <h2 className="text-2xl font-bold sm:text-3xl lg:text-[2.45rem]">Screenshots that lead somewhere useful</h2>
               <p className="mt-4 max-w-2xl text-[1rem] leading-7 text-[var(--text-dim)]">
-                The landing page already uses the repo screenshot set, so this docs page keeps the same source of truth. These are not concept mocks or fake admin dashboards.
+                Each image links to the closest matching GitHub doc so you can go deeper fast.
               </p>
             </div>
             <a
@@ -417,8 +381,8 @@ export default function DocsPage() {
 
           <div className="mt-12 grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
             {screenshots.map((shot, index) => (
-              <a key={shot.title} href={shot.href} target="_blank" rel="noopener noreferrer" className={`group overflow-hidden rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel)] transition-all duration-200 hover:border-[var(--accent)] ${index === 0 ? 'xl:col-span-2' : ''}`}>
-                <div className="relative aspect-[16/10] overflow-hidden border-b border-[var(--border)] bg-[var(--bg)]/45">
+              <a key={shot.title} href={shot.href} target="_blank" rel="noopener noreferrer" className={`group flex flex-col overflow-hidden rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel)] transition-all duration-200 hover:border-[var(--accent)] ${index === 0 ? 'xl:col-span-2' : ''}`}>
+                <div className="relative shrink-0 aspect-[16/10] overflow-hidden border-b border-[var(--border)] bg-[var(--bg)]/45">
                   <ProgressiveScreenshot
                     src={shot.src}
                     alt={shot.alt}
@@ -426,7 +390,7 @@ export default function DocsPage() {
                     className="h-full w-full scale-[1.12] object-cover object-top group-hover:scale-[1.15]"
                   />
                 </div>
-                <div className="space-y-2 px-5 py-5">
+                <div className="relative z-[1] space-y-2 px-5 pb-5 pt-[60px]">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="text-base font-semibold text-[var(--accent)]">{shot.title}</h3>
                     <span className="text-[0.68rem] uppercase tracking-[0.14em] text-[var(--text-dim)]">Open docs on GitHub</span>
@@ -442,9 +406,9 @@ export default function DocsPage() {
       <section id="modes" className="scroll-mt-24 px-4 py-24 sm:px-6 lg:py-28">
         <div className="mx-auto max-w-7xl">
           <SectionEyebrow>Modes</SectionEyebrow>
-          <h2 className="text-2xl font-bold sm:text-3xl lg:text-[2.45rem]">Choose the setup that matches your server</h2>
+          <h2 className="text-2xl font-bold sm:text-3xl lg:text-[2.45rem]">Choose the setup that fits your server</h2>
           <p className="mt-4 max-w-3xl text-[1rem] leading-7 text-[var(--text-dim)]">
-            Mcraftr always needs a reachable RCON endpoint. From there, you can run the simple path with Quick Connect or add the rest of the Mcraftr stack when you want richer world-aware operations.
+            Both modes start with a working RCON connection. Full Stack adds deeper Minecraft-side context and richer workflows.
           </p>
 
           <div className="mt-10 grid gap-6 lg:grid-cols-2">
@@ -465,25 +429,6 @@ export default function DocsPage() {
             ))}
           </div>
 
-          <div className="mt-10 grid gap-5 lg:grid-cols-3">
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg2)] p-5">
-              <p className="text-sm font-semibold text-[var(--text)]">RCON</p>
-              <p className="mt-2 text-sm leading-6 text-[var(--text-dim)]">Handles normal command execution and baseline server interaction.</p>
-            </div>
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg2)] p-5">
-              <p className="text-sm font-semibold text-[var(--text)]">Bridge</p>
-              <p className="mt-2 text-sm leading-6 text-[var(--text-dim)]">Exposes richer Minecraft-side operations that plain RCON cannot model cleanly.</p>
-            </div>
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg2)] p-5">
-              <p className="text-sm font-semibold text-[var(--text)]">Beacon</p>
-              <p className="mt-2 text-sm leading-6 text-[var(--text-dim)]">Gives Mcraftr read access to Minecraft-side data paths for catalogs, previews, and filesystem-backed context.</p>
-            </div>
-          </div>
-
-          <div className="mt-8 flex flex-wrap gap-4 text-sm">
-            <a href={`${REPO_URL}/blob/main/README.md#connection-modes`} target="_blank" rel="noopener noreferrer" className="text-[var(--text-dim)] transition-colors hover:text-[var(--accent)]">Connection modes in README</a>
-            <a href={`${REPO_URL}/blob/main/INSTALL.md#bridge-and-beacon-plainly`} target="_blank" rel="noopener noreferrer" className="text-[var(--text-dim)] transition-colors hover:text-[var(--accent)]">Bridge and Beacon in install docs</a>
-          </div>
         </div>
       </section>
 
@@ -492,9 +437,9 @@ export default function DocsPage() {
           <SectionEyebrow>Install</SectionEyebrow>
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] lg:items-start">
             <div>
-              <h2 className="text-2xl font-bold sm:text-3xl lg:text-[2.45rem]">Start with Docker Compose, then branch out</h2>
+              <h2 className="text-2xl font-bold sm:text-3xl lg:text-[2.45rem]">Start with Docker Compose</h2>
               <p className="mt-4 max-w-3xl text-[1rem] leading-7 text-[var(--text-dim)]">
-                The simplest supported path is still Docker Compose. Generate `.env`, review the core runtime values, start the app, and then connect your Minecraft server from inside the UI. For image-first installs and platform-specific guides, jump to the linked repo docs.
+                Generate your `.env`, review the core values, bring the app up, then connect your server in the UI.
               </p>
 
               <div className="mt-8 grid gap-5 xl:grid-cols-2">
@@ -541,17 +486,17 @@ export default function DocsPage() {
 
             <div className="space-y-5">
               <div className="rounded-[1.6rem] border border-[var(--border)] bg-[var(--panel)] p-6">
-                <p className="text-[0.72rem] uppercase tracking-[0.16em] text-[var(--accent)]">Repo docs</p>
+                <p className="text-[0.72rem] uppercase tracking-[0.16em] text-[var(--accent)]">More repo docs</p>
                 <div className="mt-4 grid gap-3">
                   <a href={`${REPO_URL}/blob/main/INSTALL.md`} target="_blank" rel="noopener noreferrer" className="rounded-2xl border border-[var(--border)] px-4 py-3 text-sm text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]">Install guide</a>
-                  <a href={`${REPO_URL}/blob/main/README.md#quick-start`} target="_blank" rel="noopener noreferrer" className="rounded-2xl border border-[var(--border)] px-4 py-3 text-sm text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]">Quick start in README</a>
+                  <a href={`${REPO_URL}/blob/main/INSTALL.md#platform-notes`} target="_blank" rel="noopener noreferrer" className="rounded-2xl border border-[var(--border)] px-4 py-3 text-sm text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]">Deploy</a>
                   <a href={`${REPO_URL}/blob/main/README.md#configuration`} target="_blank" rel="noopener noreferrer" className="rounded-2xl border border-[var(--border)] px-4 py-3 text-sm text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]">Configuration docs</a>
                   <a href={`${REPO_URL}/blob/main/.env.example`} target="_blank" rel="noopener noreferrer" className="rounded-2xl border border-[var(--border)] px-4 py-3 text-sm text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]">.env example</a>
                 </div>
               </div>
 
               <div className="rounded-[1.6rem] border border-[var(--border)] bg-[var(--panel)] p-6">
-                <p className="text-[0.72rem] uppercase tracking-[0.16em] text-[var(--accent)]">Platform guides</p>
+                <p className="text-[0.72rem] uppercase tracking-[0.16em] text-[var(--accent)]">Extras</p>
                 <div className="mt-4 space-y-3">
                   {platformGuides.map((guide) => (
                     <a
@@ -577,9 +522,9 @@ export default function DocsPage() {
           <SectionEyebrow>FAQ</SectionEyebrow>
           <div className="grid gap-8 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)] lg:items-start">
             <div>
-              <h2 className="text-2xl font-bold sm:text-3xl lg:text-[2.45rem]">Common questions, with repo links nearby</h2>
+              <h2 className="text-2xl font-bold sm:text-3xl lg:text-[2.45rem]">Quick answers with the full docs nearby</h2>
               <p className="mt-4 text-[1rem] leading-7 text-[var(--text-dim)]">
-                This keeps the high-signal answers on the landing site while still giving you the direct GitHub path when you need the full install and product docs.
+                This page gives you the short version. GitHub has the deeper write-up when you need it.
               </p>
               <div className="mt-6 flex flex-col gap-3 text-sm">
                 <a href={`${REPO_URL}/blob/main/README.md#live-demo`} target="_blank" rel="noopener noreferrer" className="text-[var(--text-dim)] transition-colors hover:text-[var(--accent)]">Live demo notes in README</a>
@@ -610,9 +555,8 @@ export default function DocsPage() {
       <section className="border-t border-[var(--border)] bg-[var(--bg2)] px-4 py-16 sm:px-6">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 rounded-[1.8rem] border border-[var(--border)] bg-[var(--panel)] px-6 py-8 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-[0.72rem] uppercase tracking-[0.16em] text-[var(--accent)]">Still want the source docs?</p>
-            <h2 className="mt-2 text-2xl font-bold">Go straight to the repo.</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--text-dim)]">This page is the public-facing docs layer. The full README, install guide, platform notes, roadmap, and contribution docs remain linked directly from GitHub for redundancy.</p>
+            <p className="text-[0.72rem] uppercase tracking-[0.16em] text-[var(--accent)]">Need the full source docs?</p>
+            <h2 className="mt-2 text-2xl font-bold">Go straight to GitHub for the complete documentation and source.</h2>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <a
@@ -636,7 +580,7 @@ export default function DocsPage() {
         </div>
       </section>
 
-      <PublicSiteFooter links={docsFooterLinks} tagline="Repo-backed docs for fast Minecraft server ops." />
+      <PublicSiteFooter links={docsFooterLinks} tagline="Repo-backed docs for fast Minecraft server management." />
     </main>
   )
 }
