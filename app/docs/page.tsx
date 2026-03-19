@@ -153,13 +153,6 @@ const platformGuides = [
   },
 ]
 
-const repoDocs = [
-  { label: 'GitHub repo', href: REPO_URL, desc: 'Project source, documentation, and release history in one place.' },
-  { label: 'README', href: `${REPO_URL}/blob/main/README.md`, desc: 'Product overview, feature set, and quick start.' },
-  { label: 'Install Guide', href: `${REPO_URL}/blob/main/INSTALL.md`, desc: 'Setup steps for Quick Connect and Full Stack.' },
-  { label: 'Deploy', href: `${REPO_URL}/blob/main/INSTALL.md#platform-notes`, desc: 'Docker Compose, prebuilt image, Dokploy, Coolify, and Portainer.' },
-]
-
 const faq = [
   {
     q: 'What is Mcraftr?',
@@ -217,11 +210,11 @@ export default function DocsPage() {
 
       <section className="relative overflow-hidden border-b border-[var(--border)] px-4 pb-20 pt-14 sm:px-6 sm:pb-24 lg:pb-28 lg:pt-20">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,color-mix(in_srgb,var(--accent)_15%,transparent),transparent_38%),linear-gradient(180deg,color-mix(in_srgb,var(--bg2)_82%,transparent),transparent_100%)]" />
-        <div className="relative mx-auto grid max-w-7xl gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] lg:items-start lg:gap-12">
+        <div className="relative mx-auto max-w-7xl">
           <div className="max-w-3xl">
             <SectionEyebrow>Mcraftr Docs</SectionEyebrow>
             <h1 className="max-w-3xl text-[2.6rem] font-bold leading-[0.94] sm:text-5xl lg:text-[4.2rem] lg:tracking-[-0.05em]" style={{ fontFamily: 'var(--font-operator)' }}>
-              The fast path to understanding Mcraftr.
+              The fast path <span className="whitespace-nowrap">to understanding</span> Mcraftr.
             </h1>
             <p className="mt-6 max-w-2xl text-[1rem] leading-7 text-[var(--text-dim)] sm:text-[1.08rem] sm:leading-8">
               Everything you need to learn the product, choose a setup path, and jump into the right GitHub docs.
@@ -257,29 +250,6 @@ export default function DocsPage() {
               </a>
             </div>
 
-          </div>
-
-          <div className="rounded-[1.75rem] border border-[var(--border)] bg-[color:color-mix(in_srgb,var(--panel)_92%,transparent)] p-5 shadow-2xl">
-            <p className="text-[0.72rem] uppercase tracking-[0.18em] text-[var(--accent)]">Core docs</p>
-            <h2 className="mt-3 text-xl font-semibold text-[var(--text)]">Start with the source of truth</h2>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-dim)]">Go straight to the repo for the full picture, from setup to deployment.</p>
-            <div className="mt-4 grid gap-3">
-              {repoDocs.map((item) => (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group rounded-2xl border border-[var(--border)] bg-[var(--bg)]/35 px-4 py-3 transition-all hover:border-[var(--accent)]"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-medium text-[var(--text)]">{item.label}</span>
-                    <span className="text-[0.68rem] uppercase tracking-[0.14em] text-[var(--text-dim)] transition-colors group-hover:text-[var(--accent)]">GitHub</span>
-                  </div>
-                  <p className="mt-1 text-sm leading-6 text-[var(--text-dim)]">{item.desc}</p>
-                </a>
-              ))}
-            </div>
           </div>
         </div>
       </section>
