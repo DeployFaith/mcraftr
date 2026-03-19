@@ -160,7 +160,6 @@ const navLinks = [
 const headerActions = [
   { href: 'https://github.com/deployfaith/mcraftr', label: 'GitHub', external: true },
   { href: demoLaunchHref(), label: 'Demo', external: true },
-  { href: COFFEE_URL, label: 'Coffee', external: true },
   { href: '/support', label: 'Support' },
 ]
 
