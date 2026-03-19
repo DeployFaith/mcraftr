@@ -95,28 +95,28 @@ const galleryHighlights = [
     src: dashboardShot,
     alt: 'Mcraftr dashboard overview',
     title: 'Dashboard',
-    desc: 'Current server status, online player count, TPS, weather, and time snapshot.',
+    desc: 'Current status, player count, TPS, weather, and time.',
     href: `${README_URL}#dashboard`,
   },
   {
     src: playersShot,
     alt: 'Mcraftr players view',
     title: 'Players',
-    desc: 'Live player list, vitals, effects, location, and inventory inspection.',
+    desc: 'Live players, vitals, effects, location, and inventory.',
     href: `${README_URL}#players`,
   },
   {
     src: worldsShot,
     alt: 'Mcraftr worlds view',
     title: 'Worlds',
-    desc: 'Full Stack setup for worlds, structures, entities, maps, and richer workflows.',
+    desc: 'Full Stack worlds, structures, entities, maps, and richer workflows.',
     href: `${INSTALL_URL}#option-3-full-mcraftr-stack-with-docker-compose`,
   },
   {
     src: terminalShot,
     alt: 'Mcraftr terminal view',
     title: 'Terminal',
-    desc: 'Server terminal inside Admin, alongside schedules, audit history, and user controls.',
+    desc: 'Admin terminal, schedules, audit history, and user controls.',
     href: `${README_URL}#admin`,
   },
 ]
@@ -235,14 +235,14 @@ export default async function Home() {
               <HeroProofChips />
             </div>
 
-            <div className="relative mx-auto w-full max-w-[640px] lg:mr-0 lg:max-w-[560px] lg:-translate-y-[70px]">
+            <div className="relative mx-auto w-full max-w-[640px] lg:mr-0 lg:max-w-[560px] lg:-translate-x-[55px] lg:-translate-y-[145px]">
               <div className="absolute inset-3 rounded-[1.5rem] bg-[var(--accent)]/16 blur-3xl sm:inset-6 sm:rounded-[2rem]" />
               <div className="relative overflow-hidden rounded-[1.6rem] border border-[var(--border)] bg-[var(--panel)] shadow-2xl">
                 <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--bg2)]/80 px-3 py-3 sm:px-4">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#ff7f7f]/80" />
                   <span className="h-2.5 w-2.5 rounded-full bg-[#ffd76e]/80" />
                   <span className="h-2.5 w-2.5 rounded-full bg-[var(--accent)]/80" />
-                  <span className="ml-auto text-[0.6rem] uppercase tracking-[0.14em] text-[var(--text-dim)] sm:text-[0.68rem] sm:tracking-[0.16em]">Live Product Preview</span>
+                  <span className="ml-auto text-[0.6rem] uppercase tracking-[0.14em] text-[var(--text-dim)] sm:text-[0.68rem] sm:tracking-[0.16em]">App Preview</span>
                 </div>
                 <Image
                   src={dashboardShot}
