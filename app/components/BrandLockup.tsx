@@ -4,8 +4,8 @@ type Props = {
 }
 
 export default function BrandLockup({ size = 'header', className = '' }: Props) {
-  const markSize = size === 'header' ? 'w-8 h-8' : 'w-16 h-16'
-  const textSize = size === 'header' ? 'text-[1.35rem] tracking-[0.08em]' : 'text-[3.1rem] tracking-[0.1em]'
+  const markSize = size === 'header' ? 'h-7 w-7 sm:h-8 sm:w-8' : 'w-16 h-16'
+  const textSize = size === 'header' ? 'text-[1.1rem] tracking-[0.06em] sm:text-[1.35rem] sm:tracking-[0.08em]' : 'text-[3.1rem] tracking-[0.1em]'
 
   return (
     <div className={`flex items-center gap-1 ${className}`.trim()}>

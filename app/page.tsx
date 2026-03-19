@@ -12,14 +12,11 @@ import terminalShot from '@/docs/screenshots/highlights/07-terminal.png'
 import adminShot from '@/docs/screenshots/highlights/08-admin.png'
 import chatShot from '@/docs/screenshots/highlights/09-chat.png'
 import settingsShot from '@/docs/screenshots/highlights/10-settings.png'
-import HeroProofChips from './components/HeroProofChips'
 import ProgressiveScreenshot from './components/ProgressiveScreenshot'
-import { PublicSiteFooter, PublicSiteHeader } from './components/PublicSiteChrome'
+import { PUBLIC_SITE_DEMO_URL, PUBLIC_SITE_HEADER_ACTIONS, PUBLIC_SITE_REPO_URL, PublicSiteFooter, PublicSiteHeader } from './components/PublicSiteChrome'
 
-const COFFEE_URL = 'https://buymeacoffee.com/deployfaith'
-const REPO_URL = 'https://github.com/deployfaith/mcraftr'
-const DEMO_APP_URL = 'https://demo.mcraftr.deployfaith.xyz'
-const DEMO_LAUNCH_URL = `${DEMO_APP_URL}/demo`
+const REPO_URL = PUBLIC_SITE_REPO_URL
+const DEMO_LAUNCH_URL = PUBLIC_SITE_DEMO_URL.replace('?returnTo=%2Fminecraft', '')
 const README_URL = `${REPO_URL}/blob/main/README.md`
 const INSTALL_URL = `${REPO_URL}/blob/main/INSTALL.md`
 
@@ -157,12 +154,6 @@ const navLinks = [
   { href: '#faq', label: 'FAQ' },
 ]
 
-const headerActions = [
-  { href: 'https://github.com/deployfaith/mcraftr', label: 'GitHub', external: true },
-  { href: demoLaunchHref(), label: 'Demo', external: true },
-  { href: '/support', label: 'Support' },
-]
-
 const footerLinks = [
   { href: '/docs', label: 'Docs' },
   { href: 'https://github.com/deployfaith/mcraftr', label: 'GitHub', external: true },
@@ -184,15 +175,14 @@ export default async function Home() {
     <main className="min-h-screen">
       <PublicSiteHeader
         navLinks={navLinks}
-        actionLinks={headerActions}
-        mobilePrimaryLink={{ href: demoLaunchHref(), label: 'Demo', external: true }}
+        actionLinks={PUBLIC_SITE_HEADER_ACTIONS}
         mobileMenuLabel="Open landing page menu"
       />
 
       {/* Hero */}
       <section className="px-4 pb-20 pt-14 sm:px-6 sm:pb-24 sm:pt-18 lg:pb-28 lg:pt-24">
         <div className="mx-auto max-w-6xl">
-          <div className="grid items-center gap-10 sm:gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(420px,560px)] lg:gap-16 xl:gap-20">
+          <div className="grid items-center gap-8 sm:gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(420px,560px)] lg:gap-14 xl:gap-18">
             <div className="mx-auto max-w-2xl text-center lg:mx-0 lg:max-w-xl lg:text-left">
               <h1 className="mb-5 text-[2.35rem] font-bold leading-[0.94] sm:text-5xl lg:text-[4.25rem] lg:tracking-[-0.05em]" style={{ fontFamily: 'var(--font-operator)' }}>
                 <span className="text-[var(--accent)]">Run your Minecraft server</span>
@@ -204,7 +194,7 @@ export default async function Home() {
                 Mcraftr is a self-hosted admin panel for Minecraft servers. It gives you a fast, opinionated web UI over RCON, with the full Mcraftr Stack available when you want more context.
               </p>
 
-              <div className="mb-8 flex flex-col justify-center gap-3 sm:flex-row sm:gap-4 lg:justify-start">
+              <div className="flex flex-col justify-center gap-3 sm:flex-row sm:gap-4 lg:justify-start">
                 <a
                   href={demoLaunchHref()}
                   target="_blank"
@@ -232,7 +222,6 @@ export default async function Home() {
                 </a>
               </div>
 
-              <HeroProofChips />
             </div>
 
             <div className="relative mx-auto w-full max-w-[640px] lg:mr-0 lg:max-w-[560px] lg:-translate-x-[55px] lg:-translate-y-[145px]">

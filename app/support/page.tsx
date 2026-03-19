@@ -1,9 +1,8 @@
 import type { Metadata } from 'next'
-import { PublicSiteFooter, PublicSiteHeader } from '@/app/components/PublicSiteChrome'
+import { PUBLIC_SITE_DEMO_URL, PUBLIC_SITE_HEADER_ACTIONS, PUBLIC_SITE_REPO_URL, PublicSiteFooter, PublicSiteHeader } from '@/app/components/PublicSiteChrome'
 
-const COFFEE_URL = 'https://buymeacoffee.com/deployfaith'
-const REPO_URL = 'https://github.com/deployfaith/mcraftr'
-const DEMO_URL = 'https://demo.mcraftr.deployfaith.xyz/demo?returnTo=%2Fminecraft'
+const REPO_URL = PUBLIC_SITE_REPO_URL
+const DEMO_URL = PUBLIC_SITE_DEMO_URL
 
 export const metadata: Metadata = {
   title: 'Mcraftr Support',
@@ -13,13 +12,6 @@ export const metadata: Metadata = {
 const navLinks = [
   { href: '/docs', label: 'Docs' },
   { href: '/', label: 'Home' },
-]
-
-const actionLinks = [
-  { href: REPO_URL, label: 'GitHub', external: true },
-  { href: DEMO_URL, label: 'Demo', external: true },
-  { href: COFFEE_URL, label: 'Coffee', external: true },
-  { href: '/support', label: 'Support' },
 ]
 
 const footerLinks = [
@@ -33,8 +25,7 @@ export default function SupportPage() {
     <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <PublicSiteHeader
         navLinks={navLinks}
-        actionLinks={actionLinks}
-        mobilePrimaryLink={{ href: DEMO_URL, label: 'Demo', external: true }}
+        actionLinks={PUBLIC_SITE_HEADER_ACTIONS}
         mobileMenuLabel="Open support page menu"
       />
 
