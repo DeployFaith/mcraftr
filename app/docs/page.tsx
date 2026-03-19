@@ -1,10 +1,8 @@
 import type { Metadata } from 'next'
-import { PublicSiteFooter, PublicSiteHeader } from '@/app/components/PublicSiteChrome'
+import { PUBLIC_SITE_DEMO_URL, PUBLIC_SITE_HEADER_ACTIONS, PUBLIC_SITE_REPO_URL, PublicSiteFooter, PublicSiteHeader } from '@/app/components/PublicSiteChrome'
 
-const COFFEE_URL = 'https://buymeacoffee.com/deployfaith'
-const REPO_URL = 'https://github.com/deployfaith/mcraftr'
-const DEMO_APP_URL = 'https://demo.mcraftr.deployfaith.xyz'
-const DEMO_LAUNCH_URL = `${DEMO_APP_URL}/demo`
+const REPO_URL = PUBLIC_SITE_REPO_URL
+const DEMO_LAUNCH_URL = PUBLIC_SITE_DEMO_URL.replace('?returnTo=%2Fminecraft', '')
 
 function demoLaunchHref(returnTo = '/minecraft') {
   return `${DEMO_LAUNCH_URL}?returnTo=${encodeURIComponent(returnTo)}`
@@ -42,13 +40,6 @@ const topNav = [
 const docsHeaderNavLinks = [
   { href: '/', label: 'Home' },
   ...topNav,
-]
-
-const docsHeaderActions = [
-  { href: REPO_URL, label: 'GitHub', external: true },
-  { href: demoLaunchHref(), label: 'Demo', external: true },
-  { href: COFFEE_URL, label: 'Coffee', external: true },
-  { href: '/support', label: 'Support' },
 ]
 
 const docsFooterLinks = [
@@ -190,8 +181,7 @@ export default function DocsPage() {
     <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <PublicSiteHeader
         navLinks={docsHeaderNavLinks}
-        actionLinks={docsHeaderActions}
-        mobilePrimaryLink={{ href: demoLaunchHref(), label: 'Demo', external: true }}
+        actionLinks={PUBLIC_SITE_HEADER_ACTIONS}
         mobileMenuLabel="Open docs navigation"
       />
 
@@ -451,7 +441,7 @@ export default function DocsPage() {
               Open GitHub Repo
             </a>
             <a
-              href={COFFEE_URL}
+              href="https://buymeacoffee.com/deployfaith"
               target="_blank"
               rel="noopener noreferrer"
               className="rounded-lg border border-[var(--border)] px-5 py-3 text-sm font-semibold text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
