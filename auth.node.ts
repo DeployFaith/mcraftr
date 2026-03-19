@@ -5,7 +5,8 @@ import { authConfig } from '@/auth'
 import { isDemoRestrictedUser } from '@/lib/demo-policy'
 
 function resolveDemoAdminAlias(username: string, host: string | null) {
-  if (username.trim() !== '_Dadmin') return username
+  const alias = process.env.MCRAFTR_DEMO_ADMIN_ALIAS?.trim()
+  if (!alias || username.trim() !== alias) return username
   const normalizedHost = host?.trim().toLowerCase() ?? ''
   if (normalizedHost !== 'demo.mcraftr.deployfaith.xyz') return username
   return process.env.MCRAFTR_ADMIN_USER?.trim() || username
