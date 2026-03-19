@@ -318,9 +318,9 @@ export default async function Home() {
                   href={highlight.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group overflow-hidden rounded-[1.4rem] border border-[var(--border)] bg-[var(--panel)] transition-all duration-200 hover:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--bg2)]"
+                  className="group flex flex-col overflow-hidden rounded-[1.4rem] border border-[var(--border)] bg-[var(--panel)] transition-all duration-200 hover:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--bg2)]"
                 >
-                  <div className="relative aspect-[16/10] overflow-hidden border-b border-[var(--border)] bg-[var(--bg)]/50">
+                  <div className="relative shrink-0 aspect-[16/10] overflow-hidden border-b border-[var(--border)] bg-[var(--bg)]/50">
                     <ProgressiveScreenshot
                       src={highlight.src}
                       alt={highlight.alt}
@@ -328,7 +328,7 @@ export default async function Home() {
                       className="h-full w-full scale-[1.12] object-cover object-top group-hover:scale-[1.15]"
                     />
                   </div>
-                  <div className="space-y-2 px-5 py-5">
+                  <div className="relative z-[1] space-y-2 px-5 pb-5 pt-[60px]">
                     <div className="flex flex-col items-start justify-between gap-1.5 sm:flex-row sm:items-center sm:gap-3">
                       <span className="text-base font-semibold text-[var(--accent)]">{highlight.title}</span>
                       <span className="text-[0.68rem] uppercase tracking-[0.14em] text-[var(--text-dim)]">Open docs on GitHub</span>
