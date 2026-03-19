@@ -390,7 +390,7 @@ export default function DocsPage() {
                   ))}
                 </div>
                 <p className="mt-4 text-sm leading-6 text-[var(--text-dim)]">
-                  Optional Full Stack and Beacon values include `MCRAFTR_SIDECAR_TOKEN`, `MCRAFTR_MINECRAFT_DATA`, `MCRAFTR_SCHEMATICS_DIR`, `MCRAFTR_ENTITY_PRESET_DIR`, `MCRAFTR_BLUEMAP_URL`, and `MCRAFTR_DYNMAP_URL`.
+                  Optional Full Stack and Beacon values include `MCRAFTR_BEACON_TOKEN`, `MCRAFTR_MINECRAFT_DATA`, `MCRAFTR_SCHEMATICS_DIR`, `MCRAFTR_ENTITY_PRESET_DIR`, `MCRAFTR_BLUEMAP_URL`, and `MCRAFTR_DYNMAP_URL`.
                 </p>
               </div>
             </div>

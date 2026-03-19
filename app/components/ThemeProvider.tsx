@@ -3,13 +3,14 @@ import { createContext, useContext, useEffect, useState } from 'react'
 
 // ── Accent palette ─────────────────────────────────────────────────────────────
 
-export type AccentId = 'cyan' | 'blue' | 'purple' | 'pink' | 'orange' | 'yellow' | 'red'
+export type AccentId = 'cyan' | 'blue' | 'green' | 'purple' | 'pink' | 'orange' | 'yellow' | 'red'
 export type AccentPresetId = AccentId
 export type AccentChoice = AccentPresetId | 'custom'
 
 export const ACCENTS: { id: AccentPresetId; label: string; color: string }[] = [
   { id: 'cyan',   label: 'Cyan',   color: '#00ffc8' },
   { id: 'blue',   label: 'Blue',   color: '#4d9fff' },
+  { id: 'green',  label: 'Green',  color: '#30d158' },
   { id: 'purple', label: 'Purple', color: '#b57bff' },
   { id: 'pink',   label: 'Pink',   color: '#ff6eb4' },
   { id: 'orange', label: 'Orange', color: '#ff9500' },

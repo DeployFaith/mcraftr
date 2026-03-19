@@ -141,7 +141,7 @@ In addition to the normal app values, set:
 
 - `MCRAFTR_IMAGE`
 - `MCRAFTR_MINECRAFT_DATA`
-- `MCRAFTR_SIDECAR_TOKEN` if you want Beacon auth
+- `MCRAFTR_BEACON_TOKEN` if you want Beacon auth
 - optional `MCRAFTR_SCHEMATICS_DIR`
 - optional `MCRAFTR_ENTITY_PRESET_DIR`
 

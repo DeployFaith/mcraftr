@@ -143,11 +143,11 @@ const buildEnvironmentBlock = () => {
   ]
 
   const passthrough = [
-    'MCRAFTR_SIDECAR_URL',
-    'MCRAFTR_SIDECAR_TOKEN',
+    'MCRAFTR_BEACON_URL',
+    'MCRAFTR_BEACON_TOKEN',
     'MCRAFTR_BRIDGE_COMMAND_PREFIX',
-    'MCRAFTR_SIDECAR_PORT',
-    'MCRAFTR_SIDECAR_HOST',
+    'MCRAFTR_BEACON_PORT',
+    'MCRAFTR_BEACON_HOST',
     'MCRAFTR_PLUGINS_DIR',
     'MCRAFTR_WORLDS_DIR',
     'MCRAFTR_SCHEMATICS_DIR',
@@ -158,6 +158,17 @@ const buildEnvironmentBlock = () => {
 
   for (const key of passthrough) {
     if (process.env[key]) lines.push(`${key}=${process.env[key]}`)
+  }
+
+  const legacyBeaconAliases = [
+    ['MCRAFTR_BEACON_URL', 'MCRAFTR_SIDECAR_URL'],
+    ['MCRAFTR_BEACON_TOKEN', 'MCRAFTR_SIDECAR_TOKEN'],
+    ['MCRAFTR_BEACON_PORT', 'MCRAFTR_SIDECAR_PORT'],
+    ['MCRAFTR_BEACON_HOST', 'MCRAFTR_SIDECAR_HOST'],
+  ]
+
+  for (const [modernKey, legacyKey] of legacyBeaconAliases) {
+    if (!process.env[modernKey] && process.env[legacyKey]) lines.push(`${modernKey}=${process.env[legacyKey]}`)
   }
 
   if (deployMode === 'build-context') {
