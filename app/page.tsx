@@ -13,10 +13,10 @@ import adminShot from '@/docs/screenshots/highlights/08-admin.png'
 import chatShot from '@/docs/screenshots/highlights/09-chat.png'
 import settingsShot from '@/docs/screenshots/highlights/10-settings.png'
 import ProgressiveScreenshot from './components/ProgressiveScreenshot'
-import { PUBLIC_SITE_DEMO_URL, PUBLIC_SITE_HEADER_ACTIONS, PUBLIC_SITE_REPO_URL, PublicSiteFooter, PublicSiteHeader } from './components/PublicSiteChrome'
+import { buildPublicHeaderLinks, PublicSiteFooter, PublicSiteHeader } from './components/PublicSiteChrome'
 
-const REPO_URL = PUBLIC_SITE_REPO_URL
-const DEMO_LAUNCH_URL = PUBLIC_SITE_DEMO_URL.replace('?returnTo=%2Fminecraft', '')
+const REPO_URL = 'https://github.com/deployfaith/mcraftr'
+const DEMO_LAUNCH_URL = 'https://demo.mcraftr.deployfaith.xyz/demo'
 const README_URL = `${REPO_URL}/blob/main/README.md`
 const INSTALL_URL = `${REPO_URL}/blob/main/INSTALL.md`
 
@@ -145,14 +145,7 @@ const faq = [
   },
 ]
 
-const navLinks = [
-  { href: '/docs', label: 'Docs' },
-  { href: '#features', label: 'Features' },
-  { href: '#modes', label: 'Modes' },
-  { href: '#screenshots', label: 'Screenshots' },
-  { href: '#install', label: 'Install' },
-  { href: '#faq', label: 'FAQ' },
-]
+const navLinks = buildPublicHeaderLinks('landing')
 
 const footerLinks = [
   { href: '/docs', label: 'Docs' },
@@ -175,7 +168,6 @@ export default async function Home() {
     <main className="min-h-screen">
       <PublicSiteHeader
         navLinks={navLinks}
-        actionLinks={PUBLIC_SITE_HEADER_ACTIONS}
         mobileMenuLabel="Open landing page menu"
       />
 

@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
-import { PUBLIC_SITE_DEMO_URL, PUBLIC_SITE_HEADER_ACTIONS, PUBLIC_SITE_REPO_URL, PublicSiteFooter, PublicSiteHeader } from '@/app/components/PublicSiteChrome'
+import { buildPublicHeaderLinks, PublicSiteFooter, PublicSiteHeader } from '@/app/components/PublicSiteChrome'
 
-const REPO_URL = PUBLIC_SITE_REPO_URL
-const DEMO_LAUNCH_URL = PUBLIC_SITE_DEMO_URL.replace('?returnTo=%2Fminecraft', '')
+const REPO_URL = 'https://github.com/deployfaith/mcraftr'
+const DEMO_LAUNCH_URL = 'https://demo.mcraftr.deployfaith.xyz/demo'
 
 function demoLaunchHref(returnTo = '/minecraft') {
   return `${DEMO_LAUNCH_URL}?returnTo=${encodeURIComponent(returnTo)}`
@@ -30,17 +30,8 @@ export const metadata: Metadata = {
   },
 }
 
-const topNav = [
-  { href: '#features', label: 'Features' },
-  { href: '#modes', label: 'Modes' },
-  { href: '#install', label: 'Install' },
-  { href: '#faq', label: 'FAQ' },
-]
-
-const docsHeaderNavLinks = [
-  { href: '/', label: 'Home' },
-  ...topNav,
-]
+const docsHeaderNavLinks = buildPublicHeaderLinks('subpage')
+const topNav = docsHeaderNavLinks.filter(link => link.label !== 'Docs')
 
 const docsFooterLinks = [
   { href: '/', label: 'Home' },
@@ -181,7 +172,6 @@ export default function DocsPage() {
     <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <PublicSiteHeader
         navLinks={docsHeaderNavLinks}
-        actionLinks={PUBLIC_SITE_HEADER_ACTIONS}
         mobileMenuLabel="Open docs navigation"
       />
 

@@ -7,18 +7,20 @@ type SiteLink = {
   external?: boolean
 }
 
-export const PUBLIC_SITE_REPO_URL = 'https://github.com/deployfaith/mcraftr'
-export const PUBLIC_SITE_DEMO_URL = 'https://demo.mcraftr.deployfaith.xyz/demo?returnTo=%2Fminecraft'
-export const PUBLIC_SITE_SUPPORT_LINK: SiteLink = { href: '/support', label: 'Support' }
-export const PUBLIC_SITE_HEADER_ACTIONS: SiteLink[] = [
-  { href: PUBLIC_SITE_REPO_URL, label: 'GitHub', external: true },
-  { href: PUBLIC_SITE_DEMO_URL, label: 'Demo', external: true },
-  PUBLIC_SITE_SUPPORT_LINK,
-]
+export function buildPublicHeaderLinks(scope: 'landing' | 'subpage' = 'landing'): SiteLink[] {
+  const prefix = scope === 'landing' ? '' : '/'
+  return [
+    { href: '/docs', label: 'Docs' },
+    { href: `${prefix}#features`, label: 'Features' },
+    { href: `${prefix}#screenshots`, label: 'Screenshots' },
+    { href: `${prefix}#modes`, label: 'Modes' },
+    { href: `${prefix}#install`, label: 'Install' },
+    { href: `${prefix}#faq`, label: 'FAQ' },
+  ]
+}
 
 type PublicSiteHeaderProps = {
   navLinks: SiteLink[]
-  actionLinks: SiteLink[]
   brandHref?: string
   mobileMenuLabel?: string
 }
@@ -47,37 +49,23 @@ function renderLink(link: SiteLink, className: string) {
 
 export function PublicSiteHeader({
   navLinks,
-  actionLinks,
   brandHref = '/',
   mobileMenuLabel = 'Open site menu',
 }: PublicSiteHeaderProps) {
   return (
     <header className="border-b border-[var(--border)] bg-[var(--bg)]/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
+      <div className="mx-auto flex min-h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <Link href={brandHref} className="min-w-0 shrink">
           <BrandLockup size="header" className="max-w-full" />
         </Link>
 
-        <nav className="hidden items-center gap-6 md:flex">
+        <nav className="hidden items-center justify-end gap-x-5 gap-y-2 md:flex md:flex-wrap lg:gap-x-6">
           {navLinks.map((link) => (
             <span key={`${link.label}-${link.href}`}>
               {renderLink(link, 'text-sm text-[var(--text-dim)] transition-colors hover:text-[var(--accent)]')}
             </span>
           ))}
         </nav>
-
-        <div className="hidden items-center gap-3 md:flex">
-          {actionLinks.map((link, index) => (
-            <span key={`${link.label}-${link.href}`}>
-              {renderLink(
-                link,
-                index === 1
-                  ? 'rounded-lg border border-[var(--border)] bg-[var(--panel)] px-4 py-2 text-sm text-[var(--text)] transition-all hover:border-[var(--accent)]'
-                  : 'rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]'
-              )}
-            </span>
-          ))}
-        </div>
 
         <div className="flex items-center gap-2 md:hidden">
           <details className="group relative">
@@ -103,18 +91,6 @@ export function PublicSiteHeader({
                 ))}
               </div>
 
-              <div className="mt-3 grid gap-2 border-t border-[var(--border)] pt-3">
-                {actionLinks.map((link, index) => (
-                  <div key={`${link.label}-${link.href}`}>
-                    {renderLink(
-                      link,
-                      index === 1
-                        ? 'block rounded-xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5 text-sm font-medium text-[var(--text)] transition-all hover:border-[var(--accent)]'
-                        : 'block rounded-xl border border-[var(--border)] px-3 py-2.5 text-sm text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]'
-                    )}
-                  </div>
-                ))}
-              </div>
             </div>
           </details>
         </div>
