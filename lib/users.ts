@@ -147,6 +147,17 @@ const LEGACY_JSON = path.join(DATA_DIR, 'users.json')
 
 let _initialized = false
 
+function shouldNormalizeDemoServerHost() {
+  const explicitHost = process.env.MCRAFTR_DEMO_SERVER_HOST?.trim()
+  if (explicitHost) return true
+  const authUrl = process.env.NEXTAUTH_URL?.trim().toLowerCase() ?? ''
+  return authUrl.includes('demo.mcraftr.deployfaith.xyz')
+}
+
+function getDemoServerHost() {
+  return process.env.MCRAFTR_DEMO_SERVER_HOST?.trim() || 'minecraft'
+}
+
 function initDb(): Database.Database {
   const db = getDb()
   if (_initialized) return db
@@ -162,8 +173,34 @@ function initDb(): Database.Database {
 
   // Seed admin if table is still empty
   seedAdmin(db)
+  normalizeDemoSavedServerHost(db)
 
   return db
+}
+
+function normalizeDemoSavedServerHost(db: Database.Database): void {
+  if (!shouldNormalizeDemoServerHost()) return
+
+  const targetHost = getDemoServerHost()
+  if (!targetHost) return
+
+  const updateSaved = db.prepare(`
+    UPDATE saved_servers
+    SET host = ?, updated_at = unixepoch()
+    WHERE host = 'minecraft-demo'
+  `)
+  const updateLegacy = db.prepare(`
+    UPDATE servers
+    SET host = ?
+    WHERE host = 'minecraft-demo'
+  `)
+
+  const tx = db.transaction(() => {
+    updateSaved.run(targetHost)
+    updateLegacy.run(targetHost)
+  })
+
+  tx()
 }
 
 // ── Re-encryption migration ───────────────────────────────────────────────────
