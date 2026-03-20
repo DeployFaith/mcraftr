@@ -2,14 +2,16 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 # Native build tools required by better-sqlite3
 RUN apk add --no-cache python3 make g++
+ENV npm_config_build_from_source=true
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev && npm rebuild better-sqlite3 --build-from-source
+RUN npm ci --omit=dev && npm rebuild better-sqlite3 --build-from-source --foreground-scripts
 
 FROM node:22-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
+ENV npm_config_build_from_source=true
 COPY package.json package-lock.json* ./
-RUN npm ci && npm rebuild better-sqlite3 --build-from-source
+RUN npm ci && npm rebuild better-sqlite3 --build-from-source --foreground-scripts
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
