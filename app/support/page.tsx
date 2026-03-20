@@ -1,18 +1,15 @@
 import type { Metadata } from 'next'
-import { PUBLIC_SITE_DEMO_URL, PUBLIC_SITE_HEADER_ACTIONS, PUBLIC_SITE_REPO_URL, PublicSiteFooter, PublicSiteHeader } from '@/app/components/PublicSiteChrome'
+import { buildPublicHeaderLinks, PublicSiteFooter, PublicSiteHeader } from '@/app/components/PublicSiteChrome'
 
-const REPO_URL = PUBLIC_SITE_REPO_URL
-const DEMO_URL = PUBLIC_SITE_DEMO_URL
+const REPO_URL = 'https://github.com/deployfaith/mcraftr'
+const DEMO_URL = 'https://demo.mcraftr.deployfaith.xyz/demo?returnTo=%2Fminecraft'
 
 export const metadata: Metadata = {
   title: 'Mcraftr Support',
   description: 'Placeholder page for the future Mcraftr Discord support invite.',
 }
 
-const navLinks = [
-  { href: '/docs', label: 'Docs' },
-  { href: '/', label: 'Home' },
-]
+const navLinks = buildPublicHeaderLinks('subpage')
 
 const footerLinks = [
   { href: '/docs', label: 'Docs' },
@@ -25,7 +22,6 @@ export default function SupportPage() {
     <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <PublicSiteHeader
         navLinks={navLinks}
-        actionLinks={PUBLIC_SITE_HEADER_ACTIONS}
         mobileMenuLabel="Open support page menu"
       />
 
