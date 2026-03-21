@@ -158,6 +158,10 @@ function getDemoServerHost() {
   return process.env.MCRAFTR_DEMO_SERVER_HOST?.trim() || 'minecraft'
 }
 
+function getDemoBeaconUrl() {
+  return process.env.MCRAFTR_DEMO_BEACON_URL?.trim() || 'http://beacon:9419'
+}
+
 function initDb(): Database.Database {
   const db = getDb()
   if (_initialized) return db
@@ -182,6 +186,7 @@ function normalizeDemoSavedServerHost(db: Database.Database): void {
   if (!shouldNormalizeDemoServerHost()) return
 
   const targetHost = getDemoServerHost()
+  const targetBeaconUrl = getDemoBeaconUrl()
   if (!targetHost) return
 
   const updateSaved = db.prepare(`
@@ -194,10 +199,16 @@ function normalizeDemoSavedServerHost(db: Database.Database): void {
     SET host = ?
     WHERE host = 'minecraft-demo'
   `)
+  const updateBeacon = db.prepare(`
+    UPDATE saved_servers
+    SET sidecar_url = ?, updated_at = unixepoch()
+    WHERE sidecar_url IN ('http://mcraftr-demo-beacon:9419', 'http://mcraftr-demo-beacon:9419/')
+  `)
 
   const tx = db.transaction(() => {
     updateSaved.run(targetHost)
     updateLegacy.run(targetHost)
+    updateBeacon.run(targetBeaconUrl)
   })
 
   tx()

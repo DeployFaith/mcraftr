@@ -29,13 +29,23 @@ function getConfiguredPlayerName() {
   return PLAYER_RE.test(candidate) ? candidate : DEFAULT_PLAYER_NAME
 }
 
+function isPublicDemoHost() {
+  const authUrl = process.env.NEXTAUTH_URL?.trim().toLowerCase() ?? ''
+  return authUrl.includes('demo.mcraftr.deployfaith.xyz')
+}
+
+function getDemoAdminEmail() {
+  return process.env.MCRAFTR_ADMIN_USER?.trim().toLowerCase() || null
+}
+
 export function isDemoSyntheticEnabledForUser(userId: string | null | undefined) {
   if (!userId) return false
   const user = getUserById(userId)
   if (!user) return false
   if (process.env.MCRAFTR_ENABLE_DEMO_SYNTHETIC_PLAYER === '1') return true
   const templateEmail = (process.env.MCRAFTR_DEMO_TEMPLATE_EMAIL || 'demo@mcraftr.local').trim().toLowerCase()
-  return user.isTemporary || user.email === templateEmail
+  const demoAdminEmail = getDemoAdminEmail()
+  return user.isTemporary || user.email === templateEmail || (isPublicDemoHost() && demoAdminEmail === user.email)
 }
 
 export function getDemoSyntheticPlayerName(userId: string | null | undefined) {
