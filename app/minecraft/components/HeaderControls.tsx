@@ -151,6 +151,260 @@ export default function HeaderControls() {
   const avatarLetter = currentEmail.trim().charAt(0).toUpperCase() || 'M'
   const avatarSrc = resolveAvatarSrc(avatar)
 
+  const accountSummaryCard = (
+    <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg2) 74%, transparent)' }}>
+      <div className="flex items-center gap-3">
+        {avatarSrc ? (
+          <img
+            src={avatarSrc}
+            alt="Profile picture"
+            className="h-10 w-10 rounded-full border object-cover"
+            style={{ borderColor: 'var(--accent-mid)', background: 'var(--panel)' }}
+          />
+        ) : (
+          <span
+            className="grid h-10 w-10 place-items-center rounded-full font-mono text-[14px] font-bold"
+            style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}
+          >
+            {avatarLetter}
+          </span>
+        )}
+        <div className="min-w-0">
+          <div className="truncate font-mono text-[12px] tracking-[0.12em]" style={{ color: 'var(--text)' }}>
+            {currentEmail}
+          </div>
+          <div className="truncate font-mono text-[10px] tracking-[0.12em]" style={{ color: 'var(--text-dim)' }}>
+            {activeServer ? formatServerLabel(activeServer) : 'No active server'}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
+  const accountAndServerFields = (
+    <div className="space-y-3">
+      <div>
+        <label className="mb-1.5 flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.16em]" style={{ color: 'var(--text-dim)' }}>
+          <UserRound size={12} />
+          Account
+        </label>
+        <select
+          value={accountValue}
+          onChange={e => void handleSwitchAccount(e.target.value)}
+          disabled={loadingState || switchingAccount || accounts.length === 0}
+          className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
+          style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+        >
+          {accounts.length === 0 && (
+            <option value={accountValue}>{currentEmail}</option>
+          )}
+          {accounts.map(account => (
+            <option key={account.userId} value={account.userId}>
+              {account.email}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="mb-1.5 flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.16em]" style={{ color: 'var(--text-dim)' }}>
+          <Server size={12} />
+          Server
+        </label>
+        <select
+          value={serverValue}
+          onChange={e => void handleSwitchServer(e.target.value)}
+          disabled={loadingState || switchingServer || servers.length === 0}
+          className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
+          style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+        >
+          {servers.length === 0 && (
+            <option value="">No saved servers</option>
+          )}
+          {servers.map(server => (
+            <option key={server.id} value={server.id}>
+              {formatServerLabel(server)}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
+
+  const quickAppearanceCard = (
+    <div className="rounded-2xl border p-4 space-y-3" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg2) 74%, transparent)' }}>
+      <div className="text-[10px] font-mono uppercase tracking-[0.16em]" style={{ color: 'var(--text-dim)' }}>
+        Quick Appearance
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <select
+          value={theme}
+          onChange={event => setTheme(event.target.value as 'dark' | 'light')}
+          className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
+          style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+        >
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+        </select>
+        <select
+          value={accent}
+          onChange={event => setAccent(event.target.value as typeof accent)}
+          className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
+          style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+        >
+          <option value="cyan">Cyan</option>
+          <option value="blue">Blue</option>
+          <option value="green">Green</option>
+          <option value="purple">Purple</option>
+          <option value="pink">Pink</option>
+          <option value="orange">Orange</option>
+          <option value="yellow">Yellow</option>
+          <option value="red">Red</option>
+          <option value="custom">Custom</option>
+        </select>
+        <select
+          value={font}
+          onChange={event => setFont(event.target.value as typeof font)}
+          className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
+          style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+        >
+          {FONTS.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+        </select>
+        <select
+          value={fontSize}
+          onChange={event => setFontSize(event.target.value as typeof fontSize)}
+          className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
+          style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+        >
+          {FONT_SIZES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+        </select>
+      </div>
+    </div>
+  )
+
+  const quickAudioCard = (
+    <div className="rounded-2xl border p-4 space-y-3" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg2) 74%, transparent)' }}>
+      <div className="text-[10px] font-mono uppercase tracking-[0.16em]" style={{ color: 'var(--text-dim)' }}>
+        Quick Audio
+      </div>
+      <div className="space-y-3">
+        <label className="block">
+          <div className="mb-1 flex items-center justify-between text-[11px] font-mono" style={{ color: 'var(--text)' }}>
+            <span>Sound FX</span>
+            <button type="button" onClick={() => updateSound(!soundEnabled, soundVolume)} style={{ color: soundEnabled ? 'var(--accent)' : 'var(--text-dim)' }}>
+              {soundEnabled ? 'ON' : 'OFF'}
+            </button>
+          </div>
+          <input type="range" min={0} max={1} step={0.01} value={soundVolume} onChange={event => updateSound(soundEnabled, Number(event.target.value))} className="w-full" />
+        </label>
+        <label className="block">
+          <div className="mb-1 flex items-center justify-between text-[11px] font-mono" style={{ color: 'var(--text)' }}>
+            <span>Music</span>
+            <button type="button" onClick={() => updateMusic(!musicEnabled, musicVolume)} style={{ color: musicEnabled ? 'var(--accent)' : 'var(--text-dim)' }}>
+              {musicEnabled ? 'ON' : 'OFF'}
+            </button>
+          </div>
+          <input type="range" min={0} max={1} step={0.01} value={musicVolume} onChange={event => updateMusic(musicEnabled, Number(event.target.value))} className="w-full" />
+        </label>
+      </div>
+    </div>
+  )
+
+  const actionButtons = (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={() => void handleAddAccount()}
+        className={actionRowClass('accent')}
+        style={{
+          color: 'var(--accent)',
+          borderColor: 'var(--accent-mid)',
+          background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, transparent), color-mix(in srgb, var(--panel) 88%, transparent))',
+        }}
+      >
+        <Plus size={14} strokeWidth={2} />
+        <span>Add Account</span>
+      </button>
+
+      <Link
+        href="/connect"
+        onClick={() => setOpen(false)}
+        className={actionRowClass('accent')}
+        style={{
+          color: 'var(--accent)',
+          borderColor: 'var(--accent-mid)',
+          background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent) 10%, transparent), color-mix(in srgb, var(--panel) 90%, transparent))',
+        }}
+      >
+        <Server size={14} strokeWidth={2} />
+        <span>Manage Servers</span>
+      </Link>
+
+      <button
+        type="button"
+        onClick={() => void handleForgetCurrentAccount()}
+        disabled={!currentUserId}
+        className={actionRowClass('subtle')}
+        style={{
+          color: 'var(--text-dim)',
+          borderColor: 'var(--border)',
+          background: 'color-mix(in srgb, var(--panel) 82%, transparent)',
+          opacity: currentUserId ? 1 : 0.45,
+        }}
+      >
+        <UserRound size={14} strokeWidth={2} />
+        <span>Forget Device Copy</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => signOut({ callbackUrl: '/login' })}
+        className={actionRowClass('danger')}
+        style={{
+          color: '#ffb3bd',
+          borderColor: 'color-mix(in srgb, #ff5a72 38%, var(--border))',
+          background: 'linear-gradient(180deg, rgba(255,90,114,0.12), rgba(22,22,31,0.92))',
+        }}
+      >
+        <LogOut size={14} strokeWidth={2} />
+        <span>Sign out</span>
+      </button>
+    </div>
+  )
+
+  const desktopMenuContent = (
+    <div className="space-y-4">
+      {accountSummaryCard}
+      {accountAndServerFields}
+      {quickAppearanceCard}
+      {quickAudioCard}
+      {actionButtons}
+    </div>
+  )
+
+  const mobileMenuContent = (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.16em] text-[var(--accent)]">Account menu</div>
+          <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">Account, server, and quick preferences in one place.</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="grid h-10 w-10 place-items-center rounded-2xl border border-[var(--border)] bg-[var(--panel)] text-[var(--text-dim)]"
+        >
+          <X size={16} strokeWidth={2} />
+        </button>
+      </div>
+      {accountSummaryCard}
+      {accountAndServerFields}
+      {quickAppearanceCard}
+      {quickAudioCard}
+      {actionButtons}
+    </div>
+  )
+
   const handleSwitchAccount = async (targetUserId: string) => {
     if (!targetUserId || targetUserId === currentUserId) return
     setSwitchingAccount(true)
@@ -289,237 +543,24 @@ export default function HeaderControls() {
             className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] sm:hidden"
           />
           <div
-            className="fixed inset-x-0 bottom-0 top-[calc(env(safe-area-inset-top)+3.5rem)] z-50 overflow-y-auto overscroll-contain rounded-t-[28px] border border-b-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[0_-24px_64px_rgba(0,0,0,0.42)] backdrop-blur-2xl touch-pan-y [-webkit-overflow-scrolling:touch] sm:absolute sm:inset-x-auto sm:right-[-0.4rem] sm:top-[calc(100%+0.75rem)] sm:z-40 sm:max-h-[min(82vh,42rem)] sm:w-[min(88vw,320px)] sm:rounded-[24px] sm:border-b"
+            className="fixed inset-x-0 bottom-0 top-[calc(env(safe-area-inset-top)+3.5rem)] z-50 overflow-y-auto overscroll-contain rounded-t-[28px] border border-b-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[0_-24px_64px_rgba(0,0,0,0.42)] backdrop-blur-2xl touch-pan-y [-webkit-overflow-scrolling:touch] sm:hidden"
             style={{
               borderColor: 'var(--accent-mid)',
               background: 'color-mix(in srgb, var(--panel) 96%, transparent)',
             }}
           >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between sm:hidden">
-              <div>
-                <div className="text-[10px] font-mono uppercase tracking-[0.16em] text-[var(--accent)]">Account menu</div>
-                <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">Account, server, and quick preferences in one place.</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="grid h-10 w-10 place-items-center rounded-2xl border border-[var(--border)] bg-[var(--panel)] text-[var(--text-dim)]"
-              >
-                <X size={16} strokeWidth={2} />
-              </button>
-            </div>
-            <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg2) 74%, transparent)' }}>
-              <div className="flex items-center gap-3">
-                {avatarSrc ? (
-                  <img
-                    src={avatarSrc}
-                    alt="Profile picture"
-                    className="h-10 w-10 rounded-full border object-cover"
-                    style={{ borderColor: 'var(--accent-mid)', background: 'var(--panel)' }}
-                  />
-                ) : (
-                  <span
-                    className="grid h-10 w-10 place-items-center rounded-full font-mono text-[14px] font-bold"
-                    style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}
-                  >
-                    {avatarLetter}
-                  </span>
-                )}
-                <div className="min-w-0">
-                  <div className="truncate font-mono text-[12px] tracking-[0.12em]" style={{ color: 'var(--text)' }}>
-                    {currentEmail}
-                  </div>
-                  <div className="truncate font-mono text-[10px] tracking-[0.12em]" style={{ color: 'var(--text-dim)' }}>
-                    {activeServer ? formatServerLabel(activeServer) : 'No active server'}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1.5 flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.16em]" style={{ color: 'var(--text-dim)' }}>
-                  <UserRound size={12} />
-                  Account
-                </label>
-                <select
-                  value={accountValue}
-                  onChange={e => void handleSwitchAccount(e.target.value)}
-                  disabled={loadingState || switchingAccount || accounts.length === 0}
-                  className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
-                  style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
-                >
-                  {accounts.length === 0 && (
-                    <option value={accountValue}>{currentEmail}</option>
-                  )}
-                  {accounts.map(account => (
-                    <option key={account.userId} value={account.userId}>
-                      {account.email}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1.5 flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.16em]" style={{ color: 'var(--text-dim)' }}>
-                  <Server size={12} />
-                  Server
-                </label>
-                <select
-                  value={serverValue}
-                  onChange={e => void handleSwitchServer(e.target.value)}
-                  disabled={loadingState || switchingServer || servers.length === 0}
-                  className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
-                  style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
-                >
-                  {servers.length === 0 && (
-                    <option value="">No saved servers</option>
-                  )}
-                  {servers.map(server => (
-                    <option key={server.id} value={server.id}>
-                      {formatServerLabel(server)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border p-4 space-y-3" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg2) 74%, transparent)' }}>
-              <div className="text-[10px] font-mono uppercase tracking-[0.16em]" style={{ color: 'var(--text-dim)' }}>
-                Quick Appearance
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <select
-                  value={theme}
-                  onChange={event => setTheme(event.target.value as 'dark' | 'light')}
-                  className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
-                  style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
-                >
-                  <option value="dark">Dark</option>
-                  <option value="light">Light</option>
-                </select>
-                <select
-                  value={accent}
-                  onChange={event => setAccent(event.target.value as typeof accent)}
-                  className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
-                  style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
-                >
-                  <option value="cyan">Cyan</option>
-                  <option value="blue">Blue</option>
-                  <option value="green">Green</option>
-                  <option value="purple">Purple</option>
-                  <option value="pink">Pink</option>
-                  <option value="orange">Orange</option>
-                  <option value="yellow">Yellow</option>
-                  <option value="red">Red</option>
-                  <option value="custom">Custom</option>
-                </select>
-                <select
-                  value={font}
-                  onChange={event => setFont(event.target.value as typeof font)}
-                  className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
-                  style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
-                >
-                  {FONTS.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
-                </select>
-                <select
-                  value={fontSize}
-                  onChange={event => setFontSize(event.target.value as typeof fontSize)}
-                  className="w-full rounded-2xl border px-3 py-3 text-[12px] font-mono focus:outline-none"
-                  style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
-                >
-                  {FONT_SIZES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border p-4 space-y-3" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg2) 74%, transparent)' }}>
-              <div className="text-[10px] font-mono uppercase tracking-[0.16em]" style={{ color: 'var(--text-dim)' }}>
-                Quick Audio
-              </div>
-              <div className="space-y-3">
-                <label className="block">
-                  <div className="mb-1 flex items-center justify-between text-[11px] font-mono" style={{ color: 'var(--text)' }}>
-                    <span>Sound FX</span>
-                    <button type="button" onClick={() => updateSound(!soundEnabled, soundVolume)} style={{ color: soundEnabled ? 'var(--accent)' : 'var(--text-dim)' }}>
-                      {soundEnabled ? 'ON' : 'OFF'}
-                    </button>
-                  </div>
-                  <input type="range" min={0} max={1} step={0.01} value={soundVolume} onChange={event => updateSound(soundEnabled, Number(event.target.value))} className="w-full" />
-                </label>
-                <label className="block">
-                  <div className="mb-1 flex items-center justify-between text-[11px] font-mono" style={{ color: 'var(--text)' }}>
-                    <span>Music</span>
-                    <button type="button" onClick={() => updateMusic(!musicEnabled, musicVolume)} style={{ color: musicEnabled ? 'var(--accent)' : 'var(--text-dim)' }}>
-                      {musicEnabled ? 'ON' : 'OFF'}
-                    </button>
-                  </div>
-                  <input type="range" min={0} max={1} step={0.01} value={musicVolume} onChange={event => updateMusic(musicEnabled, Number(event.target.value))} className="w-full" />
-                </label>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => void handleAddAccount()}
-                className={actionRowClass('accent')}
-                style={{
-                  color: 'var(--accent)',
-                  borderColor: 'var(--accent-mid)',
-                  background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, transparent), color-mix(in srgb, var(--panel) 88%, transparent))',
-                }}
-              >
-                <Plus size={14} strokeWidth={2} />
-                <span>Add Account</span>
-              </button>
-
-              <Link
-                href="/connect"
-                onClick={() => setOpen(false)}
-                className={actionRowClass('accent')}
-                style={{
-                  color: 'var(--accent)',
-                  borderColor: 'var(--accent-mid)',
-                  background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent) 10%, transparent), color-mix(in srgb, var(--panel) 90%, transparent))',
-                }}
-              >
-                <Server size={14} strokeWidth={2} />
-                <span>Manage Servers</span>
-              </Link>
-
-              <button
-                type="button"
-                onClick={() => void handleForgetCurrentAccount()}
-                disabled={!currentUserId}
-                className={actionRowClass('subtle')}
-                style={{
-                  color: 'var(--text-dim)',
-                  borderColor: 'var(--border)',
-                  background: 'color-mix(in srgb, var(--panel) 82%, transparent)',
-                  opacity: currentUserId ? 1 : 0.45,
-                }}
-              >
-                <UserRound size={14} strokeWidth={2} />
-                <span>Forget Device Copy</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => signOut({ callbackUrl: '/login' })}
-                className={actionRowClass('danger')}
-                style={{
-                  color: '#ffb3bd',
-                  borderColor: 'color-mix(in srgb, #ff5a72 38%, var(--border))',
-                  background: 'linear-gradient(180deg, rgba(255,90,114,0.12), rgba(22,22,31,0.92))',
-                }}
-              >
-                <LogOut size={14} strokeWidth={2} />
-                <span>Sign out</span>
-              </button>
-            </div>
+            {mobileMenuContent}
           </div>
+
+          <div
+            className="absolute right-0 top-[calc(100%+0.75rem)] z-40 hidden w-[min(92vw,22rem)] overflow-y-auto rounded-[24px] border p-4 shadow-[0_24px_64px_rgba(0,0,0,0.32)] backdrop-blur-2xl sm:block"
+            style={{
+              borderColor: 'var(--accent-mid)',
+              background: 'color-mix(in srgb, var(--panel) 96%, transparent)',
+              maxHeight: 'min(82vh, 42rem)',
+            }}
+          >
+            {desktopMenuContent}
           </div>
         </>
       )}
