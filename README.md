@@ -35,27 +35,6 @@ The full screenshot set lives in `docs/screenshots/highlights/`.
   </tr>
 </table>
 
-## Live Demo
-
-Try the public demo:
-
-- App: `https://demo.mcraftr.deployfaith.xyz/demo`
-- Access: one click creates or reuses a temporary demo account for your browser and signs you in automatically
-- Demo Minecraft server: `play.demo.mcraftr.deployfaith.xyz:25566`
-
-Notes:
-
-- The demo is a shared environment.
-- Demo state resets every 12 hours.
-- Temporary demo accounts are cleaned up automatically and profile changes stay locked.
-- Expect occasional admin changes, test data churn, and other users online at the same time.
-
-What you can test there:
-
-* the web UI with the shared demo account
-* the demo Minecraft server with a real player connection
-* player-aware flows like Players, Actions, and Worlds when someone is online
-
 ## Why Mcraftr
 
 Mcraftr is built for people who already have a Minecraft server and want a clean operations panel in front of it.

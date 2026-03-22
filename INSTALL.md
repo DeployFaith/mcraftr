@@ -7,21 +7,6 @@ This guide focuses on the easiest supported ways to run Mcraftr.
 - `Quick Connect` — fastest setup, RCON-only, no Bridge or Beacon required
 - `Full Mcraftr Stack` — RCON + Bridge + Beacon, recommended for the full product
 
-## Live Demo
-
-If you want to try Mcraftr before installing it:
-
-- App: `https://demo.mcraftr.deployfaith.xyz/login`
-- Access: `https://demo.mcraftr.deployfaith.xyz/demo`
-- Sign-in: one click creates or reuses a temporary demo account for your browser
-- Demo Minecraft server: `play.demo.mcraftr.deployfaith.xyz:25566`
-
-Notes:
-
-- This is a shared demo environment.
-- Demo state resets every 12 hours.
-- Temporary demo accounts are cleaned up automatically and profile changes stay locked.
-
 ## Bridge And Beacon, Plainly
 
 `Quick Connect` only uses RCON.
@@ -65,6 +50,12 @@ If you are only testing locally, you can leave:
 ```text
 NEXTAUTH_URL=http://localhost:3054
 ```
+
+Use the exact browser-facing URL for your install:
+
+- local only: `http://localhost:3054`
+- local network: `http://<server-ip>:3054`
+- public domain / reverse proxy: `https://<your-domain>`
 
 ### 4. Start Mcraftr
 
