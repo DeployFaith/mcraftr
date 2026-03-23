@@ -12,6 +12,7 @@ import ChatSection from './components/ChatSection'
 import AdminSection from './components/AdminSection'
 import SettingsSection from './components/SettingsSection'
 import AdminTerminalWorkspace from './components/AdminTerminalWorkspace'
+import MobileAccountDrawerPanel from './components/MobileAccountDrawerPanel'
 import type { FeatureKey } from '@/lib/features'
 import { playSound } from '@/app/components/soundfx'
 import type { ServerStackMode } from '@/lib/server-stack'
@@ -209,7 +210,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
         <button
           type="button"
           onClick={() => setMobileNavOpen(true)}
-          className="tap-target flex items-center gap-3 rounded-2xl border px-3 py-3 shadow-[0_18px_36px_rgba(0,0,0,0.22)] transition-all"
+          className="tap-target grid h-11 w-11 place-items-center rounded-2xl border shadow-[0_18px_36px_rgba(0,0,0,0.22)] transition-all"
           aria-label="Open section navigation"
           style={{
             borderColor: 'var(--border)',
@@ -217,13 +218,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
             color: 'var(--text)',
           }}
         >
-          <span
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border"
-            style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}
-          >
-            <PanelLeftOpen size={18} strokeWidth={1.9} />
-          </span>
-          <span className="font-mono text-[11px] tracking-[0.14em]">MENU</span>
+          <PanelLeftOpen size={18} strokeWidth={1.9} />
         </button>
       </div>
 
@@ -296,6 +291,8 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
                     </button>
                   )
                 })}
+
+                <MobileAccountDrawerPanel onNavigate={() => setMobileNavOpen(false)} />
               </div>
             </div>
           </nav>

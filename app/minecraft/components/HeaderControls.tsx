@@ -489,7 +489,7 @@ export default function HeaderControls() {
   }
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative hidden md:block" ref={menuRef}>
       <button
         type="button"
         aria-label="Open account menu"
