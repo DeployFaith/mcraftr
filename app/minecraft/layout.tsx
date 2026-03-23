@@ -25,7 +25,7 @@ export default async function MinecraftLayout({ children }: { children: React.Re
           >
             <BrandLockup size="header" />
           </Link>
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 pr-1 sm:pr-0 md:translate-x-[100px]">
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 pr-1 sm:pr-0 md:translate-x-[500px]">
             <HeaderControls />
           </div>
         </div>
