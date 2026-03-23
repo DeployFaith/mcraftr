@@ -3,7 +3,7 @@
 import { startTransition, useState, useCallback, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, Zap, Shield, MessageSquare, Settings, Trees, PanelLeftClose, PanelLeftOpen, SquareTerminal } from 'lucide-react'
+import { LayoutDashboard, Users, Zap, Shield, MessageSquare, Settings, Trees, SquareTerminal } from 'lucide-react'
 import DashboardSection from './components/DashboardSection'
 import PlayersSection from './components/PlayersSection'
 import ActionsSection from './components/ActionsSection'
@@ -107,6 +107,16 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
     return () => window.removeEventListener('popstate', syncFromUrl)
   }, [])
 
+  useEffect(() => {
+    const toggle = () => setMobileNavOpen(current => !current)
+    window.addEventListener('mcraftr:mobile-nav-toggle', toggle)
+    return () => window.removeEventListener('mcraftr:mobile-nav-toggle', toggle)
+  }, [])
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('mcraftr:mobile-nav-state', { detail: { open: mobileNavOpen } }))
+  }, [mobileNavOpen])
+
   const handleTabChange = useCallback((id: TabId) => {
     startTransition(() => {
       setActiveTab(id)
@@ -206,22 +216,6 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
         </div>
       </nav>
 
-      <div className="md:hidden fixed left-3 top-[calc(3.75rem+env(safe-area-inset-top))] z-30">
-        <button
-          type="button"
-          onClick={() => setMobileNavOpen(true)}
-          className="tap-target grid h-11 w-11 place-items-center rounded-2xl border shadow-[0_18px_36px_rgba(0,0,0,0.22)] transition-all"
-          aria-label="Open section navigation"
-          style={{
-            borderColor: 'var(--border)',
-            background: 'color-mix(in srgb, var(--panel) 92%, transparent)',
-            color: 'var(--text)',
-          }}
-        >
-          <PanelLeftOpen size={18} strokeWidth={1.9} />
-        </button>
-      </div>
-
       {mobileNavOpen && (
         <>
           <button
@@ -241,15 +235,8 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
             aria-label="Mobile section navigation"
           >
             <div className="flex h-full flex-col gap-2 px-3 py-3">
-              <div className="flex items-center justify-between px-1 pb-1">
+              <div className="px-1 pb-1">
                 <div className="text-[10px] font-mono uppercase tracking-[0.16em] text-[var(--accent)]">Sections</div>
-                <button
-                  type="button"
-                  onClick={() => setMobileNavOpen(false)}
-                  className="grid h-10 w-10 place-items-center rounded-2xl border border-[var(--border)] bg-[var(--panel)] text-[var(--text-dim)]"
-                >
-                  <PanelLeftClose size={18} strokeWidth={1.9} />
-                </button>
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1">

@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import BrandLockup from '@/app/components/BrandLockup'
 
@@ -8,6 +8,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
+  const [showInstantDemo, setShowInstantDemo] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setShowInstantDemo(window.location.hostname === 'demo.mcraftr.deployfaith.xyz')
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -120,13 +126,15 @@ export default function LoginPage() {
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
 
-            <Link
-              href="/demo"
-              className="block w-full rounded-lg border px-3 py-3 text-center text-xs font-mono tracking-widest transition-all"
-              style={{ borderColor: 'var(--border)', color: 'var(--text-dim)' }}
-            >
-              Open Instant Demo
-            </Link>
+            {showInstantDemo && (
+              <Link
+                href="/demo"
+                className="block w-full rounded-lg border px-3 py-3 text-center text-xs font-mono tracking-widest transition-all"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-dim)' }}
+              >
+                Open Instant Demo
+              </Link>
+            )}
           </form>
           <div className="text-center pt-1">
             <span className="text-xs font-mono" style={{ color: 'var(--text-dim)' }}>

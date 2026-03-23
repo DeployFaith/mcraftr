@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import BrandLockup from '@/app/components/BrandLockup'
 import { getUserById } from '@/lib/users'
 import HeaderControls from './components/HeaderControls'
+import MobileNavHeaderButton from './components/MobileNavHeaderButton'
 
 export default async function MinecraftLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
@@ -18,6 +19,9 @@ export default async function MinecraftLayout({ children }: { children: React.Re
         style={{ background: 'rgba(10,10,15,0.85)' }}
       >
         <div className="relative mx-auto h-14 w-full max-w-6xl px-4 sm:px-5">
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-1 sm:pl-0">
+            <MobileNavHeaderButton />
+          </div>
           <Link
             href="/minecraft"
             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
@@ -25,7 +29,7 @@ export default async function MinecraftLayout({ children }: { children: React.Re
           >
             <BrandLockup size="header" />
           </Link>
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 pr-1 sm:pr-0 md:translate-x-[500px]">
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 pr-1 sm:pr-0 md:translate-x-[180px]">
             <HeaderControls />
           </div>
         </div>
