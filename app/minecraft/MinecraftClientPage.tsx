@@ -1,6 +1,6 @@
 'use client'
 
-import { startTransition, useState, useCallback, useEffect } from 'react'
+import { startTransition, useState, useCallback, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, Users, Zap, Shield, MessageSquare, Settings, Trees, SquareTerminal } from 'lucide-react'
@@ -27,15 +27,16 @@ const ALL_TABS: {
   label: string
   Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>
   adminOnly?: boolean
+  shortcut?: string
 }[] = [
-  { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
-  { id: 'players', label: 'Players', Icon: Users },
-  { id: 'actions', label: 'Actions', Icon: Zap },
-  { id: 'worlds', label: 'Worlds', Icon: Trees },
-  { id: 'chat', label: 'Chat', Icon: MessageSquare },
-  { id: 'admin', label: 'Admin', Icon: Shield, adminOnly: true },
-  { id: 'terminal', label: 'Terminal', Icon: SquareTerminal, adminOnly: true },
-  { id: 'settings', label: 'Settings', Icon: Settings },
+  { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard, shortcut: '1' },
+  { id: 'players', label: 'Players', Icon: Users, shortcut: '2' },
+  { id: 'actions', label: 'Actions', Icon: Zap, shortcut: '3' },
+  { id: 'worlds', label: 'Worlds', Icon: Trees, shortcut: '4' },
+  { id: 'chat', label: 'Chat', Icon: MessageSquare, shortcut: '5' },
+  { id: 'admin', label: 'Admin', Icon: Shield, adminOnly: true, shortcut: '6' },
+  { id: 'terminal', label: 'Terminal', Icon: SquareTerminal, adminOnly: true, shortcut: '7' },
+  { id: 'settings', label: 'Settings', Icon: Settings, shortcut: '8' },
 ]
 
 const VALID_TABS: TabId[] = ['dashboard', 'players', 'actions', 'worlds', 'terminal', 'admin', 'chat', 'settings']
@@ -176,11 +177,47 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
       (id: TabId) => visibleTab === id || visitedTabs.includes(id),
       [visibleTab, visitedTabs])
 
+  // Keyboard shortcut handler - must be after visibleTab is defined
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle if not in an input/textarea
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+        return
+      }
+      
+      const key = e.key
+      if (key >= '1' && key <= '8') {
+        const index = parseInt(key) - 1
+        const visibleTabs = ALL_TABS.filter(t => {
+          if (t.adminOnly && role !== 'admin' && !demoReadOnly) return false
+          if (t.id === 'worlds' && stackMode === 'quick') return false
+          return true
+        })
+        const targetTab = visibleTabs[index]
+        if (targetTab && visibleTab !== targetTab.id) {
+          handleTabChange(targetTab.id)
+        }
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [role, demoReadOnly, stackMode, visibleTab, handleTabChange])
+
+  // Keyboard shortcut hints - map visible tabs to their shortcuts
+  const tabShortcuts = useMemo(() => {
+    const map: Record<string, string> = {}
+    tabs.forEach((tab, idx) => {
+      if (tab.shortcut) map[tab.id] = tab.shortcut
+    })
+    return map
+  }, [tabs])
+
   return (
     <div className="flex flex-col min-h-[calc(100vh-48px)]">
       <nav className="hidden md:flex sticky top-14 z-30 border-b border-[var(--border)] backdrop-blur-md" style={{ background: 'rgba(10,10,15,0.88)' }}>
         <div className="mx-auto flex w-full max-w-6xl justify-center gap-2 px-4 py-3">
-          {tabs.map(({ id, label, Icon }) => {
+          {tabs.map(({ id, label, Icon, shortcut }) => {
             const active = visibleTab === id
             return (
               <button
@@ -191,6 +228,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
                     ? 'text-[var(--accent)] shadow-[0_0_0_1px_var(--accent-mid),0_10px_30px_rgba(0,0,0,0.18)]'
                     : 'text-[var(--text-dim)] hover:text-[var(--text)]'
                 }`}
+                title={shortcut ? `Press ${shortcut} to switch` : undefined}
                 style={active
                   ? {
                       borderColor: 'var(--accent-mid)',
@@ -210,6 +248,11 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
                   <Icon size={14} color="currentColor" strokeWidth={1.9} />
                 </span>
                 <span>{label.toUpperCase()}</span>
+                {shortcut && (
+                  <span className={`ml-1 text-[10px] opacity-40 ${active ? 'text-[var(--accent)]' : ''}`}>
+                    {shortcut}
+                  </span>
+                )}
               </button>
             )
           })}

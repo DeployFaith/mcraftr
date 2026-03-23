@@ -345,7 +345,7 @@ html {
 }
 
 [data-font-size="sm"] {
-  --app-font-size: 14px;
+  --app-font-size: 15px;
 }
 
 [data-font-size="md"] {
@@ -358,6 +358,36 @@ html {
 
 [data-font-size="xl"] {
   --app-font-size: 20px;
+}
+
+/* Improved typography scale for better readability */
+.text-label {
+  font-size: 0.75rem;
+  line-height: 1.25;
+  font-family: var(--app-font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.text-body {
+  font-size: 1rem;
+  line-height: 1.6;
+  font-family: var(--app-font-sans);
+}
+
+.text-mono-sm {
+  font-family: var(--app-font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+
+.text-mono-md {
+  font-family: var(--app-font-mono);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
 }
 
 .font-mono {
@@ -407,8 +437,8 @@ textarea::placeholder {
   border: 1px solid var(--border);
 }
 
-/* Scanline overlay */
-body::before {
+/* Scanline overlay - now optional via user preference */
+body:not([data-scanlines="off"])::before {
   content: '';
   position: fixed;
   inset: 0;
@@ -423,7 +453,8 @@ body::before {
   z-index: 9999;
 }
 
-[data-theme="light"] body::before {
+[data-theme="light"] body::before,
+[data-scanlines="off"] body::before {
   display: none;
 }
 
@@ -432,6 +463,27 @@ body::before {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); }
+
+/* Improved focus states with accent glow */
+input:focus,
+select:focus,
+textarea:focus,
+button:focus-visible {
+  outline: none;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px var(--accent-dim), 0 0 0 4px var(--accent-mid) !important;
+}
+
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible) {
+  box-shadow: 0 0 0 2px var(--accent-dim) !important;
+}
+
+/* Smooth transitions for interactive elements */
+input, select, textarea, button {
+  transition: border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease;
+}
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }

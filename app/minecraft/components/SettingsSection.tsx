@@ -690,6 +690,36 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
           </div>
         </div>
 
+        {/* Scanlines toggle */}
+        <div>
+          <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-2">SCANLINE EFFECT</div>
+          <div className="flex gap-2">
+            {(['on', 'off'] as const).map(s => {
+              const isOn = s === 'on'
+              return (
+                <button
+                  key={s}
+                  onClick={() => {
+                    document.documentElement.setAttribute('data-scanlines', s)
+                    localStorage.setItem('mcraftr-scanlines', s)
+                  }}
+                  className="flex-1 py-2 rounded-lg font-mono text-[13px] tracking-widest transition-all border"
+                  style={{
+                    borderColor: 'var(--border)',
+                    background: isOn ? 'var(--accent-dim)' : 'var(--panel)',
+                    color: isOn ? 'var(--accent)' : 'var(--text-dim)',
+                  }}
+                >
+                  {isOn ? 'ON' : 'OFF'}
+                </button>
+              )
+            })}
+          </div>
+          <div className="text-[11px] font-mono mt-2" style={{ color: 'var(--text-dim)' }}>
+            Adds a subtle CRT-style scanline overlay. Toggle off for a cleaner look or if it causes eye strain.
+          </div>
+        </div>
+
         <div>
           <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-2">ACCENT COLOR</div>
           <div className="flex flex-wrap gap-2.5">

@@ -3,6 +3,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { AuditEntry } from '@/lib/audit'
+import { Check, X, HelpCircle } from 'lucide-react'
+
+// Utility for relative timestamps
+function formatRelativeTime(ts: number): string {
+  const now = Date.now()
+  const diff = Math.floor((now - ts * 1000) / 1000)
+  if (diff < 60) return 'just now'
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
 
 type DashboardData = {
   ok: boolean
@@ -60,6 +71,7 @@ function SummaryCard({ label, value, sub }: { label: string; value: React.ReactN
 function RulePill({ label, value }: { label: string; value: string | number | null }) {
   const active = value === 'true' || value === 'on'
   const neutral = value === null
+  const Icon = active ? Check : neutral ? HelpCircle : X
   return (
     <div
       className="rounded-lg border px-3 py-2"
@@ -69,7 +81,12 @@ function RulePill({ label, value }: { label: string; value: string | number | nu
           ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
           : { borderColor: 'var(--border)', color: 'var(--text)' }}
     >
-      <div className="text-[11px] font-mono tracking-widest opacity-70">{label}</div>
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-mono tracking-widest opacity-70">{label}</span>
+        <span style={{ opacity: 0.7 }}>
+          <Icon size={14} strokeWidth={2} />
+        </span>
+      </div>
       <div className="text-[13px] font-mono mt-1">
         {value === null ? '—' : typeof value === 'number' ? value : value === 'true' ? 'ON' : value === 'false' ? 'OFF' : value}
       </div>
@@ -165,7 +182,7 @@ export default function DashboardSection({ onNavigate }: { onNavigate: (tab: 'pl
                   {data.recentChat.map(entry => (
                     <div key={entry.id} className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
                       <div className="text-[11px] font-mono text-[var(--text-dim)]">
-                        {entry.player ? `${entry.player} · ` : ''}{new Date(entry.ts * 1000).toLocaleTimeString()}
+                        {entry.player ? `${entry.player} · ` : ''}{formatRelativeTime(entry.ts)}
                       </div>
                       <div className="text-[13px] font-mono text-[var(--text)] mt-1 break-words">{entry.message}</div>
                     </div>
@@ -223,7 +240,7 @@ export default function DashboardSection({ onNavigate }: { onNavigate: (tab: 'pl
                       <div key={entry.id} className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
                         <div className="text-[11px] font-mono text-[var(--accent)]">{entry.action}</div>
                         <div className="text-[12px] font-mono text-[var(--text-dim)] mt-1">
-                          {entry.target ? `${entry.target} · ` : ''}{new Date(entry.ts * 1000).toLocaleTimeString()}
+                          {entry.target ? `${entry.target} · ` : ''}{formatRelativeTime(entry.ts)}
                         </div>
                         {entry.detail && <div className="text-[12px] font-mono text-[var(--text)] mt-1 break-words">{entry.detail}</div>}
                       </div>

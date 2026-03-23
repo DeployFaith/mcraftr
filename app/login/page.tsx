@@ -77,15 +77,14 @@ export default function LoginPage() {
                 onChange={e => setUsername(e.target.value)}
                 autoComplete="username"
                 required
-                className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                placeholder="Enter your username"
+                className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-all placeholder:text-[var(--text-dim)] placeholder:opacity-50"
                 style={{
                   background: 'var(--panel)',
                   border: '1px solid var(--border)',
                   color: 'var(--text)',
                   fontSize: '16px',
                 }}
-                onFocus={e => (e.target.style.borderColor = 'var(--accent-mid)')}
-                onBlur={e => (e.target.style.borderColor = 'var(--border)')}
               />
             </div>
 
@@ -99,15 +98,14 @@ export default function LoginPage() {
                 onChange={e => setPassword(e.target.value)}
                 autoComplete="current-password"
                 required
-                className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
+                placeholder="Enter your password"
+                className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-all placeholder:text-[var(--text-dim)] placeholder:opacity-50"
                 style={{
                   background: 'var(--panel)',
                   border: '1px solid var(--border)',
                   color: 'var(--text)',
                   fontSize: '16px',
                 }}
-                onFocus={e => (e.target.style.borderColor = 'var(--accent-mid)')}
-                onBlur={e => (e.target.style.borderColor = 'var(--border)')}
               />
             </div>
 

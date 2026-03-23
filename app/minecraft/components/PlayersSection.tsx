@@ -9,6 +9,45 @@ import type { FeatureKey } from '@/lib/features'
 import { CATALOG, hydrateCatalogWithArt } from '@/app/minecraft/items'
 import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
 
+// ── Utility Components ─────────────────────────────────────────────────────
+
+function EmptyState({ icon, message, action }: { icon: React.ReactNode; message: string; action?: React.ReactNode }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-8 text-center">
+      <div className="mb-3 text-[var(--text-dim)] opacity-60">{icon}</div>
+      <p className="text-[13px] font-mono text-[var(--text-dim)]">{message}</p>
+      {action && <div className="mt-3">{action}</div>}
+    </div>
+  )
+}
+
+// Default empty state icons (using inline SVGs to avoid dependency issues)
+const EmptyBoxIcon = () => (
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+    <line x1="12" y1="22.08" x2="12" y2="12"/>
+  </svg>
+)
+
+const EmptyInventoryIcon = () => (
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+    <line x1="8" y1="21" x2="16" y2="21"/>
+    <line x1="12" y1="17" x2="12" y2="21"/>
+  </svg>
+)
+
+const SkeletonIcon = () => (
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <circle cx="12" cy="8" r="4"/>
+    <path d="M12 12v8"/>
+    <path d="M9 20l6-2"/>
+    <path d="M15 20l-6-2"/>
+    <path d="M8 16h8"/>
+  </svg>
+)
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type PlayerListData = {
@@ -778,7 +817,10 @@ function PlayerPanel({
                   </div>
                 </div>
                 {inventory.length === 0 && (
-                  <div className="text-[13px] font-mono text-[var(--text-dim)]">Pockets empty — nothing to see here</div>
+                  <EmptyState 
+                    icon={<EmptyInventoryIcon />} 
+                    message="Pockets empty — nothing to see here"
+                  />
                 )}
             </div>
           ))}
@@ -926,7 +968,10 @@ export default function PlayersSection({ onPlayersChange, minecraftVersion }: Pr
           </div>
         ) : (
           !loading && (
-            <div className="text-[13px] font-mono text-[var(--text-dim)]">The server is empty — not even a skeleton</div>
+            <EmptyState 
+              icon={<SkeletonIcon />} 
+              message="The server is empty — not even a skeleton"
+            />
           )
         )}
       </CollapsibleCard>
