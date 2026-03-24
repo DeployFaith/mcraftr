@@ -11,9 +11,6 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   const access = await requireTerminalAccess(req)
   if (!access.ok) return access.response
-  if (access.context.readOnly) {
-    return Response.json({ ok: false, error: 'Public demo terminal access is read-only.' }, { status: 403 })
-  }
 
   try {
     const body = await req.json().catch(() => ({}))
