@@ -2,7 +2,6 @@ import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
 import { logAudit } from '@/lib/audit'
 import { runBridgeJson } from '@/lib/server-bridge'
-import { enforceDemoGuardrails } from '@/lib/demo-limits'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -44,9 +43,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
     command += ` coords ${x} ${y} ${z}`
   }
-
-  const demoGuard = await enforceDemoGuardrails(userId, serverId, 'world_spawn', 1)
-  if (demoGuard) return demoGuard
 
   const bridge = await runBridgeJson<BridgeResponse>(req, command)
   if (!bridge.ok || bridge.data.ok === false) {

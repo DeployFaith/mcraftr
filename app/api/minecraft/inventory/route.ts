@@ -2,16 +2,8 @@ import { NextRequest } from 'next/server'
 import { getSessionUserId, rconForRequest, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
 import { Rcon } from 'rcon-client'
 import { CATALOG } from '@/app/minecraft/items'
-import { getActiveServer, getUserById } from '@/lib/users'
+import { getActiveServer } from '@/lib/users'
 import { checkRateLimit } from '@/lib/ratelimit'
-import {
-  adjustDemoSyntheticInventorySlot,
-  clearDemoSyntheticInventory,
-  getDemoSyntheticInventory,
-  moveDemoSyntheticInventoryItem,
-} from '@/lib/demo-synthetic-player'
-import { getDemoPlayerActionError } from '@/lib/demo-policy'
-import { getDemoSelfPlayerCookie } from '@/lib/demo-limits'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -131,17 +123,8 @@ export async function GET(req: NextRequest) {
   if (!/^\.?[a-zA-Z0-9_]{1,16}$/.test(player)) {
     return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
   }
-  const user = getUserById(userId)
-  const restrictedError = getDemoPlayerActionError(user, player, getDemoSelfPlayerCookie(req))
-  if (restrictedError) return Response.json({ ok: false, error: restrictedError }, { status: 403 })
-
   const server = getActiveServer(userId)
   if (!server) return Response.json({ ok: false, error: 'No server configured' }, { status: 400 })
-
-  const synthetic = getDemoSyntheticInventory(userId, server.id, player)
-  if (synthetic) {
-    return Response.json({ ok: true, items: synthetic })
-  }
 
   try {
     const allSlots = [...STANDARD_SLOTS, ...SPECIAL_SLOTS]
@@ -218,22 +201,10 @@ export async function POST(req: NextRequest) {
     if (!/^\.?[a-zA-Z0-9_]{1,16}$/.test(player)) {
       return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
     }
-    const user = getUserById(userId)
-    const restrictedError = getDemoPlayerActionError(user, player, getDemoSelfPlayerCookie(req))
-    if (restrictedError) return Response.json({ ok: false, error: restrictedError }, { status: 403 })
     const src  = nbtSlotToCommandSlot(Number(fromSlot))
     const dest = nbtSlotToCommandSlot(Number(toSlot))
     if (!src || !dest) {
       return Response.json({ ok: false, error: 'Invalid slot number' }, { status: 400 })
-    }
-
-    const server = getActiveServer(userId)
-    if (!server) return Response.json({ ok: false, error: 'No server configured' }, { status: 400 })
-    const synthetic = moveDemoSyntheticInventoryItem(userId, server.id, player, Number(fromSlot), Number(toSlot))
-    if (synthetic) {
-      return synthetic.ok
-        ? Response.json({ ok: true })
-        : Response.json({ ok: false, error: synthetic.error }, { status: 400 })
     }
 
     const liveProbe = await rconInventory(req, [
@@ -318,22 +289,6 @@ export async function DELETE(req: NextRequest) {
     if (!/^\.?[a-zA-Z0-9_]{1,16}$/.test(player)) {
       return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
     }
-    const user = getUserById(userId)
-    const restrictedError = getDemoPlayerActionError(user, player, getDemoSelfPlayerCookie(req))
-    if (restrictedError) return Response.json({ ok: false, error: restrictedError }, { status: 403 })
-    const server = getActiveServer(userId)
-    if (!server) return Response.json({ ok: false, error: 'No server configured' }, { status: 400 })
-    const synthetic = clearDemoSyntheticInventory(userId, server.id, player, {
-      item: typeof item === 'string' ? item : null,
-      count: typeof count === 'number' ? count : null,
-      slot: typeof slot === 'number' ? slot : null,
-    })
-    if (synthetic) {
-      if (!item) return Response.json({ ok: true, message: `Cleared inventory for ${player}` })
-      if (slot != null) return Response.json({ ok: true, message: `Cleared slot ${slot} for ${player}` })
-      return Response.json({ ok: true, message: `Cleared ${item} from ${player}` })
-    }
-
     if (!item) {
       const result = await rconForRequest(req, `minecraft:clear ${player}`)
       if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
@@ -390,20 +345,6 @@ export async function PATCH(req: NextRequest) {
     if (!/^\.?[a-zA-Z0-9_]{1,16}$/.test(player)) return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
     if (typeof slot !== 'number') return Response.json({ ok: false, error: 'Missing slot' }, { status: 400 })
     if (!['increment', 'fill', 'duplicate'].includes(mode)) return Response.json({ ok: false, error: 'Invalid inventory action' }, { status: 400 })
-
-    const user = getUserById(userId)
-    const restrictedError = getDemoPlayerActionError(user, player, getDemoSelfPlayerCookie(req))
-    if (restrictedError) return Response.json({ ok: false, error: restrictedError }, { status: 403 })
-
-    const server = getActiveServer(userId)
-    if (!server) return Response.json({ ok: false, error: 'No server configured' }, { status: 400 })
-
-    const synthetic = adjustDemoSyntheticInventorySlot(userId, server.id, player, slot, mode, typeof amount === 'number' ? amount : 1)
-    if (synthetic) {
-      return synthetic.ok
-        ? Response.json({ ok: true, message: synthetic.message })
-        : Response.json({ ok: false, error: synthetic.error }, { status: 400 })
-    }
 
     const probe = await rconInventory(req, [
       slotQuery(slot, player, 'id'),

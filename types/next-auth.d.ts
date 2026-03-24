@@ -6,6 +6,5 @@ declare module 'next-auth' {
     hasServer?: boolean
     activeServerId?: string | null
     activeServerLabel?: string | null
-    demoReadOnly?: boolean
   }
 }

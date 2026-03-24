@@ -503,7 +503,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
 
       {readOnly && (
         <div className="glass-card border border-[var(--accent-mid)] bg-[var(--accent-dim)] p-4 text-[13px] font-mono text-[var(--accent)]">
-          Public demo admin access is read-only. You can inspect the full admin surface here, but all changes stay disabled until you self-host Mcraftr.
+          Read-only access is enabled here for review, but admin changes stay disabled until write access is allowed.
         </div>
       )}
 
@@ -583,7 +583,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
         </div>
         {readOnly && (
           <div className="rounded-xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-4 py-3 text-[12px] font-mono text-[var(--accent)]">
-            Demo mode can inspect these server rules and controls, but all admin changes remain read-only here.
+            Read-only mode can inspect these server rules and controls, but admin changes remain disabled here.
           </div>
         )}
 
@@ -714,7 +714,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
       {/* ── MODERATION ── */}
       {canModeration && (
       <CollapsibleCard title="MODERATION" storageKey="admin:moderation" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
-        {readOnly && <div className="text-[12px] font-mono text-[var(--text-dim)]">Moderation tools are visible here for demo review, but mutations stay disabled.</div>}
+        {readOnly && <div className="text-[12px] font-mono text-[var(--text-dim)]">Moderation tools are visible here in read-only mode, but mutations stay disabled.</div>}
 
         <div>
           <SectionLabel>TARGET PLAYER</SectionLabel>
@@ -786,7 +786,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
       {/* ── WHITELIST ── */}
       {canWhitelist && (
       <CollapsibleCard title="WHITELIST" storageKey="admin:whitelist" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
-        {readOnly && <div className="text-[12px] font-mono text-[var(--text-dim)]">Whitelist reads are available in demo mode, but entry changes remain disabled.</div>}
+        {readOnly && <div className="text-[12px] font-mono text-[var(--text-dim)]">Whitelist reads are available in read-only mode, but entry changes remain disabled.</div>}
         <div className="flex items-center justify-between">
           <button onClick={fetchWhitelist} disabled={wlLoading}
             className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
@@ -832,7 +832,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
       {/* ── OPERATOR ── */}
       {canOperator && (
       <CollapsibleCard title="OPERATOR" storageKey="admin:operator" groupKey={ADMIN_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
-        {readOnly && <div className="text-[12px] font-mono text-[var(--text-dim)]">Operator controls are visible for review only in the public demo.</div>}
+        {readOnly && <div className="text-[12px] font-mono text-[var(--text-dim)]">Operator controls are visible for review only in read-only mode.</div>}
         <div>
           <SectionLabel>SELECT PLAYER</SectionLabel>
           <PlayerPicker online={players} selected={opTarget} onSelect={setOpTarget} placeholder="Or type player name…" />

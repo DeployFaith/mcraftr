@@ -34,9 +34,6 @@ export async function PUT(req: NextRequest) {
     if (!user) {
       return Response.json({ ok: false, error: 'User not found' }, { status: 404 })
     }
-    if (user.isTemporary) {
-      return Response.json({ ok: false, error: 'Profile changes are disabled for temporary demo accounts' }, { status: 403 })
-    }
     if (isProtectedAccountEmail(user.email)) {
       return Response.json({ ok: false, error: 'Profile changes are disabled for this account' }, { status: 403 })
     }

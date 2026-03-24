@@ -1,8 +1,5 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionUserId, getUserFeatureFlags, rconForRequest } from '@/lib/rcon'
-import { getUserById } from '@/lib/users'
-import { getDemoPlayerActionError } from '@/lib/demo-policy'
-import { getDemoSyntheticCommandError } from '@/lib/demo-synthetic-player'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -66,26 +63,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const user = getUserById(userId)
     const body = await req.json().catch(() => ({}))
     const mode = typeof body.mode === 'string' ? body.mode : ''
-    const selfCookie = req.cookies.get('mcraftr.demo-self-player')?.value ?? null
 
     if (mode === 'actor-to-actor') {
       const from = parseActor(body.from, 'from')
       const to = parseActor(body.to, 'to')
-      if (from.type === 'player') {
-        const restrictedError = getDemoPlayerActionError(user, from.value, selfCookie)
-        if (restrictedError) return Response.json({ ok: false, error: restrictedError }, { status: 403 })
-        const syntheticError = getDemoSyntheticCommandError(userId, from.value, 'Teleport')
-        if (syntheticError) return Response.json({ ok: false, error: syntheticError }, { status: 400 })
-      }
-      if (to.type === 'player') {
-        const restrictedError = getDemoPlayerActionError(user, to.value, selfCookie)
-        if (restrictedError) return Response.json({ ok: false, error: restrictedError }, { status: 403 })
-        const syntheticError = getDemoSyntheticCommandError(userId, to.value, 'Teleport')
-        if (syntheticError) return Response.json({ ok: false, error: syntheticError }, { status: 400 })
-      }
       const result = await rconForRequest(req, `tp ${actorSelector(from)} ${actorSelector(to)}`)
       if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })
       return Response.json({ ok: true, message: `Teleported ${actorLabel(from)} → ${actorLabel(to)}` })
@@ -98,12 +81,6 @@ export async function POST(req: NextRequest) {
       const z = Number(body.z)
       if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
         return Response.json({ ok: false, error: 'Coordinates must be numbers' }, { status: 400 })
-      }
-      if (actor.type === 'player') {
-        const restrictedError = getDemoPlayerActionError(user, actor.value, selfCookie)
-        if (restrictedError) return Response.json({ ok: false, error: restrictedError }, { status: 403 })
-        const syntheticError = getDemoSyntheticCommandError(userId, actor.value, 'Teleport')
-        if (syntheticError) return Response.json({ ok: false, error: syntheticError }, { status: 400 })
       }
       const result = await rconForRequest(req, `tp ${actorSelector(actor)} ${x} ${y} ${z}`)
       if (!result.ok) return Response.json({ ok: false, error: result.error || 'RCON error' })

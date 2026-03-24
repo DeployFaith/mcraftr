@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId } from '@/lib/rcon'
-import { getDemoSyntheticPlayerStats } from '@/lib/demo-synthetic-player'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -94,9 +93,6 @@ export async function GET(req: NextRequest) {
   if (!PLAYER_RE.test(player)) {
     return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
   }
-
-  const synthetic = getDemoSyntheticPlayerStats(userId, player)
-  if (synthetic) return Response.json(synthetic)
 
   // Fire all queries in parallel — allSettled so each field degrades independently
   const [

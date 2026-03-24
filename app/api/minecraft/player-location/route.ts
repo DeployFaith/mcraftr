@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getSessionUserId } from '@/lib/rcon'
 import { runBridgeJson } from '@/lib/server-bridge'
-import { getDemoSyntheticLocationError } from '@/lib/demo-synthetic-player'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -20,11 +19,6 @@ export async function GET(req: NextRequest) {
   }
   if (!PLAYER_RE.test(player)) {
     return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
-  }
-
-  const syntheticError = getDemoSyntheticLocationError(userId, player)
-  if (syntheticError) {
-    return Response.json({ ok: false, error: syntheticError }, { status: 400 })
   }
 
   const result = await runBridgeJson<Record<string, unknown>>(req, `player locate ${player}`)

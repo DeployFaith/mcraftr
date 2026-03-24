@@ -55,9 +55,9 @@ async function cleanUi(page) {
 async function sanitizeText(page) {
   await page.evaluate(() => {
     const replacements = [
-      { pattern: /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, value: 'demo-user@example.com' },
+      { pattern: /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, value: 'user@example.com' },
       { pattern: /\b\d{1,3}(?:\.\d{1,3}){3}\b/g, value: '203.0.113.10' },
-      { pattern: /\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}\b/gi, value: 'demo.mcraftr.local' },
+      { pattern: /\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}\b/gi, value: 'mcraftr.example.local' },
     ]
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
     const nodes = []
@@ -194,7 +194,7 @@ async function main() {
     }
   }
 
-  const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'https://demo.mcraftr.deployfaith.xyz'
+  const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3054'
   const adminEmail = process.env.PLAYWRIGHT_ADMIN_EMAIL ?? process.env.MCRAFTR_ADMIN_USER
   const adminPassword = process.env.PLAYWRIGHT_ADMIN_PASSWORD ?? process.env.MCRAFTR_ADMIN_PASS
   if (!adminEmail || !adminPassword) throw new Error('Missing screenshot credentials')

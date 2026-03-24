@@ -4,7 +4,6 @@ import { normalizeMinecraftVersion } from '@/lib/minecraft-version'
 import { getSessionUserId } from '@/lib/rcon'
 import { testBeaconConnection, testBridgeConnection } from '@/lib/server-bridge'
 import { getServerStackDescription, getServerStackLabel } from '@/lib/server-stack'
-import { DEMO_RESTRICTED_SERVER_MESSAGE, isDemoRestrictedUser } from '@/lib/demo-policy'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -88,7 +87,6 @@ export async function GET(req: NextRequest) {
     ok: true,
     activeServerId: user.activeServerId,
     servers: listUserServers(userId).map(mapSavedServer),
-    demoRestricted: isDemoRestrictedUser(user),
   })
 }
 
@@ -98,9 +96,6 @@ export async function POST(req: NextRequest) {
   try {
     const user = getUserById(userId)
     if (!user) return Response.json({ ok: false, error: 'User not found' }, { status: 404 })
-    if (isDemoRestrictedUser(user)) {
-      return Response.json({ ok: false, error: DEMO_RESTRICTED_SERVER_MESSAGE }, { status: 403 })
-    }
 
     const {
       label,

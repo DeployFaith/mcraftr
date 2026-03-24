@@ -1,18 +1,17 @@
 import { NextRequest } from 'next/server'
 import { getUserFeatures, updateUserFeatures, getUserById, listUsers } from '@/lib/users'
 import { FEATURE_KEYS, type FeatureKey } from '@/lib/features'
-import { getDemoReadonlyAccess, requireAdminReadable, rejectDemoReadonlyWrite } from '@/lib/demo-readonly'
-import { getDemoAdminUserWithFeatures, getDemoAdminUsersWithFeatures } from '@/lib/demo-admin-seeds'
+import { getAdminAccess, requireAdminReadable } from '@/lib/admin-access'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
-  const auth = requireAdminReadable(await getDemoReadonlyAccess(req))
+  const auth = requireAdminReadable(await getAdminAccess(req))
   if (!auth.ok) return auth.response
   const { access } = auth
   const userId = access.userId
-  if (!access.demoReadOnly && !getUserFeatures(userId).enable_admin_feature_policies) {
+  if (!getUserFeatures(userId).enable_admin_feature_policies) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
 
@@ -23,17 +22,6 @@ export async function GET(req: NextRequest) {
     return Response.json({ ok: false, error: 'User not found' }, { status: 404 })
   }
 
-  if (access.demoReadOnly) {
-    if (!targetId) {
-      return Response.json({ ok: true, users: getDemoAdminUsersWithFeatures(currentUser), readOnly: true })
-    }
-    const target = getDemoAdminUserWithFeatures(currentUser, targetId)
-    if (!target) {
-      return Response.json({ ok: false, error: 'User not found' }, { status: 404 })
-    }
-    return Response.json({ ok: true, user: target, readOnly: true })
-  }
-
   if (!targetId) {
     const users = listUsers()
     const allFeatures = users.map(u => ({
@@ -42,7 +30,7 @@ export async function GET(req: NextRequest) {
       role: u.role,
       features: getUserFeatures(u.id),
     }))
-      return Response.json({ ok: true, users: allFeatures, readOnly: access.demoReadOnly })
+      return Response.json({ ok: true, users: allFeatures, readOnly: false })
   }
 
   const target = getUserById(targetId)
@@ -50,14 +38,12 @@ export async function GET(req: NextRequest) {
     return Response.json({ ok: false, error: 'User not found' }, { status: 404 })
   }
 
-  return Response.json({ ok: true, user: { user_id: target.id, email: target.email, role: target.role, features: getUserFeatures(target.id) }, readOnly: access.demoReadOnly })
+  return Response.json({ ok: true, user: { user_id: target.id, email: target.email, role: target.role, features: getUserFeatures(target.id) }, readOnly: false })
 }
 
 export async function PUT(req: NextRequest) {
-  const access = await getDemoReadonlyAccess(req)
+  const access = await getAdminAccess(req)
   if (!access || !access.isAdmin) return Response.json({ ok: false, error: 'Admin only' }, { status: 403 })
-  const readOnlyResponse = rejectDemoReadonlyWrite(access)
-  if (readOnlyResponse) return readOnlyResponse
   const adminId = access.userId
   if (!getUserFeatures(adminId).enable_admin_feature_policies) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })

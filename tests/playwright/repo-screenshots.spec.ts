@@ -64,7 +64,7 @@ async function ensureDemoServer(page: Page) {
     activeServerId?: string | null
   }
   const existing = Array.isArray(listPayload.servers) ? listPayload.servers : []
-  const fullCandidate = existing.find(server => server.stackMode === 'full' || (server.label ?? '').toLowerCase() === 'demo full stack')
+  const fullCandidate = existing.find(server => server.stackMode === 'full' || (server.label ?? '').toLowerCase() === 'full stack test')
 
   if (fullCandidate) {
     if (listPayload.activeServerId !== fullCandidate.id) {
@@ -75,23 +75,23 @@ async function ensureDemoServer(page: Page) {
 
   const created = await page.request.post('/api/servers', {
     data: {
-      label: 'Demo Full Stack',
-      host: 'demo.mcraftr.test',
+      label: 'Full Stack Test',
+      host: 'mcraftr.test',
       port: 25575,
-      password: 'demo-password',
+      password: 'test-password',
       bridgeEnabled: true,
       bridgeCommandPrefix: 'mcraftr',
       sidecarEnabled: true,
-      sidecarUrl: 'http://beacon.demo.mcraftr.test:7070',
-      sidecarToken: 'demo-beacon-token',
-      sidecarStructureRoots: '/demo/world/structures',
-      sidecarEntityPresetRoots: '/demo/world/entities',
+      sidecarUrl: 'http://beacon.mcraftr.test:7070',
+      sidecarToken: 'beacon-test-token',
+      sidecarStructureRoots: '/world/structures',
+      sidecarEntityPresetRoots: '/world/entities',
       minecraftVersionOverride: '1.21.4',
     },
   })
   if (!created.ok()) {
     const body = await created.text()
-    throw new Error(`Failed to create demo server: ${created.status()} ${body}`)
+      throw new Error(`Failed to create full stack server: ${created.status()} ${body}`)
   }
 }
 
@@ -104,9 +104,9 @@ async function sanitizeUi(page: Page) {
     }
 
     const masks = [
-      { pattern: /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, value: 'demo@mcraftr.local' },
+      { pattern: /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, value: 'user@mcraftr.local' },
       { pattern: /\b\d{1,3}(?:\.\d{1,3}){3}\b/g, value: '***.***.***.***' },
-      { pattern: /\b([a-z0-9-]+\.)+[a-z]{2,}\b/gi, value: 'demo.mcraftr.test' },
+      { pattern: /\b([a-z0-9-]+\.)+[a-z]{2,}\b/gi, value: 'mcraftr.test' },
     ]
 
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)

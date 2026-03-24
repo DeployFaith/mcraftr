@@ -46,10 +46,9 @@ function normalizeTab(raw: string | null | undefined): TabId {
   return VALID_TABS.includes(raw as TabId) ? (raw as TabId) : 'dashboard'
 }
 
-export default function MinecraftClientPage({ initialTab, initialRole, initialStackMode, initialDemoReadOnly = false }: { initialTab: TabId; initialRole?: string; initialStackMode: ServerStackMode; initialDemoReadOnly?: boolean }) {
+export default function MinecraftClientPage({ initialTab, initialRole, initialStackMode }: { initialTab: TabId; initialRole?: string; initialStackMode: ServerStackMode }) {
   const { data: session } = useSession()
   const role = session?.role ?? initialRole
-  const demoReadOnly = session?.demoReadOnly ?? initialDemoReadOnly
   const pathname = usePathname()
 
   const [activeTab, setActiveTab] = useState<TabId>(initialTab)
@@ -158,14 +157,14 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
       if (!hasAnyWorldFeature) return false
     }
     if (t.id === 'terminal') {
-      if (role !== 'admin' && !demoReadOnly) return false
+      if (role !== 'admin') return false
       if (features && !features.enable_rcon) return false
     }
     if (t.id === 'admin') {
-      if (role !== 'admin' && !demoReadOnly) return false
+      if (role !== 'admin') return false
       if (features && !features.enable_admin) return false
     }
-    return !t.adminOnly || role === 'admin' || demoReadOnly
+    return !t.adminOnly || role === 'admin'
   })
   const visibleTab = tabs.find(t => t.id === activeTab) ? activeTab : 'dashboard'
 
@@ -189,7 +188,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
       if (key >= '1' && key <= '8') {
         const index = parseInt(key) - 1
         const visibleTabs = ALL_TABS.filter(t => {
-          if (t.adminOnly && role !== 'admin' && !demoReadOnly) return false
+          if (t.adminOnly && role !== 'admin') return false
           if (t.id === 'worlds' && stackMode === 'quick') return false
           return true
         })
@@ -202,7 +201,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [role, demoReadOnly, stackMode, visibleTab, handleTabChange])
+  }, [role, stackMode, visibleTab, handleTabChange])
 
   // Keyboard shortcut hints - map visible tabs to their shortcuts
   const tabShortcuts = useMemo(() => {
@@ -364,19 +363,19 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
             />
           </div>
         )}
-        {(role === 'admin' || demoReadOnly) && shouldRenderTab('admin') && (
+        {(role === 'admin') && shouldRenderTab('admin') && (
           <div className={visibleTab === 'admin' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'admin'}>
-            <AdminSection players={players} readOnly={demoReadOnly} />
+            <AdminSection players={players} readOnly={false} />
           </div>
         )}
-        {(role === 'admin' || demoReadOnly) && shouldRenderTab('terminal') && (
+        {(role === 'admin') && shouldRenderTab('terminal') && (
           <div className={visibleTab === 'terminal' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'terminal'}>
             <div className="space-y-3">
               <div className="px-1">
                 <div className="font-mono text-[12px] tracking-[0.18em] text-[var(--text-dim)]">TERMINAL</div>
                 <div className="text-[13px] text-[var(--text-dim)]">Dedicated server terminal with transcript, command catalog, docs, wizards, and favorites.</div>
               </div>
-              <AdminTerminalWorkspace fullPage readOnly={demoReadOnly} />
+              <AdminTerminalWorkspace fullPage readOnly={false} />
             </div>
           </div>
         )}

@@ -1,40 +1,31 @@
 import { NextRequest } from 'next/server'
 import { getUserById, getUserFeatures, listUsers, createUserByAdmin } from '@/lib/users'
 import { logAudit } from '@/lib/audit'
-import { getDemoReadonlyAccess, requireAdminReadable, rejectDemoReadonlyWrite } from '@/lib/demo-readonly'
-import { getDemoAdminUsers } from '@/lib/demo-admin-seeds'
+import { getAdminAccess, requireAdminReadable } from '@/lib/admin-access'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 async function requireAdmin(req: NextRequest): Promise<string | null> {
-  const access = await getDemoReadonlyAccess(req)
+  const access = await getAdminAccess(req)
   return access?.isAdmin ? access.userId : null
 }
 
 export async function GET(req: NextRequest) {
-  const auth = requireAdminReadable(await getDemoReadonlyAccess(req))
+  const auth = requireAdminReadable(await getAdminAccess(req))
   if (!auth.ok) return auth.response
   const { access } = auth
 
   const features = getUserFeatures(access.userId)
-  if (!access.demoReadOnly && !features.enable_admin_user_management) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
-
-  if (access.demoReadOnly) {
-    const currentUser = getUserById(access.userId)
-    if (!currentUser) return Response.json({ ok: false, error: 'User not found' }, { status: 404 })
-    return Response.json({ ok: true, users: getDemoAdminUsers(currentUser), readOnly: true })
-  }
+  if (!features.enable_admin_user_management) return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
 
   const users = listUsers()
-  return Response.json({ ok: true, users, readOnly: access.demoReadOnly })
+  return Response.json({ ok: true, users, readOnly: false })
 }
 
 export async function POST(req: NextRequest) {
-  const access = await getDemoReadonlyAccess(req)
+  const access = await getAdminAccess(req)
   if (!access || !access.isAdmin) return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })
-  const readOnlyResponse = rejectDemoReadonlyWrite(access)
-  if (readOnlyResponse) return readOnlyResponse
 
   const adminId = access.userId
   const features = getUserFeatures(adminId)

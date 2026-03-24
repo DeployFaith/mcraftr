@@ -28,9 +28,6 @@ export async function DELETE(req: NextRequest) {
     if (!user) {
       return Response.json({ ok: false, error: 'User not found' }, { status: 404 })
     }
-    if (user.isTemporary) {
-      return Response.json({ ok: false, error: 'Temporary demo accounts are cleaned up automatically and cannot be deleted here' }, { status: 403 })
-    }
     if (isProtectedAccountEmail(user.email)) {
       return Response.json({ ok: false, error: 'Profile changes are disabled for this account' }, { status: 403 })
     }

@@ -118,25 +118,6 @@ export function getDb(): Database.Database {
       PRIMARY KEY (user_id, server_id, player_name)
     );
 
-    CREATE TABLE IF NOT EXISTS demo_synthetic_players (
-      server_id   TEXT NOT NULL,
-      player_name TEXT NOT NULL,
-      joined_at   INTEGER NOT NULL DEFAULT (unixepoch()),
-      updated_at  INTEGER NOT NULL DEFAULT (unixepoch()),
-      PRIMARY KEY (server_id, player_name)
-    );
-
-    CREATE TABLE IF NOT EXISTS demo_synthetic_inventory (
-      server_id   TEXT NOT NULL,
-      player_name TEXT NOT NULL,
-      slot        INTEGER NOT NULL,
-      item_id     TEXT NOT NULL,
-      count       INTEGER NOT NULL,
-      enchants    TEXT,
-      updated_at  INTEGER NOT NULL DEFAULT (unixepoch()),
-      PRIMARY KEY (server_id, player_name, slot)
-    );
-
     CREATE TABLE IF NOT EXISTS chat_log (
       id        INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id   TEXT NOT NULL,

@@ -405,7 +405,7 @@ export default function AdminTerminalWorkspace({
 
   const persistFavorite = async () => {
     if (readOnly) {
-      appendLocalEntry(':favorites', 'Public demo terminal access is read-only.', false)
+      appendLocalEntry(':favorites', 'Terminal access is read-only.', false)
       return
     }
     if (!commandDraft.trim()) return
@@ -443,7 +443,7 @@ export default function AdminTerminalWorkspace({
 
   const deleteFavorite = async (id: string) => {
     if (readOnly) {
-      appendLocalEntry(':favorites', 'Public demo terminal access is read-only.', false)
+      appendLocalEntry(':favorites', 'Terminal access is read-only.', false)
       return
     }
     try {
@@ -465,7 +465,7 @@ export default function AdminTerminalWorkspace({
 
   const runServerCommand = async (command: string, meta?: { source?: 'manual' | 'wizard' | 'favorite'; wizardId?: string | null; favoriteId?: string | null }) => {
     if (readOnly) {
-      appendLocalEntry(command, 'Public demo terminal access is read-only.', false)
+      appendLocalEntry(command, 'Terminal access is read-only.', false)
       return
     }
     setExecuting(true)
@@ -1144,7 +1144,7 @@ export default function AdminTerminalWorkspace({
               )}
               {readOnly && (
                 <div className="rounded-[22px] border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-4 py-4 font-mono text-[13px] text-[var(--accent)]">
-                  Public demo terminal access is read-only. You can inspect the catalog, transcript, docs, wizards, and favorites, but command execution and edits are disabled.
+                  Terminal access is read-only. You can inspect the catalog, transcript, docs, wizards, and favorites, but command execution and edits are disabled.
                 </div>
               )}
               {!loading && visibleEntries.length === 0 && (

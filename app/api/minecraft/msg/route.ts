@@ -3,8 +3,6 @@ import { getSessionUserId, getSessionActiveServerId, getUserFeatureFlags, checkF
 import { getDb } from '@/lib/db'
 import { logAudit } from '@/lib/audit'
 import { runBridgeCommand } from '@/lib/server-bridge'
-import { getUserById } from '@/lib/users'
-import { getDemoPlayerActionError } from '@/lib/demo-policy'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,9 +25,6 @@ export async function POST(req: NextRequest) {
     if (!player || !PLAYER_RE.test(player)) {
       return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
     }
-    const user = getUserById(userId)
-    const restrictedError = getDemoPlayerActionError(user, player)
-    if (restrictedError) return Response.json({ ok: false, error: restrictedError }, { status: 403 })
     if (!message || typeof message !== 'string' || !message.trim()) {
       return Response.json({ ok: false, error: 'Message is required' }, { status: 400 })
     }

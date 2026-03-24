@@ -3,7 +3,6 @@ import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUser
 import { logAudit } from '@/lib/audit'
 import { createStructurePlacement } from '@/lib/structure-placements'
 import { callSidecarForRequest, runBridgeJson } from '@/lib/server-bridge'
-import { enforceDemoGuardrails } from '@/lib/demo-limits'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -75,9 +74,6 @@ export async function POST(req: NextRequest) {
   if (locationMode === 'coords' && (!world || !isFiniteNumber(x) || !isFiniteNumber(y) || !isFiniteNumber(z))) {
     return Response.json({ ok: false, error: 'World and coordinates are required' }, { status: 400 })
   }
-
-  const demoGuard = await enforceDemoGuardrails(userId, serverId, 'structure_place', 1)
-  if (demoGuard) return demoGuard
 
   if (placementKind === 'native-worldgen' || placementKind === 'native-template') {
     const vanillaCommand = placementKind === 'native-worldgen'

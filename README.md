@@ -4,10 +4,6 @@ Mcraftr is a self-hosted Minecraft admin panel for fast, opinionated server mana
 
 It gives you a polished web UI for moderation, player tools, server actions, chat, schedules, theming, and account management without trying to become a full host-control panel.
 
-## Teaser
-
-![Mcraftr teaser](docs/screenshots/mcraftr-demo-teaser.gif)
-
 ## Repository Screenshots
 
 The full screenshot set lives in `docs/screenshots/highlights/`.

@@ -45,8 +45,6 @@ type SavedServer = {
   updatedAt: number
 }
 
-const DEMO_RESTRICTED_SERVER_MESSAGE = 'The public demo is locked to the shared demo server. To connect your own server, self-host Mcraftr.'
-
 function ConnectForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -75,7 +73,6 @@ function ConnectForm() {
   const [loadingServers, setLoadingServers] = useState(true)
   const [servers, setServers] = useState<SavedServer[]>([])
   const [activeServerId, setActiveServerId] = useState<string | null>(null)
-  const [demoRestricted, setDemoRestricted] = useState(false)
   const [editingServerId, setEditingServerId] = useState<string | null>(null)
 
   const applyStackMode = useCallback((mode: ServerStackMode) => {
@@ -122,8 +119,6 @@ function ConnectForm() {
       const nextServers = (data.servers ?? []) as SavedServer[]
       setServers(nextServers)
       setActiveServerId(data.activeServerId ?? null)
-      setDemoRestricted(data.demoRestricted === true)
-
       if (wantsEdit && !editingServerId) {
         const active = nextServers.find(server => server.id === data.activeServerId) ?? nextServers[0]
         if (active) {
@@ -187,11 +182,6 @@ function ConnectForm() {
   }
 
   const handleTest = async () => {
-    if (demoRestricted) {
-      setTestMsg(DEMO_RESTRICTED_SERVER_MESSAGE)
-      setTestState('fail')
-      return
-    }
     if (!host || !password) {
       setTestMsg('Enter your server address and RCON password first')
       setTestState('fail')
@@ -236,10 +226,6 @@ function ConnectForm() {
   }
 
   const handleSave = async () => {
-    if (demoRestricted) {
-      setError(DEMO_RESTRICTED_SERVER_MESSAGE)
-      return
-    }
     if (!host || !password) {
       setError('Server address and RCON password are required')
       return
@@ -303,10 +289,6 @@ function ConnectForm() {
   }
 
   const handleActivate = async (serverId: string) => {
-    if (demoRestricted) {
-      setError(DEMO_RESTRICTED_SERVER_MESSAGE)
-      return
-    }
     try {
       const res = await fetch('/api/servers/active', {
         method: 'POST',
@@ -324,10 +306,6 @@ function ConnectForm() {
   }
 
   const handleDelete = async (server: SavedServer) => {
-    if (demoRestricted) {
-      setError(DEMO_RESTRICTED_SERVER_MESSAGE)
-      return
-    }
     if (!confirm(`Delete ${server.label?.trim() || `${server.host}:${server.port}`}?`)) return
     try {
       const res = await fetch(`/api/servers/${server.id}`, { method: 'DELETE' })
@@ -371,12 +349,6 @@ function ConnectForm() {
                   ? 'Add another server or edit an existing saved server connection.'
                   : 'Choose Quick Connect for a fast RCON-only setup, or use the Full Mcraftr Stack for the experience Mcraftr is designed around.'}
             </p>
-
-            {demoRestricted && (
-              <div className="rounded-2xl border px-4 py-4 text-[12px] font-mono" style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}>
-                {DEMO_RESTRICTED_SERVER_MESSAGE}
-              </div>
-            )}
 
             <div className="space-y-3 rounded-[22px] border border-[var(--border)] bg-[var(--panel)] p-4">
               <div>

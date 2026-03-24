@@ -150,16 +150,6 @@ const main = async () => {
     const bindHost = localhostOnly ? '127.0.0.1' : '0.0.0.0'
 
     let outputEnv = example
-    outputEnv = removeKeys(outputEnv, [
-      'MCRAFTR_PROTECTED_ACCOUNTS',
-      'MCRAFTR_DEMO_TEMPLATE_EMAIL',
-      'MCRAFTR_DEMO_ACCOUNT_DOMAIN',
-      'MCRAFTR_TEMP_DEMO_TTL_HOURS',
-      'MCRAFTR_DEMO_CLEANUP_TOKEN',
-      'MCRAFTR_DEMO_SERVER_HOST',
-      'MCRAFTR_DEMO_BEACON_URL',
-      'MCRAFTR_DEMO_ADMIN_ALIAS',
-    ])
 
     outputEnv = updateKey(outputEnv, 'NEXTAUTH_SECRET', randomHex(32))
     outputEnv = updateKey(outputEnv, 'NEXTAUTH_URL', nextAuthUrl)

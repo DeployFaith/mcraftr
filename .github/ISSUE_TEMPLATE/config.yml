@@ -2,4 +2,4 @@ blank_issues_enabled: true
 contact_links:
   - name: Mcraftr README
     url: https://github.com/DeployFaith/mcraftr/blob/main/README.md
-    about: Start with the README for product scope, demo info, and install guidance.
+    about: Start with the README for product scope, self-host docs, and install guidance.

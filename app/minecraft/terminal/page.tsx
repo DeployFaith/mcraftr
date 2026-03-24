@@ -8,7 +8,7 @@ export default async function MinecraftTerminalPage() {
   if (!session?.user?.id || !getUserById(session.user.id)) {
     redirect('/login')
   }
-  if (session.role !== 'admin' && session.demoReadOnly !== true) {
+  if (session.role !== 'admin') {
     redirect('/minecraft?tab=dashboard')
   }
 
@@ -18,7 +18,7 @@ export default async function MinecraftTerminalPage() {
         <div className="font-mono text-[12px] tracking-[0.18em] text-[var(--text-dim)]">SERVER TERMINAL</div>
         <div className="text-[14px] text-[var(--text-dim)]">Standalone terminal workspace for server command discovery, execution, docs, and favorites.</div>
       </div>
-      <AdminTerminalWorkspace initialMode="popout" standalone readOnly={session.demoReadOnly === true} />
+      <AdminTerminalWorkspace initialMode="popout" standalone readOnly={false} />
     </div>
   )
 }

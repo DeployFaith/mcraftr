@@ -1,21 +1,19 @@
 import { NextRequest } from 'next/server'
 import { getUserById, getUserFeatures, setUserRole, deleteUser, updatePassword } from '@/lib/users'
 import { logAudit } from '@/lib/audit'
-import { getDemoReadonlyAccess, rejectDemoReadonlyWrite } from '@/lib/demo-readonly'
+import { getAdminAccess } from '@/lib/admin-access'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 async function requireAdmin(req: NextRequest): Promise<string | null> {
-  const access = await getDemoReadonlyAccess(req)
+  const access = await getAdminAccess(req)
   return access?.isAdmin ? access.userId : null
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const access = await getDemoReadonlyAccess(req)
+  const access = await getAdminAccess(req)
   if (!access || !access.isAdmin) return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })
-  const readOnlyResponse = rejectDemoReadonlyWrite(access)
-  if (readOnlyResponse) return readOnlyResponse
   const adminId = access.userId
 
   const features = getUserFeatures(adminId)
@@ -54,10 +52,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const access = await getDemoReadonlyAccess(req)
+  const access = await getAdminAccess(req)
   if (!access || !access.isAdmin) return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })
-  const readOnlyResponse = rejectDemoReadonlyWrite(access)
-  if (readOnlyResponse) return readOnlyResponse
   const adminId = access.userId
 
   const { id } = await params

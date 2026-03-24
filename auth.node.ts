@@ -2,15 +2,6 @@ import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { getUserByEmail, getUserById, validatePassword } from '@/lib/users'
 import { authConfig } from '@/auth'
-import { isDemoRestrictedUser } from '@/lib/demo-policy'
-
-function resolveDemoAdminAlias(username: string, host: string | null) {
-  const alias = process.env.MCRAFTR_DEMO_ADMIN_ALIAS?.trim()
-  if (!alias || username.trim() !== alias) return username
-  const normalizedHost = host?.trim().toLowerCase() ?? ''
-  if (normalizedHost !== 'demo.mcraftr.deployfaith.xyz') return username
-  return process.env.MCRAFTR_ADMIN_USER?.trim() || username
-}
 
 // This file is Node.js only — it uses static imports of lib/users which
 // depends on fs, crypto, better-sqlite3, etc. It must NEVER be imported
@@ -30,11 +21,7 @@ export const { handlers, auth: nodeAuth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials, request) {
         if (!credentials?.username || !credentials?.password) return null
-        const username = resolveDemoAdminAlias(
-          credentials.username as string,
-          request.headers.get('host'),
-        )
-        const user = getUserByEmail(username)
+        const user = getUserByEmail(credentials.username as string)
         if (!user) return null
         if (!validatePassword(user, credentials.password as string)) return null
         return { id: user.id, name: user.email, email: user.email }
@@ -66,7 +53,6 @@ export const { handlers, auth: nodeAuth, signIn, signOut } = NextAuth({
         token.role = u?.role ?? 'user'
         token.activeServerId = u?.activeServerId ?? null
         token.activeServerLabel = u?.serverLabel ?? null
-        token.demoReadOnly = u ? isDemoRestrictedUser(u) : false
       }
       return token
     },

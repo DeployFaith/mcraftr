@@ -1,13 +1,13 @@
 import { NextRequest } from 'next/server'
 import { getUserById, getUserFeatures } from '@/lib/users'
 import { getDb } from '@/lib/db'
-import { getDemoReadonlyAccess, requireAdminReadable } from '@/lib/demo-readonly'
+import { getAdminAccess, requireAdminReadable } from '@/lib/admin-access'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
-  const auth = requireAdminReadable(await getDemoReadonlyAccess(req))
+  const auth = requireAdminReadable(await getAdminAccess(req))
   if (!auth.ok) return auth.response
   const { access } = auth
   const userId = access.userId
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   if (!serverId) return Response.json({ ok: false, error: 'No active server' }, { status: 400 })
 
   const features = getUserFeatures(userId)
-  if (!access.demoReadOnly && !features.enable_admin_moderation && !features.enable_admin_whitelist && !features.enable_admin_operator) {
+  if (!features.enable_admin_moderation && !features.enable_admin_whitelist && !features.enable_admin_operator) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
 
@@ -34,5 +34,5 @@ export async function GET(req: NextRequest) {
         'SELECT player_name, last_seen FROM player_directory WHERE user_id = ? AND server_id = ? ORDER BY last_seen DESC'
       ).all(userId, serverId) as { player_name: string; last_seen: number }[]
 
-  return Response.json({ ok: true, players: rows, readOnly: access.demoReadOnly })
+  return Response.json({ ok: true, players: rows, readOnly: false })
 }

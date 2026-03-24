@@ -3,7 +3,6 @@ import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUser
 import { logAudit } from '@/lib/audit'
 import { runBridgeJson } from '@/lib/server-bridge'
 import { buildPresetSnbt, normalizeEntityPresetInput } from '@/lib/entity-presets'
-import { enforceDemoGuardrails, getDemoCappedCount } from '@/lib/demo-limits'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -33,7 +32,7 @@ export async function POST(req: NextRequest) {
   const sourceKind = typeof body.sourceKind === 'string' ? body.sourceKind.trim() : 'native'
   const locationMode = body.locationMode === 'coords' ? 'coords' : 'player'
   const requestedCount = Math.max(1, Math.min(64, Number(body.count) || 1))
-  const count = getDemoCappedCount(userId, requestedCount, 32)
+  const count = requestedCount
   if (!entityId) {
     return Response.json({ ok: false, error: 'Entity id is required' }, { status: 400 })
   }
@@ -50,9 +49,6 @@ export async function POST(req: NextRequest) {
   if (locationMode === 'coords' && (!world || !isFiniteNumber(x) || !isFiniteNumber(y) || !isFiniteNumber(z))) {
     return Response.json({ ok: false, error: 'World and coordinates are required' }, { status: 400 })
   }
-
-  const demoGuard = await enforceDemoGuardrails(userId, serverId, 'entity_spawn', count)
-  if (demoGuard) return demoGuard
 
   if (sourceKind !== 'native') {
     const preset = normalizeEntityPresetInput(body)
