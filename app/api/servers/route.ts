@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
       const bridge = await testBridgeConnection(created.host, created.port, password, created.bridge.commandPrefix)
       updateServerBridgeHealth(userId, created.id, {
         lastSeen: bridge.ok ? Math.floor(Date.now() / 1000) : null,
-        lastError: bridge.ok ? null : bridge.error || 'Bridge test failed',
+        lastError: bridge.ok ? null : bridge.error || 'Relay test failed',
         capabilities: bridge.ok ? (bridge.capabilities ?? []) : [],
         providerId: bridge.ok ? (bridge.providerId ?? null) : undefined,
         providerLabel: bridge.ok ? (bridge.providerLabel ?? null) : undefined,
@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
           detectedAt: null,
         })
       }
-      if (!bridge.ok) warnings.push(bridge.error || 'Bridge test failed')
+      if (!bridge.ok) warnings.push(bridge.error || 'Relay test failed')
     } else {
       updateServerBridgeHealth(userId, created.id, { lastSeen: null, lastError: null, capabilities: [] })
       updateServerMinecraftVersion(userId, created.id, created.minecraftVersion.override

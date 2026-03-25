@@ -2,6 +2,8 @@
 
 Portainer is a good fit for Mcraftr if you already manage your Docker host there.
 
+This is an alternative deployment path. For the easiest first install, start with `./install.sh` from the repo root and use Portainer when you specifically want stack management there.
+
 ## Easiest Path
 
 Use one of the shipped compose files as a stack template:
@@ -51,6 +53,6 @@ For the full stack compose:
 1. deploy `deploy/compose/full-stack.image.compose.yaml`
 2. mount your Minecraft server data into Beacon at `/data`
 3. expose the app normally
-4. configure Bridge + Beacon in the Mcraftr server setup flow
+4. configure Relay + Beacon in the Mcraftr server setup flow
 
 The full-stack image compose file is the best reference for how to model Portainer stack services.

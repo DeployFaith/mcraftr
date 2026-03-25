@@ -367,7 +367,7 @@ function ConnectForm() {
                   {
                     mode: 'full',
                     title: 'Full Mcraftr Stack',
-                    description: 'RCON + Bridge + Beacon for Worlds, structures, entities, maps, catalog art, and the designed Mcraftr workflow.',
+                    description: 'RCON + Relay + Beacon for Worlds, structures, entities, maps, catalog art, and the designed Mcraftr workflow.',
                   },
                 ] as const).map(option => {
                   const active = stackMode === option.mode
@@ -481,13 +481,13 @@ function ConnectForm() {
                 type="text"
                 value={minecraftVersionOverride}
                 onChange={e => setMinecraftVersionOverride(e.target.value)}
-                placeholder={fullStackSelected ? 'Leave blank to use Bridge detection' : '1.21.11'}
+                placeholder={fullStackSelected ? 'Leave blank to use Relay detection' : '1.21.11'}
                 className="w-full px-3 py-2.5 rounded-lg font-mono text-sm focus:outline-none transition-colors"
                 style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
               />
               <div className="mt-1 text-[10px] font-mono" style={{ color: 'var(--text-dim)' }}>
                 {fullStackSelected
-                  ? 'Override the detected Minecraft version only if Bridge reporting is unavailable or wrong. Version-aware art and compatibility will use this value first.'
+                  ? 'Override the detected Minecraft version only if Relay reporting is unavailable or wrong. Version-aware art and compatibility will use this value first.'
                   : 'Quick Connect cannot detect Minecraft version on its own. Set this so version-aware art and compatibility match the server you are connecting to.'}
               </div>
             </div>
@@ -497,9 +497,9 @@ function ConnectForm() {
                 <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-[11px] font-mono tracking-widest" style={{ color: 'var(--text-dim)' }}>MCRAFTR BRIDGE</div>
+                      <div className="text-[11px] font-mono tracking-widest" style={{ color: 'var(--text-dim)' }}>MCRAFTR RELAY</div>
                       <div className="text-[12px] font-mono mt-1" style={{ color: 'var(--text-dim)' }}>
-                        Command and control layer for world operations, plugin stack data, typed server actions, and the deeper Mcraftr workflow.
+                        Mcraftr's live integration layer for world operations, plugin stack data, typed server actions, and the deeper workflow. Your server needs a Relay API integration that exposes a relay prefix over RCON.
                       </div>
                     </div>
                     <div className="rounded border px-2 py-1 text-[10px] font-mono tracking-widest" style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}>
@@ -509,7 +509,7 @@ function ConnectForm() {
 
                   <div>
                     <label className="block text-[9px] font-mono tracking-widest mb-1.5" style={{ color: 'var(--text-dim)' }}>
-                      BRIDGE COMMAND PREFIX
+                      RELAY PREFIX
                     </label>
                     <input
                       type="text"
@@ -520,7 +520,7 @@ function ConnectForm() {
                       style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
                     />
                     <div className="mt-1 text-[10px] font-mono" style={{ color: 'var(--text-dim)' }}>
-                      Use <code>mcraftr</code> for the public bridge. Change this only if you intentionally run a custom adapter.
+                      Enter the relay prefix exposed by your server's Relay API integration. Change this only if your plugin or mod uses a custom prefix.
                     </div>
                   </div>
                 </div>
@@ -714,7 +714,7 @@ function ConnectForm() {
                           </div>
                           {server.bridge?.enabled && (
                             <div className="text-[10px] font-mono text-[var(--text-dim)] mt-1 break-all">
-                              bridge · {sanitizeBridgePrefix(server.bridge.commandPrefix)}{server.bridge.providerLabel ? ` · ${sanitizeBridgeProviderLabel(server.bridge.providerLabel)}` : ''}{server.bridge.lastSeen ? ` · seen ${new Date(server.bridge.lastSeen * 1000).toLocaleString()}` : ''}
+                              relay · {sanitizeBridgePrefix(server.bridge.commandPrefix)}{server.bridge.providerLabel ? ` · ${sanitizeBridgeProviderLabel(server.bridge.providerLabel)}` : ''}{server.bridge.lastSeen ? ` · seen ${new Date(server.bridge.lastSeen * 1000).toLocaleString()}` : ''}
                             </div>
                           )}
                           {server.bridge?.enabled && server.bridge.lastError && (

@@ -1,28 +1,10 @@
 # Mcraftr Install Guide
 
-This guide focuses on the easiest supported ways to run Mcraftr.
+This guide is organized around the easiest path first.
 
-## Choose a Path
+## Option 1: Easiest Local, Private-Network, or LAN Install
 
-- `Quick Connect` — fastest setup, RCON-only, no Bridge or Beacon required
-- `Full Mcraftr Stack` — RCON + Bridge + Beacon, recommended for the full product
-
-## Bridge And Beacon, Plainly
-
-`Quick Connect` only uses RCON.
-
-`Full Mcraftr Stack` adds two extra pieces:
-
-- `Bridge` — exposes richer Minecraft-side operations that go beyond plain RCON command flows
-- `Beacon` — gives Mcraftr access to Minecraft-side data paths for world-aware catalogs, previews, and filesystem-backed context
-
-Use `Quick Connect` if you just want to manage a server over RCON.
-
-Use `Full Mcraftr Stack` if you want the worlds, structures, entities, and richer Mcraftr-specific workflows.
-
-## Option 1: Quick Connect With Docker Compose
-
-Best for most users on a VPS, home server, or local Docker host.
+Best for most users on a home server, VPS, mini PC, NAS, or local Docker host.
 
 ### 1. Clone the repo
 
@@ -31,45 +13,36 @@ git clone https://github.com/DeployFaith/mcraftr.git
 cd mcraftr
 ```
 
-### 2. Generate a working `.env`
+### 2. Run the installer
 
 ```bash
-npm run setup:env
+chmod +x install.sh
+./install.sh
 ```
 
-### 3. Edit `.env`
+The installer can configure Mcraftr for:
 
-Minimum fields to review:
+- this machine only
+- a private network like Tailscale, WireGuard, or another VPN
+- your local network
+- a public domain with HTTPS
 
-- `NEXTAUTH_URL`
-- `MCRAFTR_ADMIN_USER`
-- `MCRAFTR_ADMIN_PASS`
+It creates `.env`, generates secrets, starts Docker services, and prints the URL to open.
 
-If you are only testing locally, you can leave:
+If `.env` already exists, the installer preserves it by default and lets you reuse it, update a few values, or replace it completely.
 
-```text
-NEXTAUTH_URL=http://localhost:3054
-```
+### Which mode should you choose?
 
-Use the exact browser-facing URL for your install:
+- `This machine only` keeps Mcraftr on `localhost`.
+- `Private network` binds to a specific private IP or VPN hostname that already belongs to this machine.
+- `Local network` binds to every LAN-facing interface with `0.0.0.0`.
+- `Public domain` keeps Mcraftr private on the host and lets Caddy expose HTTPS.
 
-- local only: `http://localhost:3054`
-- local network: `http://<server-ip>:3054`
-- public domain / reverse proxy: `https://<your-domain>`
+### 3. Sign in
 
-### 4. Start Mcraftr
+Use the admin email and password from the installer.
 
-```bash
-docker compose up -d --build
-```
-
-### 5. Open the app
-
-```text
-http://localhost:3054
-```
-
-### 6. Add your Minecraft server
+### 4. Add your Minecraft server
 
 In Mcraftr, choose `Quick Connect` and enter:
 
@@ -78,89 +51,96 @@ In Mcraftr, choose `Quick Connect` and enter:
 - RCON password
 - optional Minecraft version override
 
-## Option 2: Quick Connect With a Prebuilt Docker Image
+Your Minecraft server can be local, on your LAN, on a private VPN, or on a remote VPS.
 
-Use this if you do not want to build locally.
+## Option 2: Public Domain Install With Caddy
 
-### 1. Copy the example env file
+This path is also available through `./install.sh`.
 
-```bash
-cp .env.example .env
-```
+Choose `Public domain` in the installer, then provide:
 
-### 2. Edit `.env`
+- your public domain
+- your Let's Encrypt email
 
-Set at least:
+The installer starts:
 
-- `NEXTAUTH_URL`
-- `MCRAFTR_ADMIN_USER`
-- `MCRAFTR_ADMIN_PASS`
-- `MCRAFTR_IMAGE`
+- Mcraftr
+- Redis
+- Caddy for TLS and reverse proxying
 
-Recommended image name once GHCR publishing is enabled:
+### DNS Requirements
 
-```text
-ghcr.io/deployfaith/mcraftr:latest
-```
+Point your domain's A or AAAA record at the host running Docker before or shortly after the first start.
 
-### 3. Start the image-based stack
+### Exposure Model
 
-```bash
-docker compose -f deploy/compose/quick-connect.image.compose.yaml up -d
-```
+For public installs:
 
-## Option 3: Full Mcraftr Stack With Docker Compose
+- Caddy exposes `80` and `443`
+- Mcraftr itself stays bound to localhost on the host machine
 
-Use this if you want Worlds, structures, entities, maps, and the designed Mcraftr workflow.
+That keeps the app port private while still giving users a clean `https://your-domain` entrypoint.
+
+## Option 3: Full Mcraftr Stack
+
+Use this if you want the richer Mcraftr feature set beyond plain RCON.
+
+`Full Mcraftr Stack` adds:
+
+- `Relay` for Mcraftr's live structured server operations
+- `Beacon` for filesystem-backed Minecraft data access
 
 ### Requirements
 
 - reachable Minecraft RCON
-- Bridge plugin/adapter installed on the Minecraft server
+- a compatible Relay API integration installed on the Minecraft server
 - Beacon-enabled Mcraftr deployment
-- a readable host path for your Minecraft server data
+- readable Minecraft server data path mounted into Beacon
 
-### 1. Copy the env file
+Relay is Mcraftr's live integration layer. Your plugin or mod exposes a Relay prefix over RCON, and Mcraftr uses that prefix for structured world, entity, terminal, and advanced admin workflows.
+
+Beacon is Mcraftr's read-only data layer. It scans your Minecraft data directory for worlds, structures, plugins, entity presets, maps, and related metadata.
+
+Read more:
+
+- `docs/full-stack-relay-and-beacon.md`
+- `docs/relay-api.md`
+- `docs/beacon.md`
+
+### Image-Based Full Stack
+
+1. Copy the env file:
 
 ```bash
 cp .env.example .env
 ```
 
-### 2. Edit `.env`
-
-In addition to the normal app values, set:
+2. Set at least:
 
 - `MCRAFTR_IMAGE`
 - `MCRAFTR_MINECRAFT_DATA`
-- `MCRAFTR_BEACON_TOKEN` if you want Beacon auth
+- optional `MCRAFTR_BEACON_TOKEN`
 - optional `MCRAFTR_SCHEMATICS_DIR`
 - optional `MCRAFTR_ENTITY_PRESET_DIR`
 
-Example:
-
-```bash
-MCRAFTR_IMAGE=ghcr.io/deployfaith/mcraftr:latest
-MCRAFTR_MINECRAFT_DATA=/srv/minecraft/data
-MCRAFTR_SCHEMATICS_DIR=plugins/WorldEdit/schematics
-MCRAFTR_ENTITY_PRESET_DIR=mcraftr/entity-presets
-```
-
-### 3. Start the full stack
+3. Start the full stack:
 
 ```bash
 docker compose -f deploy/compose/full-stack.image.compose.yaml up -d
 ```
 
-### 4. In Mcraftr, choose `Full Mcraftr Stack`
-
-Enter:
+4. In Mcraftr, choose `Full Mcraftr Stack` and enter:
 
 - RCON details
-- Bridge command prefix
+- Relay prefix
 - Beacon URL
 - Beacon token if required
 
-## Option 4: Dokploy
+## Option 4: Alternative Platforms
+
+If you already manage your infrastructure through another control plane, these are supported but intentionally secondary to the default installer.
+
+### Dokploy
 
 Mcraftr includes Dokploy templates and a deploy script.
 
@@ -177,12 +157,15 @@ You will need:
 - the normal app env values
 - either `MCRAFTR_IMAGE` or `MCRAFTR_BUILD_CONTEXT_URL`
 
-## Platform Notes
+### Coolify
 
-- Coolify: see `docs/install-coolify.md`
-- Portainer: see `docs/install-portainer.md`
+See `docs/install-coolify.md`.
 
-## What Mcraftr Actually Needs At Runtime
+### Portainer
+
+See `docs/install-portainer.md`.
+
+## What Mcraftr Needs At Runtime
 
 No matter which deployment platform you use, Mcraftr needs:
 
@@ -194,4 +177,4 @@ No matter which deployment platform you use, Mcraftr needs:
 
 `Quick Connect` only needs RCON.
 
-`Full Mcraftr Stack` additionally needs Bridge and Beacon.
+`Full Mcraftr Stack` additionally needs Relay and Beacon.

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
+import { requireServerCapability } from '@/lib/server-capability'
 import { getActiveServer, updateServerMinecraftVersion } from '@/lib/users'
 import { resolveMinecraftVersion } from '@/lib/minecraft-version'
 import { callSidecarForRequest, runBridgeJson } from '@/lib/server-bridge'
@@ -42,6 +43,9 @@ export async function GET(req: NextRequest) {
   if (!checkFeatureAccess(features, 'enable_plugin_stack_status')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+
+  const capability = await requireServerCapability(req, 'beacon')
+  if (!capability.ok) return capability.response
 
   const activeServer = getActiveServer(userId)
   if (!activeServer) return Response.json({ ok: false, error: 'No active server configured' }, { status: 400 })

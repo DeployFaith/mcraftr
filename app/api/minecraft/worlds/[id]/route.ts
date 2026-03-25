@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { logAudit } from '@/lib/audit'
 import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
+import { requireServerCapability } from '@/lib/server-capability'
 import { runBridgeJson } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
@@ -51,6 +52,9 @@ export async function GET(
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
 
+  const capability = await requireServerCapability(req, 'full')
+  if (!capability.ok) return capability.response
+
   const { id } = await params
   const bridge = await runBridgeJson<WorldSettingsResponse>(req, `worlds settings ${id}`)
   if (!bridge.ok || bridge.data.ok === false) {
@@ -100,6 +104,9 @@ export async function PATCH(
     return Response.json({ ok: false, error: 'Feature disabled by admin or unsupported setting' }, { status: 403 })
   }
 
+  const capability = await requireServerCapability(req, 'full')
+  if (!capability.ok) return capability.response
+
   const command = isGamerule
     ? `worlds set ${id} gamerule ${key} ${value === true || value === 'true' ? 'true' : 'false'}`
     : `worlds set ${id} ${key} ${String(value ?? '').trim()}`
@@ -129,6 +136,9 @@ export async function DELETE(
   if (!checkFeatureAccess(features, 'enable_world_build_tools')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+
+  const capability = await requireServerCapability(req, 'full')
+  if (!capability.ok) return capability.response
 
   const { id } = await params
   const bridge = await runBridgeJson<{ ok: boolean; world?: string; error?: string }>(req, `worlds delete ${id}`)

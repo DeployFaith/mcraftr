@@ -8,9 +8,11 @@ import PlayerPicker from './PlayerPicker'
 import SpawnInspectModal, { type EntityCatalogEntry, type LocationMode, type StructureCatalogEntry } from './SpawnInspectModal'
 import CatalogArtwork, { isCatalogArtworkEnabled } from './CatalogArtwork'
 import EntityPresetEditorModal from './EntityPresetEditorModal'
+import CapabilityLockCard from './CapabilityLockCard'
 import { playSound } from '@/app/components/soundfx'
 import type { CatalogArtPayload } from '@/lib/catalog-art/types'
 import type { FeatureKey } from '@/lib/features'
+import type { ServerStackMode } from '@/lib/server-stack'
 import { FALLBACK_ENTITY_CATALOG } from '@/lib/entity-catalog'
 
 type FeatureFlags = Record<FeatureKey, boolean>
@@ -427,10 +429,12 @@ export default function WorldsSection({
   players,
   selectedPlayer,
   onSelectedPlayerChange,
+  stackMode,
 }: {
   players: string[]
   selectedPlayer: string
   onSelectedPlayerChange: (player: string) => void
+  stackMode: ServerStackMode
 }) {
   const [features, setFeatures] = useState<FeatureFlags | null>(null)
   const [worldsData, setWorldsData] = useState<WorldsData | null>(null)
@@ -536,6 +540,13 @@ export default function WorldsSection({
   }, [collapseAllActive])
 
   const loadData = useCallback(async (showSpinner = false) => {
+    if (stackMode !== 'full') {
+      setLoading(false)
+      setError(null)
+      setStructureLoadError(null)
+      setEntityLoadError(null)
+      return
+    }
     if (showSpinner) setLoading(true)
     setError(null)
     setStructureLoadError(null)
@@ -615,7 +626,7 @@ export default function WorldsSection({
 
     setError(nextErrors[0] ?? null)
     setLoading(false)
-  }, [canEntityCatalog, canSpawnTools, canStructureCatalog, canWorldInventory])
+  }, [canEntityCatalog, canSpawnTools, canStructureCatalog, canWorldInventory, stackMode])
 
   const runWorldCommand = useCallback(async (kind: 'time' | 'weather', value: string) => {
     if (!activeWorld) {
@@ -652,10 +663,14 @@ export default function WorldsSection({
   }, [loadFeatures])
 
   useEffect(() => {
+    if (stackMode !== 'full') {
+      setLoading(false)
+      return
+    }
     void loadData(true)
     const id = setInterval(() => void loadData(false), 30_000)
     return () => clearInterval(id)
-  }, [loadData])
+  }, [loadData, stackMode])
 
   useEffect(() => {
     const firstWorld = worldsData?.worlds?.[0]?.name ?? ''
@@ -686,6 +701,10 @@ export default function WorldsSection({
   }, [activeWorld, worldsData])
 
   useEffect(() => {
+    if (stackMode !== 'full') {
+      setPlayerWorlds({})
+      return
+    }
     let cancelled = false
     if (players.length === 0) {
       setPlayerWorlds({})
@@ -704,7 +723,7 @@ export default function WorldsSection({
       setPlayerWorlds(Object.fromEntries(entries))
     })
     return () => { cancelled = true }
-  }, [players])
+  }, [players, stackMode])
 
   const structureCategories = useMemo(
     () => ['all', ...Array.from(new Set(structures.map(entry => entry.category))).sort((a, b) => a.localeCompare(b))],
@@ -1293,6 +1312,17 @@ export default function WorldsSection({
               Delete
             </button>
           )}
+        </div>
+      </div>
+    )
+  }
+
+  if (stackMode !== 'full') {
+    return (
+      <div className="space-y-4 pb-6">
+        <CapabilityLockCard requirement="full" feature="Worlds, Structures, Entities, and Maps" />
+        <div className="glass-card p-4 text-[13px] font-mono text-[var(--text-dim)]">
+          Quick Connect keeps the core panel fast and simple. Upgrade this server to the Full Mcraftr Stack when you want world inventory, structure placement, entity workflows, maps, and the designed Mcraftr world surface.
         </div>
       </div>
     )
@@ -1907,7 +1937,7 @@ export default function WorldsSection({
           <div className="grid gap-2 sm:grid-cols-3">
             {[
               { key: 'all', label: 'All Entries', count: entities.length, hint: 'Built-in catalog plus presets' },
-              { key: 'native', label: 'Native Catalog', count: entitySourceCounts.native, hint: 'Bridge/fallback spawnable entities' },
+              { key: 'native', label: 'Native Catalog', count: entitySourceCounts.native, hint: 'Relay/fallback spawnable entities' },
               { key: 'custom', label: 'Custom Presets', count: entitySourceCounts.custom, hint: 'Saved JSON presets with extra config' },
             ].map(option => (
               <button

@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     )
     const firstError = results.find(result => !result.ok)
     if (firstError && !firstError.ok) {
-      return Response.json({ ok: false, error: firstError.error || 'Bridge request failed', code: firstError.code }, { status: 502 })
+      return Response.json({ ok: false, error: firstError.error || 'Relay request failed', code: firstError.code }, { status: 502 })
     }
     const gamerules: Record<string, string> = {}
     ADMIN_GAMERULES.forEach((rule, i) => {

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { logAudit } from '@/lib/audit'
 import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags, rconForRequest } from '@/lib/rcon'
+import { requireServerCapability } from '@/lib/server-capability'
 import { runBridgeJson } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
@@ -33,6 +34,9 @@ export async function POST(
   if (!checkFeatureAccess(features, 'enable_world')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+
+  const capability = await requireServerCapability(req, 'full')
+  if (!capability.ok) return capability.response
 
   const { id } = await params
   const body = await req.json().catch(() => ({}))

@@ -338,7 +338,7 @@ function buildScheduleCommand(task: ScheduleRecord, bridge: { enabled: boolean; 
   const payload = task.actionPayload
   const bridgePrefix = bridge.enabled ? ((bridge.commandPrefix ?? '').trim().replace(/^\/+/, '') || 'mcraftr') : null
   const bridgeCommand = (suffix: string) => {
-    if (!bridgePrefix) throw new Error('Bridge integration is required for this scheduled action')
+    if (!bridgePrefix) throw new Error('Relay is required for this scheduled action')
     return `${bridgePrefix} ${suffix}`
   }
   if (task.actionType === 'broadcast') return bridgeCommand(`broadcast ${(payload as { message: string }).message}`)

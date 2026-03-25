@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getUserFeatureFlags } from '@/lib/rcon'
+import { requireServerCapability } from '@/lib/server-capability'
 import { runBridgeJson } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
@@ -39,6 +40,9 @@ export async function GET(req: NextRequest) {
   if (!checkFeatureAccess(features, 'enable_entity_catalog')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+
+  const capability = await requireServerCapability(req, 'relay')
+  if (!capability.ok) return capability.response
 
   const world = req.nextUrl.searchParams.get('world')?.trim() ?? ''
   const command = world ? `entities live ${world}` : 'entities live'

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getUserFeatureFlags } from '@/lib/rcon'
+import { requireServerCapability } from '@/lib/server-capability'
 import { callSidecarForRequest, runBridgeJson } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
@@ -29,6 +30,9 @@ export async function GET(req: NextRequest) {
   if (!checkFeatureAccess(features, 'enable_world_build_tools')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+
+  const capability = await requireServerCapability(req, 'relay')
+  if (!capability.ok) return capability.response
 
   const player = req.nextUrl.searchParams.get('player')
   const bridge = await runBridgeJson<WorldEditInfoResponse>(req, player ? `worldedit info ${player}` : 'worldedit info')

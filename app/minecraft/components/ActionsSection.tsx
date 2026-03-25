@@ -17,6 +17,7 @@ import type { ConfirmModalProps } from './ConfirmModal'
 import type { FeatureKey } from '@/lib/features'
 import PlayerPicker from './PlayerPicker'
 import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
+import CapabilityLockCard from './CapabilityLockCard'
 import KitIcon from './KitIcon'
 import CatalogArtwork from './CatalogArtwork'
 import {
@@ -37,6 +38,7 @@ type Props = {
   selectedPlayer?: string
   onSelectedPlayerChange?: (player: string) => void
   minecraftVersion?: string | null
+  relayEnabled?: boolean
 }
 
 type FeatureFlags = Record<FeatureKey, boolean>
@@ -335,7 +337,7 @@ function QuantityPicker({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function ActionsSection({ players, selectedPlayer: selectedPlayerProp, onSelectedPlayerChange, minecraftVersion }: Props) {
+export default function ActionsSection({ players, selectedPlayer: selectedPlayerProp, onSelectedPlayerChange, minecraftVersion, relayEnabled = true }: Props) {
   const { toasts, addToast } = useToast()
   const hydratedCatalog = useMemo(() => hydrateCatalogWithArt(minecraftVersion, CATALOG), [minecraftVersion])
   const [features, setFeatures] = useState<FeatureFlags | null>(null)
@@ -492,6 +494,11 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
   }
 
   const loadLiveEntities = useCallback(async () => {
+    if (!relayEnabled) {
+      setLiveEntities([])
+      setLiveEntitiesLoading(false)
+      return
+    }
     setLiveEntitiesLoading(true)
     try {
       const response = await fetch('/api/minecraft/entities/live')
@@ -507,7 +514,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
     } finally {
       setLiveEntitiesLoading(false)
     }
-  }, [addToast])
+  }, [addToast, relayEnabled])
 
   const teleportActor = async (payload: Record<string, unknown>, reset?: () => void) => {
     setActorTping(true)
@@ -1001,10 +1008,13 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
   const canInventory = features ? features.enable_inventory : true
   const allSectionsDisabled = !canPlayerCmd && !canTeleport && !canKits && !canCatalog && !canInventory
   useEffect(() => {
-    if (canTeleport) {
+    if (canTeleport && relayEnabled) {
       loadLiveEntities()
+    } else if (!relayEnabled) {
+      setLiveEntities([])
+      setLiveEntitiesLoading(false)
     }
-  }, [canTeleport, loadLiveEntities])
+  }, [canTeleport, loadLiveEntities, relayEnabled])
   const [collapseAllActive, setCollapseAllActive] = useState(false)
   const toggleCollapseAll = () => {
     const nextOpen = collapseAllActive
@@ -1100,47 +1110,53 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
       {canTeleport && (
       <CollapsibleCard title="TELEPORT" storageKey="actions:teleport" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
         <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-3 text-[12px] font-mono text-[var(--text-dim)]">
-          {liveEntitiesLoading ? 'Loading live entities…' : `${liveEntities.length} live entit${liveEntities.length === 1 ? 'y' : 'ies'} available for actor-based teleport controls.`}
+          {relayEnabled
+            ? (liveEntitiesLoading ? 'Loading live entities…' : `${liveEntities.length} live entit${liveEntities.length === 1 ? 'y' : 'ies'} available for actor-based teleport controls.`)
+            : 'Player teleport stays available with raw RCON. Relay unlocks live entity targeting and actor-based teleport controls.'}
         </div>
 
-        <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-3">
-          <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">LIVE ENTITY PICKER</div>
-          <input
-            type="text"
-            value={entitySearch}
-            onChange={event => setEntitySearch(event.target.value)}
-            placeholder="Search entity label, custom name, or world"
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[13px] font-mono text-[var(--text)]"
-          />
-          <div className="max-h-48 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2">
-            {filteredEntities.length === 0 ? (
-              <div className="px-2 py-2 text-[12px] font-mono text-[var(--text-dim)]">No matching live entities.</div>
-            ) : (
-              <div className="space-y-1">
-                {filteredEntities.map(entity => {
-                  const selected = entity.uuid === entityToPlayerId || entity.uuid === playerToEntityId || entity.uuid === entityCoordId
-                  return (
-                    <button
-                      key={entity.uuid}
-                      type="button"
-                      onClick={() => {
-                        setEntityToPlayerId(entity.uuid)
-                        setPlayerToEntityId(entity.uuid)
-                        setEntityCoordId(entity.uuid)
-                      }}
-                      className="w-full rounded-lg border px-3 py-2 text-left font-mono text-[12px] transition-all"
-                      style={selected
-                        ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
-                        : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
-                    >
-                      {formatEntityOption(entity)}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+        {relayEnabled ? (
+          <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-3">
+            <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">LIVE ENTITY PICKER</div>
+            <input
+              type="text"
+              value={entitySearch}
+              onChange={event => setEntitySearch(event.target.value)}
+              placeholder="Search entity label, custom name, or world"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[13px] font-mono text-[var(--text)]"
+            />
+            <div className="max-h-48 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2">
+              {filteredEntities.length === 0 ? (
+                <div className="px-2 py-2 text-[12px] font-mono text-[var(--text-dim)]">No matching live entities.</div>
+              ) : (
+                <div className="space-y-1">
+                  {filteredEntities.map(entity => {
+                    const selected = entity.uuid === entityToPlayerId || entity.uuid === playerToEntityId || entity.uuid === entityCoordId
+                    return (
+                      <button
+                        key={entity.uuid}
+                        type="button"
+                        onClick={() => {
+                          setEntityToPlayerId(entity.uuid)
+                          setPlayerToEntityId(entity.uuid)
+                          setEntityCoordId(entity.uuid)
+                        }}
+                        className="w-full rounded-lg border px-3 py-2 text-left font-mono text-[12px] transition-all"
+                        style={selected
+                          ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
+                          : { borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+                      >
+                        {formatEntityOption(entity)}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <CapabilityLockCard requirement="relay" feature="Live entity targeting and actor teleports" compact />
+        )}
 
         <div>
           <SectionLabel>PLAYER → PLAYER</SectionLabel>
@@ -1201,7 +1217,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
           </div>
         </div>
 
-        <div>
+        {relayEnabled && <div>
           <SectionLabel>ENTITY → PLAYER</SectionLabel>
           {!selectedPlayer ? (
             <div className="text-[13px] font-mono text-[var(--text-dim)]">Choose an active player above</div>
@@ -1229,9 +1245,9 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
               </button>
             </div>
           )}
-        </div>
+        </div>}
 
-        <div>
+        {relayEnabled && <div>
           <SectionLabel>PLAYER → ENTITY</SectionLabel>
           {!selectedPlayer ? (
             <div className="text-[13px] font-mono text-[var(--text-dim)]">Choose an active player above</div>
@@ -1259,9 +1275,9 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
               </button>
             </div>
           )}
-        </div>
+        </div>}
 
-        <div>
+        {relayEnabled && <div>
           <SectionLabel>ENTITY → COORDINATES</SectionLabel>
           <div className="space-y-3">
             <select
@@ -1300,7 +1316,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
               {actorTping ? 'Teleporting...' : 'Teleport Entity to Coordinates'}
             </button>
           </div>
-        </div>
+        </div>}
       </CollapsibleCard>
       )}
 

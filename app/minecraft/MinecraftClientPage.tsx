@@ -3,7 +3,7 @@
 import { startTransition, useState, useCallback, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, Zap, Shield, MessageSquare, Settings, Trees, SquareTerminal } from 'lucide-react'
+import { LayoutDashboard, Users, Zap, Shield, MessageSquare, Settings, Trees, SquareTerminal, LockKeyhole } from 'lucide-react'
 import DashboardSection from './components/DashboardSection'
 import PlayersSection from './components/PlayersSection'
 import ActionsSection from './components/ActionsSection'
@@ -15,7 +15,7 @@ import AdminTerminalWorkspace from './components/AdminTerminalWorkspace'
 import MobileAccountDrawerPanel from './components/MobileAccountDrawerPanel'
 import type { FeatureKey } from '@/lib/features'
 import { playSound } from '@/app/components/soundfx'
-import type { ServerStackMode } from '@/lib/server-stack'
+import { meetsCapabilityRequirement, type ServerCapabilityRequirement, type ServerStackMode } from '@/lib/server-stack'
 import type { MinecraftVersionState } from '@/lib/minecraft-version'
 
 export type TabId = 'dashboard' | 'players' | 'actions' | 'worlds' | 'terminal' | 'admin' | 'chat' | 'settings'
@@ -28,11 +28,12 @@ const ALL_TABS: {
   Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>
   adminOnly?: boolean
   shortcut?: string
+  requirement?: ServerCapabilityRequirement
 }[] = [
   { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard, shortcut: '1' },
   { id: 'players', label: 'Players', Icon: Users, shortcut: '2' },
   { id: 'actions', label: 'Actions', Icon: Zap, shortcut: '3' },
-  { id: 'worlds', label: 'Worlds', Icon: Trees, shortcut: '4' },
+  { id: 'worlds', label: 'Worlds', Icon: Trees, shortcut: '4', requirement: 'full' },
   { id: 'chat', label: 'Chat', Icon: MessageSquare, shortcut: '5' },
   { id: 'admin', label: 'Admin', Icon: Shield, adminOnly: true, shortcut: '6' },
   { id: 'terminal', label: 'Terminal', Icon: SquareTerminal, adminOnly: true, shortcut: '7' },
@@ -57,6 +58,8 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
   const [selectedPlayer, setSelectedPlayer] = useState('')
   const [features, setFeatures] = useState<FeatureFlags | null>(null)
   const [stackMode, setStackMode] = useState<ServerStackMode>(initialStackMode)
+  const [bridgeEnabled, setBridgeEnabled] = useState(initialStackMode === 'full')
+  const [sidecarEnabled, setSidecarEnabled] = useState(initialStackMode === 'full')
   const [minecraftVersion, setMinecraftVersion] = useState<MinecraftVersionState | null>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
@@ -83,6 +86,8 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
       const payload = await response.json()
       if (payload.ok && payload.activeServer?.stackMode) {
         setStackMode(payload.activeServer.stackMode as ServerStackMode)
+        setBridgeEnabled(payload.activeServer.bridgeEnabled === true)
+        setSidecarEnabled(payload.activeServer.sidecarEnabled === true)
         setMinecraftVersion(payload.activeServer.minecraftVersion ?? null)
       }
     } catch {
@@ -139,7 +144,6 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
     if (t.id === 'players' && features && !features.enable_players_tab) return false
     if (t.id === 'actions' && features && !features.enable_actions_tab) return false
     if (t.id === 'worlds' && features && !features.enable_worlds_tab) return false
-    if (t.id === 'worlds' && stackMode === 'quick') return false
     if (t.id === 'chat' && features && !features.enable_chat) return false
     if (t.id === 'actions' && features) {
       const hasAnyAction = features.enable_world || features.enable_player_commands || features.enable_chat_write || features.enable_teleport || features.enable_kits || features.enable_item_catalog || features.enable_inventory
@@ -167,6 +171,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
     return !t.adminOnly || role === 'admin'
   })
   const visibleTab = tabs.find(t => t.id === activeTab) ? activeTab : 'dashboard'
+  const stackFlags = useMemo(() => ({ bridgeEnabled, sidecarEnabled }), [bridgeEnabled, sidecarEnabled])
 
   useEffect(() => {
     setVisitedTabs(prev => (prev.includes(visibleTab) ? prev : [...prev, visibleTab]))
@@ -189,7 +194,6 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
         const index = parseInt(key) - 1
         const visibleTabs = ALL_TABS.filter(t => {
           if (t.adminOnly && role !== 'admin') return false
-          if (t.id === 'worlds' && stackMode === 'quick') return false
           return true
         })
         const targetTab = visibleTabs[index]
@@ -216,8 +220,9 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
     <div className="flex flex-col min-h-[calc(100vh-48px)]">
       <nav className="hidden md:flex sticky top-14 z-30 border-b border-[var(--border)] backdrop-blur-md" style={{ background: 'rgba(10,10,15,0.88)' }}>
         <div className="mx-auto flex w-full max-w-6xl justify-center gap-2 px-4 py-3">
-          {tabs.map(({ id, label, Icon, shortcut }) => {
+          {tabs.map(({ id, label, Icon, shortcut, requirement = 'none' }) => {
             const active = visibleTab === id
+            const locked = !meetsCapabilityRequirement(stackFlags, requirement)
             return (
               <button
                 key={id}
@@ -247,6 +252,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
                   <Icon size={14} color="currentColor" strokeWidth={1.9} />
                 </span>
                 <span>{label.toUpperCase()}</span>
+                {locked && <LockKeyhole size={12} strokeWidth={1.8} className="opacity-70" />}
                 {shortcut && (
                   <span className={`ml-1 text-[10px] opacity-40 ${active ? 'text-[var(--accent)]' : ''}`}>
                     {shortcut}
@@ -282,8 +288,9 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1">
-                {tabs.map(({ id, label, Icon }) => {
+                {tabs.map(({ id, label, Icon, requirement = 'none' }) => {
                   const active = visibleTab === id
+                  const locked = !meetsCapabilityRequirement(stackFlags, requirement)
                   return (
                     <button
                       key={id}
@@ -317,6 +324,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
                       <span className="min-w-0 truncate font-mono text-[11px] tracking-[0.14em]">
                         {label.toUpperCase()}
                       </span>
+                      {locked && <LockKeyhole size={14} strokeWidth={1.8} className="ml-auto shrink-0 opacity-70" />}
                     </button>
                   )
                 })}
@@ -351,6 +359,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
               selectedPlayer={selectedPlayer}
               onSelectedPlayerChange={setSelectedPlayer}
               minecraftVersion={minecraftVersion?.resolved ?? null}
+              relayEnabled={bridgeEnabled}
             />
           </div>
         )}
@@ -360,6 +369,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
               players={players}
               selectedPlayer={selectedPlayer}
               onSelectedPlayerChange={setSelectedPlayer}
+              stackMode={stackMode}
             />
           </div>
         )}
@@ -370,15 +380,15 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
         )}
         {(role === 'admin') && shouldRenderTab('terminal') && (
           <div className={visibleTab === 'terminal' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'terminal'}>
-            <div className="space-y-3">
-              <div className="px-1">
-                <div className="font-mono text-[12px] tracking-[0.18em] text-[var(--text-dim)]">TERMINAL</div>
-                <div className="text-[13px] text-[var(--text-dim)]">Dedicated server terminal with transcript, command catalog, docs, wizards, and favorites.</div>
+              <div className="space-y-3">
+                <div className="px-1">
+                  <div className="font-mono text-[12px] tracking-[0.18em] text-[var(--text-dim)]">TERMINAL</div>
+                  <div className="text-[13px] text-[var(--text-dim)]">Dedicated server terminal with transcript, command catalog, docs, wizards, and favorites.</div>
+                </div>
+              <AdminTerminalWorkspace fullPage readOnly={false} relayEnabled={bridgeEnabled} />
               </div>
-              <AdminTerminalWorkspace fullPage readOnly={false} />
             </div>
-          </div>
-        )}
+          )}
         {shouldRenderTab('chat') && (
           <div className={visibleTab === 'chat' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'chat'}>
             <ChatSection />

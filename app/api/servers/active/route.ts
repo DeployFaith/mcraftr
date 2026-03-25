@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
                   stackLabel: getServerStackLabel(server.stackMode),
                   stackDescription: getServerStackDescription(server.stackMode),
                   minecraftVersion: server.minecraftVersion,
+                  bridgeEnabled: server.bridge.enabled,
+                  sidecarEnabled: server.sidecar.enabled,
                 }
               : null
           })()
@@ -65,6 +67,8 @@ export async function GET(req: NextRequest) {
           stackLabel: getServerStackLabel(activeServer.stackMode),
           stackDescription: getServerStackDescription(activeServer.stackMode),
           minecraftVersion: activeServer.minecraftVersion,
+          bridgeEnabled: activeServer.bridge.enabled,
+          sidecarEnabled: activeServer.sidecar.enabled,
         }
       : null,
   })

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags, rconForRequest } from '@/lib/rcon'
 import { logAudit } from '@/lib/audit'
+import { requireServerCapability } from '@/lib/server-capability'
 import { createStructurePlacement } from '@/lib/structure-placements'
 import { callSidecarForRequest, runBridgeJson } from '@/lib/server-bridge'
 
@@ -48,6 +49,9 @@ export async function POST(req: NextRequest) {
   if (!checkFeatureAccess(features, 'enable_structure_catalog')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+
+  const capability = await requireServerCapability(req, 'full')
+  if (!capability.ok) return capability.response
 
   const body = await req.json()
   const structureId = typeof body.structureId === 'string' ? body.structureId.trim() : ''

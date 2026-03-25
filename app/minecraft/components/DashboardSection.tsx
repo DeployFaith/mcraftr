@@ -1,9 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
 import type { AuditEntry } from '@/lib/audit'
 import { Check, X, HelpCircle } from 'lucide-react'
+import CapabilityLockCard from './CapabilityLockCard'
 
 // Utility for relative timestamps
 function formatRelativeTime(ts: number): string {
@@ -158,7 +158,7 @@ export default function DashboardSection({ onNavigate }: { onNavigate: (tab: 'pl
             <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">SAFE SERVER SETTINGS SNAPSHOT</div>
             {data.server.stackMode === 'full' && data.rules.bridgeError && (
               <div className="rounded-lg border border-red-900 bg-red-950/30 px-3 py-2 text-[12px] font-mono text-red-300">
-                Bridge unavailable: {data.rules.bridgeError}
+                Relay unavailable: {data.rules.bridgeError}
               </div>
             )}
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -196,30 +196,27 @@ export default function DashboardSection({ onNavigate }: { onNavigate: (tab: 'pl
                 <div className="glass-card p-4 space-y-3">
                   <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">SERVER SURFACE</div>
                   {data.stack.upgradeRecommended && (
-                    <div className="rounded-2xl border px-4 py-4" style={{ borderColor: 'var(--accent-mid)', background: 'color-mix(in srgb, var(--accent) 10%, transparent)' }}>
-                      <div className="text-[12px] font-mono tracking-[0.16em] text-[var(--accent)]">QUICK CONNECT ACTIVE</div>
-                      <div className="mt-2 text-[12px] font-mono text-[var(--text-dim)]">
+                    <div className="space-y-3">
+                      <CapabilityLockCard requirement={data.stack.bridgeOk ? 'beacon' : data.stack.sidecarOk ? 'relay' : 'full'} feature="Worlds, Structures, Entities, Maps, and Version-Aware Surfaces" compact />
+                      <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)]">
                         {data.stack.modeDescription}
                       </div>
-                      <div className="mt-2 text-[12px] font-mono text-[var(--text-dim)]">
-                        Upgrade this server to the Full Mcraftr Stack to unlock Worlds, structures, entities, maps, and version-aware catalog surfaces.
+                      <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)]">
+                        {!data.stack.bridgeOk && !data.stack.sidecarOk
+                          ? 'Quick Connect is active. Add Relay and Beacon to unlock the full Mcraftr surface.'
+                          : !data.stack.bridgeOk
+                            ? 'Beacon is already connected. Add Relay to unlock live structured workflows.'
+                            : 'Relay is already connected. Add Beacon to unlock the read-only world and metadata surfaces.'}
                       </div>
-                      <Link
-                        href="/connect?edit=1"
-                        className="mt-3 inline-flex rounded-xl border px-3 py-2 text-[11px] font-mono tracking-[0.12em]"
-                        style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}
-                      >
-                        OPEN STACK SETUP
-                      </Link>
                     </div>
                   )}
                   {!data.stack.upgradeRecommended && (data.stack.bridgeError || data.stack.sidecarError) && (
                     <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)]">
-                      {data.stack.bridgeError ? `Bridge: ${data.stack.bridgeError}` : `Beacon: ${data.stack.sidecarError}`}
+                      {data.stack.bridgeError ? `Relay: ${data.stack.bridgeError}` : `Beacon: ${data.stack.sidecarError}`}
                     </div>
                   )}
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <RulePill label="Bridge" value={data.stack.bridgeOk ? 'true' : 'false'} />
+                    <RulePill label="Relay" value={data.stack.bridgeOk ? 'true' : 'false'} />
                     <RulePill label="Beacon" value={data.stack.sidecarOk ? 'true' : 'false'} />
                     <RulePill label="Worlds" value={data.stack.worldCount} />
                     <RulePill label="Maps" value={data.stack.mapCount} />

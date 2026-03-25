@@ -4,6 +4,7 @@ import { signOut, useSession } from 'next-auth/react'
 import { useTheme, ACCENTS, FONTS, FONT_SIZES, type ThemePack } from '@/app/components/ThemeProvider'
 import { FEATURE_DEFS, FEATURE_CATEGORIES, type FeatureKey, type FeatureCategory } from '@/lib/features'
 import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
+import CapabilityLockCard from './CapabilityLockCard'
 import ColorPickerModal from './ColorPickerModal'
 import McraftrSwitch from './McraftrSwitch'
 import { sanitizeBridgePrefix, sanitizeBridgeProviderLabel } from '@/lib/public-branding'
@@ -91,6 +92,9 @@ type SavedServerSummary = {
 
 type PluginStackData = {
   ok: boolean
+  code?: string
+  requirement?: 'relay' | 'beacon' | 'full'
+  error?: string
   bridge: {
     ok?: boolean
     error?: string
@@ -352,7 +356,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
     fetch('/api/minecraft/plugin-stack', { cache: 'no-store' })
       .then(r => r.json())
       .then(d => setPluginStack(d))
-      .catch(() => {})
+      .catch(() => setPluginStack({ ok: false, error: 'Failed to load stack status', bridge: {}, sidecar: {} }))
   }, [])
 
   const disconnectServer = async () => {
@@ -1228,7 +1232,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
         </div>
         {activeServer?.bridge?.enabled && (
           <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-3">
-            <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">ACTIVE BRIDGE</div>
+            <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">ACTIVE RELAY</div>
             <div className="text-[13px] font-mono text-[var(--text)] break-all">
               {activeServer.bridge.providerLabel ? sanitizeBridgeProviderLabel(activeServer.bridge.providerLabel) : sanitizeBridgePrefix(activeServer.bridge.commandPrefix)}
             </div>
@@ -1257,10 +1261,29 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
             </div>
           </div>
         )}
-        {pluginStack && (
+        {activeServer && (!activeServer.bridge?.enabled || !activeServer.sidecar?.enabled) && (
+          <CapabilityLockCard
+            requirement={activeServer.bridge?.enabled ? 'beacon' : activeServer.sidecar?.enabled ? 'relay' : 'full'}
+            feature={activeServer.bridge?.enabled ? 'Beacon-backed world and metadata surfaces' : activeServer.sidecar?.enabled ? 'Relay-backed live workflows' : 'Full Mcraftr Stack features'}
+            compact
+          />
+        )}
+        {pluginStack?.ok === false && pluginStack.requirement && (
+          <CapabilityLockCard
+            requirement={pluginStack.requirement}
+            feature={pluginStack.requirement === 'beacon' ? 'Plugin Stack and Beacon Status' : pluginStack.requirement === 'relay' ? 'Relay Status' : 'Full Stack Status'}
+            compact
+          />
+        )}
+        {pluginStack?.ok === false && !pluginStack.requirement && pluginStack.error && (
+          <div className="rounded-lg border border-red-900 bg-red-950/30 px-3 py-2 text-[12px] font-mono text-red-300">
+            {pluginStack.error}
+          </div>
+        )}
+        {pluginStack?.ok !== false && pluginStack && (
           <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4">
-              <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">BRIDGE STATUS</div>
+              <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">RELAY STATUS</div>
               <div className="text-[13px] font-mono text-[var(--text)]">
                 {pluginStack.bridge?.ok === false ? pluginStack.bridge.error : 'Connected'}
               </div>
@@ -1294,7 +1317,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
                     </div>
                     {server.bridge?.enabled && (
                       <div className="text-[10px] font-mono text-[var(--text-dim)] truncate mt-1">
-                        bridge · {sanitizeBridgePrefix(server.bridge.commandPrefix)}{server.bridge.providerLabel ? ` · ${sanitizeBridgeProviderLabel(server.bridge.providerLabel)}` : ''}{server.bridge.lastSeen ? ` · seen ${new Date(server.bridge.lastSeen * 1000).toLocaleString()}` : ''}
+                        relay · {sanitizeBridgePrefix(server.bridge.commandPrefix)}{server.bridge.providerLabel ? ` · ${sanitizeBridgeProviderLabel(server.bridge.providerLabel)}` : ''}{server.bridge.lastSeen ? ` · seen ${new Date(server.bridge.lastSeen * 1000).toLocaleString()}` : ''}
                       </div>
                     )}
                     {server.bridge?.enabled && server.bridge.lastError && (

@@ -2,16 +2,14 @@ import { nodeAuth } from '@/auth.node'
 import { redirect } from 'next/navigation'
 import MinecraftClientPage, { type TabId } from './MinecraftClientPage'
 import { getActiveServer, getUserById } from '@/lib/users'
-import { type ServerStackMode } from '@/lib/server-stack'
 
 const VALID_TABS: TabId[] = ['dashboard', 'players', 'actions', 'worlds', 'terminal', 'admin', 'chat', 'settings']
 
-function normalizeTab(raw: string | undefined, canAccessAdminPanels: boolean, stackMode: ServerStackMode): TabId {
+function normalizeTab(raw: string | undefined, canAccessAdminPanels: boolean): TabId {
   if (!raw) return 'dashboard'
   const tab = raw as TabId
   if (!VALID_TABS.includes(tab)) return 'dashboard'
   if ((tab === 'admin' || tab === 'terminal') && !canAccessAdminPanels) return 'dashboard'
-  if (tab === 'worlds' && stackMode === 'quick') return 'dashboard'
   return tab
 }
 
@@ -29,7 +27,7 @@ export default async function MinecraftPage({
 
   const params = await searchParams
   const tabParam = Array.isArray(params.tab) ? params.tab[0] : params.tab
-  const initialTab = normalizeTab(tabParam, canAccessAdminPanels, stackMode)
+  const initialTab = normalizeTab(tabParam, canAccessAdminPanels)
 
   return <MinecraftClientPage initialTab={initialTab} initialRole={session?.role} initialStackMode={stackMode} />
 }

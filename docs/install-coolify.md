@@ -2,6 +2,8 @@
 
 Coolify can run Mcraftr either from source or from a prebuilt Docker image.
 
+This is an alternative deployment path. For the easiest first install, start with `./install.sh` from the repo root and come back to Coolify only if you already prefer managing apps there.
+
 ## Recommended Path
 
 Use a prebuilt image when available.

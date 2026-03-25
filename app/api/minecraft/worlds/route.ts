@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
+import { requireServerCapability } from '@/lib/server-capability'
 import { callSidecarForRequest, runBridgeJson } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
@@ -52,6 +53,9 @@ export async function GET(req: NextRequest) {
   if (!checkFeatureAccess(features, 'enable_world_inventory')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+
+  const capability = await requireServerCapability(req, 'full')
+  if (!capability.ok) return capability.response
 
   const [bridge, sidecar] = await Promise.all([
     runBridgeJson<WorldsBridgeResponse>(req, 'worlds list'),

@@ -103,7 +103,7 @@ export async function PUT(
       const bridge = await testBridgeConnection(updated.host, updated.port, password, updated.bridge.commandPrefix)
       updateServerBridgeHealth(userId, id, {
         lastSeen: bridge.ok ? Math.floor(Date.now() / 1000) : null,
-        lastError: bridge.ok ? null : bridge.error || 'Bridge test failed',
+        lastError: bridge.ok ? null : bridge.error || 'Relay test failed',
         capabilities: bridge.ok ? (bridge.capabilities ?? []) : [],
         providerId: bridge.ok ? (bridge.providerId ?? null) : undefined,
         providerLabel: bridge.ok ? (bridge.providerLabel ?? null) : undefined,
@@ -136,7 +136,7 @@ export async function PUT(
           detectedAt: null,
         })
       }
-      if (!bridge.ok) warnings.push(bridge.error || 'Bridge test failed')
+      if (!bridge.ok) warnings.push(bridge.error || 'Relay test failed')
     } else {
       updateServerBridgeHealth(userId, id, { lastSeen: null, lastError: null, capabilities: [] })
       updateServerMinecraftVersion(userId, id, updated?.minecraftVersion.override

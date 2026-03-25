@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { requireTerminalAccess } from '@/lib/terminal-access'
 import { LOCAL_TERMINAL_COMMANDS, normalizeServerCommand, normalizeTerminalCommand } from '@/lib/terminal-shared'
+import { requireServerCapability } from '@/lib/server-capability'
 import { runBridgeJson } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
@@ -31,17 +32,14 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: true, line, matches })
   }
 
+  const capability = await requireServerCapability(req, 'relay')
+  if (!capability.ok) return capability.response
+
   const normalized = normalizeServerCommand(line)
   const encoded = Buffer.from(normalized, 'utf8').toString('base64url')
   const bridge = await runBridgeJson<BridgeCompleteResponse>(req, `commands complete64 ${encoded}`)
   if (!bridge.ok || bridge.data.ok === false) {
-    return Response.json({
-      ok: true,
-      warning: bridge.ok ? bridge.data.error || 'Bridge completions unavailable' : bridge.error,
-      warningCode: bridge.ok ? null : bridge.code,
-      line: normalized,
-      matches: [],
-    })
+    return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || 'Relay completions unavailable' : bridge.error, code: bridge.ok ? null : bridge.code }, { status: 502 })
   }
 
   const matches = Array.isArray(bridge.data.matches)

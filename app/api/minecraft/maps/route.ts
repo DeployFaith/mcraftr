@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getUserFeatureFlags } from '@/lib/rcon'
+import { requireServerCapability } from '@/lib/server-capability'
 import { callSidecarForRequest } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
@@ -21,6 +22,9 @@ export async function GET(req: NextRequest) {
   if (!checkFeatureAccess(features, 'enable_world_maps')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+
+  const capability = await requireServerCapability(req, 'beacon')
+  if (!capability.ok) return capability.response
 
   const sidecar = await callSidecarForRequest<MapsResponse>(req, '/maps')
   if (!sidecar.ok) {

@@ -24,7 +24,7 @@ export const authConfig = {
         httpOnly: true,
         sameSite: 'lax' as const,
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NEXTAUTH_URL?.startsWith('https://') ?? false,
       },
     },
     csrfToken: {
@@ -33,7 +33,7 @@ export const authConfig = {
         httpOnly: true,
         sameSite: 'lax' as const,
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NEXTAUTH_URL?.startsWith('https://') ?? false,
       },
     },
   },

@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { requireServerCapability } from '@/lib/server-capability'
 import { getSessionUserId } from '@/lib/rcon'
 import { runBridgeJson } from '@/lib/server-bridge'
 
@@ -21,9 +22,12 @@ export async function GET(req: NextRequest) {
     return Response.json({ ok: false, error: 'Invalid player name' }, { status: 400 })
   }
 
+  const capability = await requireServerCapability(req, 'relay')
+  if (!capability.ok) return capability.response
+
   const result = await runBridgeJson<Record<string, unknown>>(req, `player locate ${player}`)
   if (!result.ok) {
-    return Response.json({ ok: false, error: result.error || 'Bridge request failed', code: result.code }, { status: 502 })
+    return Response.json({ ok: false, error: result.error || 'Relay request failed', code: result.code }, { status: 502 })
   }
   const payload = result.data
   return Response.json(payload, { status: payload.ok === true ? 200 : 400 })

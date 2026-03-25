@@ -5,10 +5,16 @@ services:
     container_name: mcraftr
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3054:3050"
+      - "${MCRAFTR_BIND_HOST:-127.0.0.1}:${MCRAFTR_BIND_PORT:-3054}:3050"
     env_file: .env
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@mcraftr-redis:6379
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3050/api/health').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     volumes:
       - ./data:/app/data
     depends_on:

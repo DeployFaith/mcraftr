@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getUserFeatureFlags } from '@/lib/rcon'
+import { requireServerCapability } from '@/lib/server-capability'
 import { callSidecarForRequest } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
@@ -16,6 +17,9 @@ export async function GET(req: NextRequest) {
   if (!checkFeatureAccess(features, 'enable_structure_catalog')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+
+  const capability = await requireServerCapability(req, 'full')
+  if (!capability.ok) return capability.response
 
   const resourceKey = req.nextUrl.searchParams.get('resourceKey')?.trim()
   if (!resourceKey) {

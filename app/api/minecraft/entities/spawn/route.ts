@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags, rconForRequest } from '@/lib/rcon'
 import { logAudit } from '@/lib/audit'
+import { requireServerCapability } from '@/lib/server-capability'
 import { runBridgeJson } from '@/lib/server-bridge'
 import { buildPresetSnbt, normalizeEntityPresetInput } from '@/lib/entity-presets'
 
@@ -67,6 +68,9 @@ export async function POST(req: NextRequest) {
     }
     return Response.json({ ok: true, entity: preset.entityId, count, world: locationMode === 'coords' ? world : null })
   }
+
+  const capability = await requireServerCapability(req, 'relay')
+  if (!capability.ok) return capability.response
 
   let command = `entities spawn ${entityId} ${count}`
   if (locationMode === 'player') {

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
 import { logAudit } from '@/lib/audit'
+import { requireServerCapability } from '@/lib/server-capability'
 import { runBridgeJson } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
@@ -16,6 +17,9 @@ export async function POST(
   if (!checkFeatureAccess(features, 'enable_world_build_tools')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+
+  const capability = await requireServerCapability(req, 'full')
+  if (!capability.ok) return capability.response
 
   const { id } = await params
   const bridge = await runBridgeJson<BridgeMutationResponse>(req, `worlds unload ${id}`)

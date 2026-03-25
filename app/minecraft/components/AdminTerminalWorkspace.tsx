@@ -3,6 +3,7 @@
 import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpRight, BookOpen, Command, ExternalLink, GripVertical, LayoutPanelLeft, LayoutPanelTop, Maximize2, Minimize2, Play, Plus, Search, Star, Trash2, X } from 'lucide-react'
 import ConfirmModal from './ConfirmModal'
+import CapabilityLockCard from './CapabilityLockCard'
 import type {
   TerminalCatalogEntry,
   TerminalFavorite,
@@ -37,6 +38,7 @@ type WorkspaceProps = {
   standalone?: boolean
   fullPage?: boolean
   readOnly?: boolean
+  relayEnabled?: boolean
 }
 
 type WizardTabId = NonNullable<TerminalState['activeInspectorTab']>
@@ -120,6 +122,7 @@ export default function AdminTerminalWorkspace({
   standalone = false,
   fullPage = false,
   readOnly = false,
+  relayEnabled = true,
 }: WorkspaceProps) {
   const transcriptRef = useRef<HTMLDivElement | null>(null)
   const commandInputRef = useRef<HTMLInputElement | null>(null)
@@ -162,7 +165,9 @@ export default function AdminTerminalWorkspace({
       setCatalogWarningCode(null)
       try {
         const [catalogRes, historyRes, favoritesRes, stateRes] = await Promise.all([
-          fetch('/api/minecraft/terminal/catalog', { cache: 'no-store' }),
+          relayEnabled
+            ? fetch('/api/minecraft/terminal/catalog', { cache: 'no-store' })
+            : Promise.resolve(new Response(JSON.stringify({ ok: false, error: 'This feature requires Mcraftr Relay.', code: 'requires_relay' }), { status: 409, headers: { 'Content-Type': 'application/json' } })),
           fetch('/api/minecraft/terminal/history?limit=100', { cache: 'no-store' }),
           fetch('/api/minecraft/terminal/favorites', { cache: 'no-store' }),
           fetch('/api/minecraft/terminal/state', { cache: 'no-store' }),
@@ -180,8 +185,20 @@ export default function AdminTerminalWorkspace({
         if (!stateData.ok) throw new Error(stateData.error || 'Failed to load terminal state')
 
         setCatalog(Array.isArray(catalogData.commands) ? catalogData.commands : [])
-        setCatalogWarning(typeof catalogData.warning === 'string' && catalogData.warning.trim() ? catalogData.warning.trim() : null)
-        setCatalogWarningCode(typeof catalogData.warningCode === 'string' ? catalogData.warningCode : null)
+        setCatalogWarning(
+          typeof catalogData.warning === 'string' && catalogData.warning.trim()
+            ? catalogData.warning.trim()
+            : typeof catalogData.error === 'string' && catalogData.error.trim()
+              ? catalogData.error.trim()
+              : null,
+        )
+        setCatalogWarningCode(
+          typeof catalogData.warningCode === 'string'
+            ? catalogData.warningCode
+            : typeof catalogData.code === 'string'
+              ? catalogData.code
+              : null,
+        )
         setHistory(Array.isArray(historyData.entries) ? historyData.entries : [])
         setFavorites(Array.isArray(favoritesData.favorites) ? favoritesData.favorites : [])
         setState(prev => ({
@@ -201,7 +218,7 @@ export default function AdminTerminalWorkspace({
     }
     void load()
     return () => { mounted = false }
-  }, [initialMode, standalone])
+  }, [initialMode, relayEnabled, standalone])
 
   useEffect(() => {
     if (readOnly) return
@@ -235,6 +252,13 @@ export default function AdminTerminalWorkspace({
       return
     }
 
+    if (!relayEnabled) {
+      setSuggestions([])
+      setSuggestionIndex(0)
+      setCompletionLoading(false)
+      return
+    }
+
     const controller = new AbortController()
     const timer = window.setTimeout(async () => {
       setCompletionLoading(true)
@@ -265,7 +289,7 @@ export default function AdminTerminalWorkspace({
       controller.abort()
       window.clearTimeout(timer)
     }
-  }, [commandDraft])
+  }, [commandDraft, relayEnabled])
 
   useEffect(() => {
     if (!transcriptRef.current) return
@@ -307,10 +331,10 @@ export default function AdminTerminalWorkspace({
   const setupHint = useMemo(() => {
     if (!catalogWarning) return null
     if (catalogWarningCode === 'bridge_invalid_prefix' || /prefix .* is not valid/i.test(catalogWarning)) {
-      return 'The saved bridge prefix does not match this server. Update the active server in Connect before using live catalog, autocomplete, or wizards.'
+      return 'The saved relay prefix does not match this server. Update the active server in Connect before using live catalog, autocomplete, or wizards.'
     }
     if (/bridge integration is not configured|no active server selected/i.test(catalogWarning)) {
-      return 'Install or configure a Mcraftr bridge integration to unlock live command discovery, docs, and guided wizards. Raw RCON commands still run here.'
+      return 'Install or configure a Mcraftr Relay API integration to unlock live command discovery, docs, and guided wizards. Raw RCON commands still run here.'
     }
     return 'Live command discovery is currently unavailable. Raw RCON commands still run here.'
   }, [catalogWarning, catalogWarningCode])
@@ -647,14 +671,23 @@ export default function AdminTerminalWorkspace({
             ))}
           </section>
 
-          {catalog.length === 0 && catalogWarning && (
+          {!relayEnabled && (
+            <section className="space-y-3">
+              <CapabilityLockCard requirement="relay" feature="Live command discovery, docs, and wizards" compact />
+              <div className="rounded-2xl border border-[var(--border)] bg-black/10 px-3 py-3 text-[12px] text-[var(--text-dim)]">
+                Raw RCON commands still work here. Relay unlocks the command catalog, autocomplete, docs, and guided wizard flows.
+              </div>
+            </section>
+          )}
+
+          {relayEnabled && catalog.length === 0 && catalogWarning && (
             <section className="rounded-2xl border border-[var(--border)] bg-black/10 px-3 py-3">
               <div className="font-mono text-[11px] tracking-[0.18em] text-[var(--text-dim)]">COMMAND DISCOVERY</div>
               <div className="mt-2 text-[12px] text-[var(--text-dim)]">{setupHint ?? catalogWarning}</div>
             </section>
           )}
 
-          {filteredGroups.map(([group, entries]) => (
+          {relayEnabled && filteredGroups.map(([group, entries]) => (
             <section key={group} className="space-y-2">
               <div className="font-mono text-[11px] tracking-[0.18em] text-[var(--text-dim)]">{group}</div>
               <div className="space-y-1.5">
@@ -726,7 +759,12 @@ export default function AdminTerminalWorkspace({
           <BookOpen size={16} strokeWidth={1.8} className="text-[var(--accent)]" />
           <div className="font-mono text-[11px] tracking-[0.16em] text-[var(--text-dim)]">COMMAND DOCS</div>
         </div>
-        {selectedLocalCommand ? (
+        {!relayEnabled && !selectedLocalCommand ? (
+          <div className="mt-3 space-y-3">
+            <CapabilityLockCard requirement="relay" feature="Structured command docs" compact />
+            <div className="text-[13px] text-[var(--text-dim)]">Relay unlocks the command docs pane for server-provided commands. Local terminal shortcuts still work without it.</div>
+          </div>
+        ) : selectedLocalCommand ? (
           <div className="mt-3 space-y-2">
             <div className="font-mono text-[14px] text-[var(--text)]">{selectedLocalCommand.id}</div>
             <div className="text-[13px] text-[var(--text-dim)]">{selectedLocalCommand.description}</div>
@@ -785,7 +823,12 @@ export default function AdminTerminalWorkspace({
           <LayoutPanelTop size={16} strokeWidth={1.8} className="text-[var(--accent)]" />
           <div className="font-mono text-[11px] tracking-[0.16em] text-[var(--text-dim)]">COMMAND WIZARD</div>
         </div>
-        {!currentWizardId ? (
+        {!relayEnabled ? (
+          <div className="mt-3 space-y-3">
+            <CapabilityLockCard requirement="relay" feature="Guided command wizards" compact />
+            <div className="text-[13px] text-[var(--text-dim)]">Wizards are powered by Relay-backed command metadata. Raw commands and saved favorites still work without it.</div>
+          </div>
+        ) : !currentWizardId ? (
           <div className="mt-3 text-[13px] text-[var(--text-dim)]">No structured wizard is attached to the selected command yet.</div>
         ) : (
           <div className="mt-3 space-y-3">
@@ -1016,9 +1059,9 @@ export default function AdminTerminalWorkspace({
           </div>
           <div className="min-w-0 flex-1">
             <div className="font-mono text-[12px] tracking-[0.2em] text-[var(--text-dim)]">SERVER TERMINAL</div>
-            <div className="truncate font-mono text-[13px] text-[var(--text)]">
-              {loading ? 'Connecting to server command surface…' : loadingError ? loadingError : catalogWarning ? catalogWarning : 'Live command catalog, transcript, docs, and favorites.'}
-            </div>
+              <div className="truncate font-mono text-[13px] text-[var(--text)]">
+              {loading ? 'Connecting to server command surface…' : loadingError ? loadingError : !relayEnabled ? 'Raw RCON terminal active. Relay unlocks discovery, docs, and wizards.' : catalogWarning ? catalogWarning : 'Live command catalog, transcript, docs, and favorites.'}
+              </div>
           </div>
           {readOnly && (
             <div className="rounded-full border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-1 font-mono text-[10px] tracking-[0.16em] text-[var(--accent)]">
@@ -1092,7 +1135,7 @@ export default function AdminTerminalWorkspace({
                 <button
                   type="button"
                   onClick={() => setState(prev => ({ ...prev, commandDraft: wizardCommand || prev.commandDraft }))}
-                  disabled={!wizardCommand}
+                  disabled={!relayEnabled || !wizardCommand}
                   className="tap-target rounded-2xl border px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-[var(--text-dim)] transition-all hover:border-[var(--accent-mid)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   LOAD WIZARD
@@ -1100,7 +1143,7 @@ export default function AdminTerminalWorkspace({
                 <button
                   type="button"
                   onClick={() => void persistFavorite()}
-                  disabled={readOnly || !commandDraft.trim() || favoriteBusy}
+                   disabled={readOnly || !commandDraft.trim() || favoriteBusy}
                   className="tap-target rounded-2xl border px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-[var(--accent)] transition-all hover:border-[var(--accent-mid)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {favoriteBusy ? 'SAVING…' : favoriteId ? 'UPDATE FAVORITE' : 'SAVE FAVORITE'}

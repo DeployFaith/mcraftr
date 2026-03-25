@@ -82,13 +82,13 @@ function detectBridgeRejection(raw: string, commandPrefix: string): { code: Brid
   if (prefixPattern.test(trimmed)) {
     return {
       code: 'bridge_invalid_prefix',
-      error: `Bridge prefix "${commandPrefix}" is not valid for the active server`,
+      error: `Relay prefix "${commandPrefix}" is not valid for the active server`,
     }
   }
 
   return {
     code: 'bridge_command_rejected',
-    error: 'Bridge command was rejected by the server',
+    error: 'Relay command was rejected by the server',
   }
 }
 
@@ -132,7 +132,7 @@ async function resolveBridgeContext(req: NextRequest): Promise<
 
   const server = getActiveServer(userId)
   if (!server?.bridge.enabled) {
-    return { ok: false, error: 'Bridge integration is not configured for the active server', code: 'bridge_not_configured' }
+    return { ok: false, error: 'Relay is not configured for the active server', code: 'bridge_not_configured' }
   }
 
   return {
@@ -191,8 +191,8 @@ export async function runBridgeJson<T>(req: NextRequest, command: string): Promi
   }
   const json = extractJson(response.stdout)
   if (!json) {
-    updateServerBridgeHealth(bridge.context.userId, bridge.context.serverId, { lastError: 'Bridge did not return JSON' })
-    return { ok: false, error: 'Bridge did not return JSON', raw: response.stdout, code: 'bridge_non_json_response' }
+    updateServerBridgeHealth(bridge.context.userId, bridge.context.serverId, { lastError: 'Relay did not return JSON' })
+    return { ok: false, error: 'Relay did not return JSON', raw: response.stdout, code: 'bridge_non_json_response' }
   }
   try {
     const data = JSON.parse(json) as T
@@ -236,7 +236,7 @@ export async function testBridgeConnection(
 
   const json = extractJson(result.stdout)
   if (!json) {
-    return { ok: false, error: 'Bridge did not return JSON', code: 'bridge_non_json_response', raw: result.stdout }
+    return { ok: false, error: 'Relay did not return JSON', code: 'bridge_non_json_response', raw: result.stdout }
   }
 
   try {

@@ -2,9 +2,9 @@ const PRIVATE_PREFIX = ['f', 'g', 'm', 'c'].join('')
 const PRIVATE_PROVIDER = ['family', 'guard'].join('')
 
 const PRIVATE_PATTERNS = [
-  { pattern: new RegExp(`\\b${PRIVATE_PREFIX}\\b`, 'gi'), replacement: 'bridge' },
-  { pattern: new RegExp(`\\b${PRIVATE_PROVIDER}\\b`, 'gi'), replacement: 'Server Bridge' },
-  { pattern: /\bmcrafter bridge\b/gi, replacement: 'server bridge' },
+  { pattern: new RegExp(`\\b${PRIVATE_PREFIX}\\b`, 'gi'), replacement: 'relay' },
+  { pattern: new RegExp(`\\b${PRIVATE_PROVIDER}\\b`, 'gi'), replacement: 'Relay API integration' },
+  { pattern: /\bmcrafter bridge\b/gi, replacement: 'relay integration' },
 ]
 
 export function sanitizePublicText(value: string | null | undefined) {
@@ -18,9 +18,9 @@ export function sanitizePublicText(value: string | null | undefined) {
 
 export function sanitizeBridgePrefix(value: string | null | undefined) {
   const next = sanitizePublicText(value)?.trim().replace(/^\/+/, '')
-  return next || 'bridge'
+  return next || 'relay'
 }
 
 export function sanitizeBridgeProviderLabel(value: string | null | undefined) {
-  return sanitizePublicText(value)?.trim() || 'Server Bridge'
+  return sanitizePublicText(value)?.trim() || 'Relay API integration'
 }

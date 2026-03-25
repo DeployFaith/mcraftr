@@ -30,6 +30,10 @@ function isBlockedHost(host: string): boolean {
   return false
 }
 
+function allowPrivateRconHosts(): boolean {
+  return process.env.MCRAFTR_ALLOW_PRIVATE_RCON_HOSTS === 'true'
+}
+
 function parsePort(raw: unknown, fallback = 25575): number {
   const n = parseInt(String(raw))
   if (!Number.isInteger(n) || n < 1 || n > 65535) return fallback
@@ -43,7 +47,7 @@ export async function POST(req: NextRequest) {
   try {
     const { host, port, password, label } = await req.json()
     if (!host || typeof host !== 'string') return Response.json({ ok: false, error: 'Server address is required' }, { status: 400 })
-    if (isBlockedHost(host)) return Response.json({ ok: false, error: 'That server address is not allowed' }, { status: 400 })
+    if (isBlockedHost(host) && !allowPrivateRconHosts()) return Response.json({ ok: false, error: 'That server address is not allowed' }, { status: 400 })
     if (!password || typeof password !== 'string') return Response.json({ ok: false, error: 'RCON password is required' }, { status: 400 })
 
     const server = createUserServer(userId, {
@@ -116,7 +120,7 @@ export async function PUT(req: NextRequest) {
     if (!host || !password) {
       return Response.json({ ok: false, error: 'Host and password are required' }, { status: 400 })
     }
-    if (isBlockedHost(host)) {
+    if (isBlockedHost(host) && !allowPrivateRconHosts()) {
       return Response.json({ ok: false, error: 'That server address is not allowed' }, { status: 400 })
     }
 
@@ -161,7 +165,7 @@ export async function PUT(req: NextRequest) {
       const override = normalizeMinecraftVersion(minecraftVersionOverride)
       return Response.json({
         ok: true,
-          message: `Connected! ${clean} Bridge prefix "${sanitizeBridgePrefix(typeof bridgeCommandPrefix === 'string' ? bridgeCommandPrefix : 'bridge')}" responded successfully.`,
+          message: `Connected! ${clean} Relay prefix "${sanitizeBridgePrefix(typeof bridgeCommandPrefix === 'string' ? bridgeCommandPrefix : 'relay')}" responded successfully.`,
         bridge,
         minecraftVersion: {
           override,
@@ -183,7 +187,7 @@ export async function PUT(req: NextRequest) {
     if (!beacon.ok) {
       return Response.json({
         ok: false,
-        error: `RCON and Bridge connected, but ${beacon.error || 'the Beacon test failed'}`,
+        error: `RCON and Relay connected, but ${beacon.error || 'the Beacon test failed'}`,
         bridge,
         beacon,
       })

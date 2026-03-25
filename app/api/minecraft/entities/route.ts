@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getUserFeatureFlags } from '@/lib/rcon'
+import { requireServerCapability } from '@/lib/server-capability'
 import { callSidecarForRequest, runBridgeJson } from '@/lib/server-bridge'
 import { FALLBACK_ENTITY_CATALOG } from '@/lib/entity-catalog'
 import { getSessionUserId } from '@/lib/rcon'
@@ -187,6 +188,9 @@ export async function GET(req: NextRequest) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
 
+  const capability = await requireServerCapability(req, 'full')
+  if (!capability.ok) return capability.response
+
   const userId = await getSessionUserId(req)
   const activeServer = userId ? getActiveServer(userId) : null
   const minecraftVersion = activeServer?.minecraftVersion.resolved ?? null
@@ -200,17 +204,17 @@ export async function GET(req: NextRequest) {
 
   if (!bridge.ok) {
     const message = bridge.code === 'bridge_json_parse_failed'
-      ? 'Native entity catalog fallback in use: Bridge catalog response was truncated, so Mcraftr is using the built-in entity catalog.'
+      ? 'Native entity catalog fallback in use: Relay catalog response was truncated, so Mcraftr is using the built-in entity catalog.'
       : `Native entity catalog fallback in use: ${bridge.error}`
     warnings.push(message)
   } else if (bridge.data.ok === false) {
-    warnings.push(`Native entity catalog fallback in use: ${bridge.data.error || 'Bridge integration returned an error'}`)
+    warnings.push(`Native entity catalog fallback in use: ${bridge.data.error || 'Relay integration returned an error'}`)
   } else {
     const bridgeEntities = pickEntityArray(bridge.data)
       .map(entry => normalizeEntityEntry(entry, 'native'))
       .filter((entry): entry is CatalogEntityEntry => !!entry)
     if (bridgeEntities.length === 0) {
-      warnings.push('Native entity catalog fallback in use: Bridge integration returned no entities.')
+      warnings.push('Native entity catalog fallback in use: Relay integration returned no entities.')
     } else {
       nativeEntities = mergeNativeEntities(nativeEntities, bridgeEntities)
       nativeSource = 'bridge'

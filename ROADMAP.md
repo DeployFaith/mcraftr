@@ -11,7 +11,7 @@ This is a lightweight roadmap for the near-term direction of the project.
 
 ## Next
 
-- document the exact value of Bridge + Beacon over plain RCON
+- document the exact value of Relay + Beacon over plain RCON
 - improve contribution onboarding and issue hygiene
 - publish an initial tagged release
 - expand seeded content for screenshots and product walkthroughs
