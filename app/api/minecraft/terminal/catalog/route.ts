@@ -23,12 +23,14 @@ export async function GET(req: NextRequest) {
 
   const bridge = await runBridgeJson<BridgeCatalogResponse>(req, 'commands catalog')
   if (!bridge.ok || bridge.data.ok === false) {
-    if (!bridge.ok && bridge.code === 'bridge_json_parse_failed') {
+    if (!bridge.ok && (bridge.code === 'bridge_json_parse_failed' || (bridge.code === 'bridge_transport_failed' && /too many requests/i.test(bridge.error)))) {
       return Response.json({
         ok: true,
         commands: [],
         localCommands: LOCAL_TERMINAL_COMMANDS,
-        warning: 'Relay command catalog is too large to parse right now. Raw commands, docs-only commands, and manual terminal execution still work.',
+        warning: bridge.code === 'bridge_json_parse_failed'
+          ? 'Relay command catalog is too large to parse right now. Raw commands, docs-only commands, and manual terminal execution still work.'
+          : 'Relay command catalog is busy right now. Raw commands, docs-only commands, and manual terminal execution still work while Mcraftr backs off.',
         warningCode: bridge.code,
       })
     }

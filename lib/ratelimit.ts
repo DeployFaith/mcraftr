@@ -1,6 +1,10 @@
 import { RateLimiterRedis, RateLimiterMemory, RateLimiterAbstract } from 'rate-limiter-flexible'
 import { NextRequest } from 'next/server'
 
+function isRateLimitingEnabled() {
+  return process.env.MCRAFTR_PUBLIC_DEMO === 'true'
+}
+
 // ── Redis client (lazy, singleton) ────────────────────────────────────────────
 
 let _redisClient: import('ioredis').Redis | null = null
@@ -66,6 +70,10 @@ export async function checkRateLimit(
   key: LimiterKey,
   userId?: string,
 ): Promise<RateLimitResult> {
+  if (!isRateLimitingEnabled()) {
+    return { limited: false }
+  }
+
   const limiter = await getLimiter(key)
   // Use the rightmost entry in X-Forwarded-For — the last hop added by a
   // trusted proxy. The leftmost entry is client-controlled and trivially

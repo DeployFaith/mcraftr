@@ -33,6 +33,8 @@ function isCacheableReadOnlyCommand(command: string) {
     || normalized === 'time query daytime'
     || normalized === 'difficulty'
     || normalized === 'whitelist list'
+    || normalized.endsWith(' commands catalog')
+    || normalized.includes(' commands complete64 ')
 }
 
 function getCachedRconResult(cacheKey: string) {

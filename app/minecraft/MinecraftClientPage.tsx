@@ -375,7 +375,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
             <AdminSection players={players} readOnly={false} relayEnabled={bridgeEnabled} />
           </div>
         )}
-        {(role === 'admin') && shouldRenderTab('terminal') && (
+        {shouldRenderTab('terminal') && (
           <div className={visibleTab === 'terminal' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'terminal'}>
               <div className="space-y-3">
                 <div className="px-1">
