@@ -20,6 +20,7 @@ type PlacementContext = {
   world: string
   kind: PlacementKind
   anchorX?: number | null
+  anchorY?: number | null
   anchorZ?: number | null
   width?: number
   height?: number
@@ -30,7 +31,7 @@ type PlacementContext = {
 const MIN_Y = -32
 const MAX_Y = 160
 const SURFACE_SCAN_STEP = 8
-const RANDOM_ATTEMPTS = 18
+const RANDOM_ATTEMPTS = 30
 
 function normalizedFootprint(width: number, length: number, rotation: number) {
   if (rotation === 90 || rotation === 270) {
@@ -40,11 +41,23 @@ function normalizedFootprint(width: number, length: number, rotation: number) {
 }
 
 function candidateCoords(anchorX: number, anchorZ: number) {
-  const radius = 24 + Math.floor(Math.random() * 88)
+  const radius = 8 + Math.floor(Math.random() * 48)
   const angle = Math.random() * Math.PI * 2
   return {
     x: Math.round(anchorX + Math.cos(angle) * radius),
     z: Math.round(anchorZ + Math.sin(angle) * radius),
+  }
+}
+
+function fallbackCandidate(x: number, y: number, z: number, message: string, details: string[]): PlacementCheckResult {
+  return {
+    ok: true,
+    status: 'warn',
+    x,
+    y,
+    z,
+    message,
+    details,
   }
 }
 
@@ -110,11 +123,11 @@ async function scoreEntityPlacement(context: PlacementContext, x: number, y: num
 
   return {
     ok: true,
-    status: details.some(item => item.includes('No stable ground') || item.includes('Not enough open air')) ? 'bad' : 'warn',
+    status: details.some(item => item.includes('Not enough open air')) ? 'bad' : 'warn',
     x,
     y,
     z,
-    message: details.some(item => item.includes('No stable ground') || item.includes('Not enough open air'))
+    message: details.some(item => item.includes('Not enough open air'))
       ? 'This spot looks unsafe for entity placement. Try Randomize Again.'
       : 'This spot may need review before spawning the entity.',
     details,
@@ -165,11 +178,11 @@ async function scoreStructurePlacement(context: PlacementContext, x: number, y: 
 
   return {
     ok: true,
-    status: details.some(item => item.includes('support') || item.includes('obstructed')) ? 'bad' : 'warn',
+    status: details.some(item => item.includes('obstructed')) ? 'bad' : 'warn',
     x,
     y,
     z,
-    message: details.some(item => item.includes('support') || item.includes('obstructed'))
+    message: details.some(item => item.includes('obstructed'))
       ? 'This spot looks unsafe for the structure footprint. Try Randomize Again.'
       : 'This structure placement may need review before you confirm.',
     details,
@@ -185,27 +198,50 @@ export async function validatePlacementCoordinates(context: PlacementContext, x:
 
 export async function randomizePlacementCoordinates(context: PlacementContext): Promise<PlacementCheckResult> {
   const anchorX = context.anchorX ?? 0
+  const anchorY = context.anchorY ?? 64
   const anchorZ = context.anchorZ ?? 0
   let fallback: PlacementCheckResult | null = null
 
   for (let attempt = 0; attempt < RANDOM_ATTEMPTS; attempt += 1) {
     const candidate = candidateCoords(anchorX, anchorZ)
     const y = await surfaceY(context.host, context.port, context.password, context.world, candidate.x, candidate.z)
-    if (y === null) continue
+    if (y === null) {
+      fallback = fallback ?? fallbackCandidate(
+        candidate.x,
+        anchorY,
+        candidate.z,
+        'Mcraftr found a nearby candidate but could not confirm the ground height quickly. Review the coordinates before placing.',
+        ['Surface probing was inconclusive for this location.'],
+      )
+      continue
+    }
     const scored = await validatePlacementCoordinates(context, candidate.x, y, candidate.z)
     if (scored.status === 'good') return scored
-    fallback = fallback ?? scored
+    if (!fallback) {
+      fallback = scored
+      continue
+    }
+    if (fallback.status === 'bad' && scored.status !== 'bad') {
+      fallback = scored
+      continue
+    }
+    if (fallback.status === scored.status) {
+      const fallbackDistance = Math.abs(fallback.x - anchorX) + Math.abs(fallback.z - anchorZ)
+      const scoredDistance = Math.abs(scored.x - anchorX) + Math.abs(scored.z - anchorZ)
+      if (scoredDistance < fallbackDistance) {
+        fallback = scored
+      }
+    }
   }
 
   if (fallback) return fallback
 
-  return {
-    ok: true,
-    status: 'bad',
-    x: anchorX,
-    y: 64,
-    z: anchorZ,
-    message: 'Mcraftr could not find a safer randomized spot quickly. Try another world, move closer to open terrain, or enter coordinates manually.',
-    details: ['No candidate passed the fast placement checks.'],
-  }
+  const emergency = candidateCoords(anchorX, anchorZ)
+  return fallbackCandidate(
+    emergency.x,
+    anchorY,
+    emergency.z,
+    'Mcraftr could not find a clearly safer randomized spot quickly. It picked a nearby best-effort location you should review before placing.',
+    ['No candidate passed the fast placement checks.'],
+  )
 }

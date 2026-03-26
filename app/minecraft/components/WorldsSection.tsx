@@ -857,7 +857,7 @@ export default function WorldsSection({
     return data as PlacementCheckResult & { world: string }
   }, [])
 
-  const randomizePlacement = useCallback(async (kind: 'entity' | 'structure', world: string, options?: { anchorX?: number | null; anchorZ?: number | null; player?: string; width?: number; height?: number; length?: number; rotation?: number }) => {
+  const randomizePlacement = useCallback(async (kind: 'entity' | 'structure', world: string, options?: { anchorX?: number | null; anchorY?: number | null; anchorZ?: number | null; player?: string; width?: number; height?: number; length?: number; rotation?: number }) => {
     const res = await fetch('/api/minecraft/placement/randomize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1199,13 +1199,17 @@ export default function WorldsSection({
     })
   }
 
+  const worldSpawnFor = useCallback((worldName: string) => worldsData?.worlds.find(entry => entry.name === worldName)?.spawn ?? null, [worldsData])
+
   const handleRandomizeStructureCoords = async () => {
     if (!structureWorld || !selectedStructure) return
     setStructureRandomizeBusy(true)
     try {
+      const spawn = worldSpawnFor(structureWorld)
       const placement = await randomizePlacement('structure', structureWorld, {
-        anchorX: structureX ? Number(structureX) : null,
-        anchorZ: structureZ ? Number(structureZ) : null,
+        anchorX: structureX ? Number(structureX) : (spawn?.x ?? null),
+        anchorY: structureY ? Number(structureY) : (spawn?.y ?? null),
+        anchorZ: structureZ ? Number(structureZ) : (spawn?.z ?? null),
         player: selectedPlayer || undefined,
         width: selectedStructure.dimensions?.width ?? 1,
         height: selectedStructure.dimensions?.height ?? 1,
@@ -1227,9 +1231,11 @@ export default function WorldsSection({
     if (!entityWorld) return
     setEntityRandomizeBusy(true)
     try {
+      const spawn = worldSpawnFor(entityWorld)
       const placement = await randomizePlacement('entity', entityWorld, {
-        anchorX: entityX ? Number(entityX) : null,
-        anchorZ: entityZ ? Number(entityZ) : null,
+        anchorX: entityX ? Number(entityX) : (spawn?.x ?? null),
+        anchorY: entityY ? Number(entityY) : (spawn?.y ?? null),
+        anchorZ: entityZ ? Number(entityZ) : (spawn?.z ?? null),
         player: selectedPlayer || undefined,
       })
       setEntityX(String(placement.x))

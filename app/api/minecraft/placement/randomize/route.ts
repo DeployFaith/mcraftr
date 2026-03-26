@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
   let world = typeof body.world === 'string' ? body.world.trim() : ''
   const player = typeof body.player === 'string' ? body.player.trim() : ''
   let anchorX = isFiniteNumber(body.anchorX) ? body.anchorX : null
+  let anchorY = isFiniteNumber(body.anchorY) ? body.anchorY : null
   let anchorZ = isFiniteNumber(body.anchorZ) ? body.anchorZ : null
 
   if (player) {
@@ -40,6 +41,7 @@ export async function POST(req: NextRequest) {
     if (locate.ok && locate.data.ok && locate.data.location && typeof locate.data.world === 'string') {
       world = locate.data.world
       anchorX = locate.data.location.x
+      anchorY = locate.data.location.y
       anchorZ = locate.data.location.z
     }
   }
@@ -55,6 +57,7 @@ export async function POST(req: NextRequest) {
     world,
     kind: kind as PlacementKind,
     anchorX,
+    anchorY,
     anchorZ,
     width: isFiniteNumber(body.width) ? Math.max(1, Math.floor(body.width)) : 1,
     height: isFiniteNumber(body.height) ? Math.max(1, Math.floor(body.height)) : 1,
