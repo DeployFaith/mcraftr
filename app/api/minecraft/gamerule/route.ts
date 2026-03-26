@@ -1,8 +1,7 @@
 import { NextRequest } from 'next/server'
-import { getSessionUserId } from '@/lib/rcon'
+import { getSessionUserId, rconForRequest } from '@/lib/rcon'
 import { getToken } from 'next-auth/jwt'
 import { getUserById, getUserFeatures } from '@/lib/users'
-import { runBridgeCommand } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -20,18 +19,18 @@ export async function GET(req: NextRequest) {
 
   try {
     const results = await Promise.all(
-      ADMIN_GAMERULES.map(rule => runBridgeCommand(req, `gamerule get ${rule}`))
+      ADMIN_GAMERULES.map(rule => rconForRequest(req, `gamerule ${rule}`))
     )
     const firstError = results.find(result => !result.ok)
     if (firstError && !firstError.ok) {
-      return Response.json({ ok: false, error: firstError.error || 'Relay request failed', code: firstError.code }, { status: 502 })
+      return Response.json({ ok: false, error: firstError.error || 'RCON request failed' }, { status: 502 })
     }
     const gamerules: Record<string, string> = {}
     ADMIN_GAMERULES.forEach((rule, i) => {
       const res = results[i]
       if (res.ok) {
-        const m = res.stdout.match(/set to:\s*(\S+)/i)
-        if (m) gamerules[rule] = m[1]
+        const m = res.stdout.match(/\b(true|false)\b/i)
+        if (m) gamerules[rule] = m[1].toLowerCase()
       }
     })
     return Response.json({ ok: true, gamerules })
@@ -56,8 +55,8 @@ export async function POST(req: NextRequest) {
     if (value !== 'true' && value !== 'false') {
       return Response.json({ ok: false, error: 'Value must be true or false' }, { status: 400 })
     }
-    const result = await runBridgeCommand(req, `gamerule set ${rule} ${value}`)
-    if (!result.ok) return Response.json({ ok: false, error: result.error, code: result.code }, { status: 502 })
+    const result = await rconForRequest(req, `gamerule ${rule} ${value}`)
+    if (!result.ok) return Response.json({ ok: false, error: result.error }, { status: 502 })
     return Response.json({ ok: true, message: `${rule} set to ${value}` })
   } catch (e: unknown) {
     return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Server error' }, { status: 500 })

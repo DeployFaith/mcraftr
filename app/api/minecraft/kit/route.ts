@@ -1,11 +1,10 @@
 import { NextRequest } from 'next/server'
-import { getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
+import { getSessionUserId, getUserFeatureFlags, checkFeatureAccess, rconForRequest } from '@/lib/rcon'
 import { getUserById } from '@/lib/users'
 import { KITS_BY_ID } from '@/lib/kits'
 import { getDb } from '@/lib/db'
 import { giveItemViaRcon } from '@/lib/minecraft-give'
 import type { CustomKitItem } from '@/lib/custom-kits'
-import { runBridgeCommand } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -55,12 +54,15 @@ export async function POST(req: NextRequest) {
     }
 
     if (kit) {
-      const result = await runBridgeCommand(req, `kit ${player} ${kitId}`)
-      if (!result.ok) {
-        console.warn('[mcraftr] /api/minecraft/kit failed', { player, kitId, error: result.error || 'RCON error' })
-        return Response.json({ ok: false, error: result.error || 'RCON error', code: result.code }, { status: 502 })
+      for (const command of kit.commands) {
+        const resolved = command.replaceAll('{player}', player)
+        const result = await rconForRequest(req, resolved)
+        if (!result.ok) {
+          console.warn('[mcraftr] /api/minecraft/kit failed', { player, kitId, error: result.error || 'RCON error', command: resolved })
+          return Response.json({ ok: false, error: result.error || 'RCON error' }, { status: 502 })
+        }
       }
-      return Response.json({ ok: true, message: result.stdout || `${kit.label} kit issued to ${player}` })
+      return Response.json({ ok: true, message: `${kit.label} kit issued to ${player}` })
     }
 
     const items = JSON.parse(customKit!.items_json) as CustomKitItem[]

@@ -1,29 +1,28 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
-import { runBridgeCommand } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-type CommandStep = { transport: 'bridge' | 'rcon'; command: string }
+type CommandStep = { command: string }
 
 const COMMANDS: Record<string, { cmds: CommandStep[]; label: string; requiresPlayer: boolean }> = {
-  day:           { requiresPlayer: false, label: 'Day',          cmds: [{ transport: 'bridge', command: 'world time day' }] },
-  night:         { requiresPlayer: false, label: 'Night',        cmds: [{ transport: 'bridge', command: 'world time night' }] },
-  clear_weather: { requiresPlayer: false, label: 'Clear sky',    cmds: [{ transport: 'bridge', command: 'world weather clear' }] },
-  storm:         { requiresPlayer: false, label: 'Storm',        cmds: [{ transport: 'bridge', command: 'world weather storm' }] },
-  creative:      { requiresPlayer: true,  label: 'Creative',     cmds: [{ transport: 'bridge', command: 'player gamemode creative {player}' }] },
-  survival:      { requiresPlayer: true,  label: 'Survival',     cmds: [{ transport: 'bridge', command: 'player gamemode survival {player}' }] },
-  adventure:     { requiresPlayer: true,  label: 'Adventure',    cmds: [{ transport: 'bridge', command: 'player gamemode adventure {player}' }] },
-  fly:           { requiresPlayer: true,  label: 'Fly',          cmds: [{ transport: 'rcon', command: 'fly {player}' }] },
-  heal:          { requiresPlayer: true,  label: 'Heal',         cmds: [{ transport: 'rcon', command: 'heal {player}' }, { transport: 'rcon', command: 'feed {player}' }] },
-  night_vision:  { requiresPlayer: true,  label: 'Night Vision', cmds: [{ transport: 'rcon', command: 'effect give {player} minecraft:night_vision 300 1' }] },
-  speed:         { requiresPlayer: true,  label: 'Speed',        cmds: [{ transport: 'rcon', command: 'effect give {player} minecraft:speed 120 3' }] },
-  invisibility:  { requiresPlayer: true,  label: 'Invisible',    cmds: [{ transport: 'rcon', command: 'effect give {player} minecraft:invisibility 120 1' }] },
-  jump:          { requiresPlayer: true,  label: 'Super Jump',   cmds: [{ transport: 'rcon', command: 'effect give {player} minecraft:jump_boost 120 5' }] },
-  strength:      { requiresPlayer: true,  label: 'Strength',     cmds: [{ transport: 'rcon', command: 'effect give {player} minecraft:strength 120 2' }] },
-  haste:         { requiresPlayer: true,  label: 'Haste',        cmds: [{ transport: 'rcon', command: 'effect give {player} minecraft:haste 120 2' }] },
-  clear_fx:      { requiresPlayer: true,  label: 'Clear FX',     cmds: [{ transport: 'rcon', command: 'effect clear {player}' }] },
+  day:           { requiresPlayer: false, label: 'Day',          cmds: [{ command: 'time set day' }] },
+  night:         { requiresPlayer: false, label: 'Night',        cmds: [{ command: 'time set night' }] },
+  clear_weather: { requiresPlayer: false, label: 'Clear sky',    cmds: [{ command: 'weather clear' }] },
+  storm:         { requiresPlayer: false, label: 'Storm',        cmds: [{ command: 'weather thunder' }] },
+  creative:      { requiresPlayer: true,  label: 'Creative',     cmds: [{ command: 'gamemode creative {player}' }] },
+  survival:      { requiresPlayer: true,  label: 'Survival',     cmds: [{ command: 'gamemode survival {player}' }] },
+  adventure:     { requiresPlayer: true,  label: 'Adventure',    cmds: [{ command: 'gamemode adventure {player}' }] },
+  fly:           { requiresPlayer: true,  label: 'Fly',          cmds: [{ command: 'fly {player}' }] },
+  heal:          { requiresPlayer: true,  label: 'Heal',         cmds: [{ command: 'heal {player}' }, { command: 'feed {player}' }] },
+  night_vision:  { requiresPlayer: true,  label: 'Night Vision', cmds: [{ command: 'effect give {player} minecraft:night_vision 300 1' }] },
+  speed:         { requiresPlayer: true,  label: 'Speed',        cmds: [{ command: 'effect give {player} minecraft:speed 120 3' }] },
+  invisibility:  { requiresPlayer: true,  label: 'Invisible',    cmds: [{ command: 'effect give {player} minecraft:invisibility 120 1' }] },
+  jump:          { requiresPlayer: true,  label: 'Super Jump',   cmds: [{ command: 'effect give {player} minecraft:jump_boost 120 5' }] },
+  strength:      { requiresPlayer: true,  label: 'Strength',     cmds: [{ command: 'effect give {player} minecraft:strength 120 2' }] },
+  haste:         { requiresPlayer: true,  label: 'Haste',        cmds: [{ command: 'effect give {player} minecraft:haste 120 2' }] },
+  clear_fx:      { requiresPlayer: true,  label: 'Clear FX',     cmds: [{ command: 'effect clear {player}' }] },
 }
 
 export async function POST(req: NextRequest) {
@@ -53,9 +52,7 @@ export async function POST(req: NextRequest) {
     const outputs: string[] = []
     for (const step of def.cmds) {
       const cmd = buildCommand(step.command, player)
-      const result = step.transport === 'bridge'
-        ? await runBridgeCommand(req, cmd)
-        : await rconForRequest(req, cmd)
+      const result = await rconForRequest(req, cmd)
       if (!result.ok) errors.push(result.error || cmd)
       if (result.stdout) outputs.push(result.stdout)
     }

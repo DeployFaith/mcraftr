@@ -1,8 +1,7 @@
 import { NextRequest } from 'next/server'
-import { getSessionUserId, getSessionActiveServerId, getUserFeatureFlags, checkFeatureAccess } from '@/lib/rcon'
+import { getSessionUserId, getSessionActiveServerId, getUserFeatureFlags, checkFeatureAccess, rconForRequest } from '@/lib/rcon'
 import { getDb } from '@/lib/db'
 import { logAudit } from '@/lib/audit'
-import { runBridgeCommand } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -29,8 +28,8 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, error: 'Message is required' }, { status: 400 })
     }
     const clean = message.replace(/[\x00-\x1f\x7f]/g, '').slice(0, 256)
-    const result = await runBridgeCommand(req, `msg ${player} ${clean}`)
-    if (!result.ok) return Response.json({ ok: false, error: result.error, code: result.code }, { status: 502 })
+    const result = await rconForRequest(req, `msg ${player} ${clean}`)
+    if (!result.ok) return Response.json({ ok: false, error: result.error }, { status: 502 })
     logAudit(userId, 'msg', player, clean, serverId)
     try {
       getDb().prepare('INSERT INTO chat_log (user_id, server_id, type, player, message) VALUES (?, ?, ?, ?, ?)').run(userId, serverId, 'msg', player, clean)

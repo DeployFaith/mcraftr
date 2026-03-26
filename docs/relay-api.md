@@ -61,12 +61,7 @@ Mcraftr currently expects Relay-backed support for command families like:
 - `commands catalog`
 - `commands complete64 <base64url-line>`
 
-There are also convenience paths routed through Relay, including things like:
-
-- `broadcast ...`
-- `msg ...`
-- `kit ...`
-- curated gamerule reads and writes
+There are also some optional convenience paths that a Relay integration may expose, but Mcraftr should prefer plain RCON for any feature that can work cleanly without an external provider.
 
 The exact command surface should be treated as the current app contract, not yet a finalized long-term public API.
 

@@ -10,17 +10,17 @@ const COPY: Record<Requirement, { badge: string; title: string; summary: string;
   relay: {
     badge: 'REQUIRES RELAY',
     title: 'This feature uses Mcraftr Relay',
-    summary: 'Relay is Mcraftr\'s live integration layer for structured server operations.',
+    summary: 'Relay is Mcraftr\'s optional live integration layer for structured server operations.',
     bullets: [
-      'Install or configure a Relay API integration on your Minecraft server',
+      'Install or configure a Relay API integration on your Minecraft server if you want this enhanced workflow',
       'Set the Relay Prefix in Connect',
-      'Keep using Quick Connect for the raw RCON basics in the meantime',
+      'Keep using Quick Connect for the core RCON experience in the meantime',
     ],
   },
   beacon: {
     badge: 'REQUIRES BEACON',
     title: 'This feature uses Mcraftr Beacon',
-    summary: 'Beacon is Mcraftr\'s read-only data layer for worlds, structures, plugins, maps, and related metadata.',
+    summary: 'Beacon is Mcraftr\'s optional read-only data layer for worlds, structures, plugins, maps, and related metadata.',
     bullets: [
       'Run Beacon as part of your Mcraftr deployment',
       'Mount your Minecraft data directory read-only into Beacon',
@@ -30,11 +30,11 @@ const COPY: Record<Requirement, { badge: string; title: string; summary: string;
   full: {
     badge: 'REQUIRES FULL STACK',
     title: 'This feature uses the Full Mcraftr Stack',
-    summary: 'Full Stack combines RCON, Relay, and Beacon for the complete Mcraftr experience.',
+    summary: 'Full Stack combines core RCON with optional Relay and Beacon enhancements for the richer integrated experience.',
     bullets: [
       'Relay unlocks live structured world, entity, terminal, and admin workflows',
       'Beacon unlocks read-only world, structure, plugin, and metadata discovery',
-      'Upgrade this server in Connect to explore everything this area can do',
+      'Upgrade this server in Connect to explore everything this enhanced area can do',
     ],
   },
 }

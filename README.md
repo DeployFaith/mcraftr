@@ -109,6 +109,7 @@ Relay depends on a compatible Relay API integration on your Minecraft server. Be
 Read more:
 
 - `INSTALL.md`
+- `docs/core-and-extensions.md`
 - `docs/full-stack-relay-and-beacon.md`
 - `docs/relay-api.md`
 - `docs/beacon.md`
