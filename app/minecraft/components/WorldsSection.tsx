@@ -12,6 +12,7 @@ import CapabilityLockCard from './CapabilityLockCard'
 import { playSound } from '@/app/components/soundfx'
 import type { CatalogArtPayload } from '@/lib/catalog-art/types'
 import type { FeatureKey } from '@/lib/features'
+import type { PlacementCheckResult } from '@/lib/placement-randomize'
 import type { ServerStackMode } from '@/lib/server-stack'
 import { FALLBACK_ENTITY_CATALOG } from '@/lib/entity-catalog'
 
@@ -475,6 +476,8 @@ export default function WorldsSection({
   const [structureRotation, setStructureRotation] = useState('0')
   const [structureIncludeAir, setStructureIncludeAir] = useState(false)
   const [structureBusy, setStructureBusy] = useState(false)
+  const [structureRandomizeBusy, setStructureRandomizeBusy] = useState(false)
+  const [structurePlacementCheck, setStructurePlacementCheck] = useState<PlacementCheckResult | null>(null)
   const [worldActionBusy, setWorldActionBusy] = useState<string | null>(null)
   const [structureCategoryPage, setStructureCategoryPage] = useState(0)
 
@@ -489,6 +492,8 @@ export default function WorldsSection({
   const [entityZ, setEntityZ] = useState('')
   const [entityCount, setEntityCount] = useState('1')
   const [entityBusy, setEntityBusy] = useState(false)
+  const [entityRandomizeBusy, setEntityRandomizeBusy] = useState(false)
+  const [entityPlacementCheck, setEntityPlacementCheck] = useState<PlacementCheckResult | null>(null)
   const [presetEditorOpen, setPresetEditorOpen] = useState(false)
   const [presetEditorBusy, setPresetEditorBusy] = useState(false)
   const [editingPreset, setEditingPreset] = useState<EntityCatalogEntry | null>(null)
@@ -841,6 +846,28 @@ export default function WorldsSection({
     return data
   }, [])
 
+  const validatePlacement = useCallback(async (kind: 'entity' | 'structure', world: string, x: number, y: number, z: number, dimensions?: { width?: number; height?: number; length?: number; rotation?: number }) => {
+    const res = await fetch('/api/minecraft/placement/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind, world, x, y, z, ...dimensions }),
+    })
+    const data = await res.json()
+    if (!data.ok) throw new Error(data.error || 'Failed to validate placement')
+    return data as PlacementCheckResult & { world: string }
+  }, [])
+
+  const randomizePlacement = useCallback(async (kind: 'entity' | 'structure', world: string, options?: { anchorX?: number | null; anchorZ?: number | null; player?: string; width?: number; height?: number; length?: number; rotation?: number }) => {
+    const res = await fetch('/api/minecraft/placement/randomize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind, world, ...options }),
+    })
+    const data = await res.json()
+    if (!data.ok) throw new Error(data.error || 'Failed to randomize placement')
+    return data as PlacementCheckResult & { world: string }
+  }, [])
+
   const resolvePlayerTarget = useCallback(async (player: string, expectedWorld?: string) => {
     if (!player) throw new Error('Select a player first.')
     const res = await fetch(`/api/minecraft/player-location?player=${encodeURIComponent(player)}`, { cache: 'no-store' })
@@ -962,6 +989,18 @@ export default function WorldsSection({
             rotation: Number(structureRotation),
             includeAir: structureIncludeAir,
           }
+      if (!playerTarget) {
+        const placementCheck = await validatePlacement('structure', structureWorld, Number(structureX), Number(structureY), Number(structureZ), {
+          width: selectedStructure.dimensions?.width ?? 1,
+          height: selectedStructure.dimensions?.height ?? 1,
+          length: selectedStructure.dimensions?.length ?? 1,
+          rotation: Number(structureRotation),
+        })
+        setStructurePlacementCheck(placementCheck)
+        if (placementCheck.status === 'bad') {
+          throw new Error(placementCheck.message)
+        }
+      }
       const data = await postJson('/api/minecraft/structures/place', payload)
       setStatus(`Placed ${selectedStructure.label}${data.world ? ` in ${data.world}` : ''}.`)
       setSelectedStructure(null)
@@ -1055,6 +1094,13 @@ export default function WorldsSection({
             z: Number(entityZ),
             count: Number(entityCount) || 1,
           }
+      if (!playerTarget) {
+        const placementCheck = await validatePlacement('entity', entityWorld, Number(entityX), Number(entityY), Number(entityZ))
+        setEntityPlacementCheck(placementCheck)
+        if (placementCheck.status === 'bad') {
+          throw new Error(placementCheck.message)
+        }
+      }
       const data = await postJson('/api/minecraft/entities/spawn', payload)
       setStatus(`Spawned ${data.count} ${selectedEntity.label}${data.world ? ` in ${data.world}` : ''}.`)
       setSelectedEntity(null)
@@ -1151,6 +1197,50 @@ export default function WorldsSection({
         length: placement.max_z - placement.min_z + 1,
       },
     })
+  }
+
+  const handleRandomizeStructureCoords = async () => {
+    if (!structureWorld || !selectedStructure) return
+    setStructureRandomizeBusy(true)
+    try {
+      const placement = await randomizePlacement('structure', structureWorld, {
+        anchorX: structureX ? Number(structureX) : null,
+        anchorZ: structureZ ? Number(structureZ) : null,
+        player: selectedPlayer || undefined,
+        width: selectedStructure.dimensions?.width ?? 1,
+        height: selectedStructure.dimensions?.height ?? 1,
+        length: selectedStructure.dimensions?.length ?? 1,
+        rotation: Number(structureRotation),
+      })
+      setStructureX(String(placement.x))
+      setStructureY(String(placement.y))
+      setStructureZ(String(placement.z))
+      setStructurePlacementCheck(placement)
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Failed to randomize structure placement')
+    } finally {
+      setStructureRandomizeBusy(false)
+    }
+  }
+
+  const handleRandomizeEntityCoords = async () => {
+    if (!entityWorld) return
+    setEntityRandomizeBusy(true)
+    try {
+      const placement = await randomizePlacement('entity', entityWorld, {
+        anchorX: entityX ? Number(entityX) : null,
+        anchorZ: entityZ ? Number(entityZ) : null,
+        player: selectedPlayer || undefined,
+      })
+      setEntityX(String(placement.x))
+      setEntityY(String(placement.y))
+      setEntityZ(String(placement.z))
+      setEntityPlacementCheck(placement)
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Failed to randomize entity placement')
+    } finally {
+      setEntityRandomizeBusy(false)
+    }
   }
 
   const currentSpawn = useMemo(() => worldsData?.worlds.find(entry => entry.name === spawnWorld)?.spawn ?? null, [spawnWorld, worldsData])
@@ -2166,7 +2256,11 @@ export default function WorldsSection({
             if (axis === 'x') setStructureX(value)
             if (axis === 'y') setStructureY(value)
             if (axis === 'z') setStructureZ(value)
+            setStructurePlacementCheck(null)
           }}
+          randomizeBusy={structureRandomizeBusy}
+          placementCheck={structurePlacementCheck}
+          onRandomize={() => void handleRandomizeStructureCoords()}
           rotation={structureRotation}
           onRotationChange={setStructureRotation}
           includeAir={structureIncludeAir}
@@ -2226,7 +2320,11 @@ export default function WorldsSection({
             if (axis === 'x') setEntityX(value)
             if (axis === 'y') setEntityY(value)
             if (axis === 'z') setEntityZ(value)
+            setEntityPlacementCheck(null)
           }}
+          randomizeBusy={entityRandomizeBusy}
+          placementCheck={entityPlacementCheck}
+          onRandomize={() => void handleRandomizeEntityCoords()}
           count={entityCount}
           onCountChange={setEntityCount}
           confirmLabel={`Spawn ${selectedEntity.label}`}

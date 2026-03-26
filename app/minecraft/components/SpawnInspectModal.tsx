@@ -4,6 +4,7 @@ import { useEffect, useMemo } from 'react'
 import { X } from 'lucide-react'
 import type { CatalogArtPayload } from '@/lib/catalog-art/types'
 import CatalogArtwork, { isCatalogArtworkEnabled } from './CatalogArtwork'
+import type { PlacementCheckResult } from '@/lib/placement-randomize'
 
 const ENTITY_COUNT_PRESETS = ['1', '4', '8', '16', '32', '64']
 
@@ -80,6 +81,9 @@ type Props = {
   confirmLabel: string
   dangerLabel?: string | null
   busy?: boolean
+  randomizeBusy?: boolean
+  placementCheck?: PlacementCheckResult | null
+  onRandomize?: () => void
   onCancel: () => void
   onConfirm: () => void
 }
@@ -183,6 +187,9 @@ export default function SpawnInspectModal({
   confirmLabel,
   dangerLabel,
   busy = false,
+  randomizeBusy = false,
+  placementCheck = null,
+  onRandomize,
   onCancel,
   onConfirm,
 }: Props) {
@@ -425,6 +432,41 @@ export default function SpawnInspectModal({
                           </label>
                         ))}
                       </div>
+                      {onRandomize && (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={onRandomize}
+                            disabled={randomizeBusy || !world}
+                            className="rounded-2xl border px-4 py-3 font-mono text-[12px] tracking-[0.14em] disabled:opacity-40"
+                            style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}
+                          >
+                            {randomizeBusy ? 'Randomizing…' : x || y || z ? 'Randomize Again' : 'Randomize'}
+                          </button>
+                          <div className="rounded-xl border px-3 py-3 font-mono text-[11px]" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}>
+                            Mcraftr will look for a safer spot with ground support and open space before filling the coordinates.
+                          </div>
+                        </div>
+                      )}
+                      {placementCheck && (
+                        <div
+                          className="rounded-xl border px-3 py-3 font-mono text-[11px]"
+                          style={{
+                            borderColor: placementCheck.status === 'good' ? 'color-mix(in srgb, var(--accent) 42%, var(--border))' : placementCheck.status === 'warn' ? 'rgba(245, 177, 87, 0.45)' : 'rgba(255, 90, 114, 0.45)',
+                            background: placementCheck.status === 'good' ? 'color-mix(in srgb, var(--accent) 10%, var(--panel))' : placementCheck.status === 'warn' ? 'rgba(245, 177, 87, 0.08)' : 'rgba(255, 90, 114, 0.08)',
+                            color: placementCheck.status === 'good' ? 'var(--text-dim)' : placementCheck.status === 'warn' ? '#ffd7a3' : '#ffb3bd',
+                          }}
+                        >
+                          <div>{placementCheck.message}</div>
+                          {placementCheck.details && placementCheck.details.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {placementCheck.details.map(detail => (
+                                <div key={detail}>- {detail}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div className="rounded-xl border px-3 py-3 font-mono text-[11px]" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}>
                         Best for precise structure anchors, scripted entity drops, and repeatable placement tests.
                       </div>
