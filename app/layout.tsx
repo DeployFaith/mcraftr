@@ -1,19 +1,25 @@
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import './globals.css'
 import ThemeProvider from './components/ThemeProvider'
 import SessionProviderWrapper from './components/SessionProviderWrapper'
 import BackToTopButton from './components/BackToTopButton'
 import BackgroundMusicProvider from './components/BackgroundMusicProvider'
 
-export const metadata: Metadata = {
+export async function generateMetadata(): Promise<Metadata> {
+  const host = (await headers()).get('host')?.toLowerCase() ?? ''
+  const title = host === 'mcraftr.mesh' ? 'Mcraftr - Private' : 'Mcraftr by DeployFaith'
+
+  return {
   metadataBase: new URL('https://mcraftr.deployfaith.xyz'),
-  title: 'Mcraftr',
-  description: 'Minecraft server admin panel',
-  icons: {
-    icon: '/m.svg',
-    shortcut: '/m.svg',
-    apple: '/m.svg',
-  },
+    title,
+    description: 'Minecraft server admin panel',
+    icons: {
+      icon: '/m.svg',
+      shortcut: '/m.svg',
+      apple: '/m.svg',
+    },
+  }
 }
 
 export default function RootLayout({
