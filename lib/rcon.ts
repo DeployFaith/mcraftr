@@ -9,6 +9,57 @@ import { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { checkRateLimit } from './ratelimit'
 
+const READ_ONLY_RCON_CACHE_TTL_MS = 3000
+
+type CachedRconEntry = {
+  expiresAt: number
+  promise: Promise<RconResult>
+}
+
+const readOnlyRconCache = new Map<string, CachedRconEntry>()
+
+function normalizeRconCommand(command: string) {
+  return command.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+function isCacheableReadOnlyCommand(command: string) {
+  const normalized = normalizeRconCommand(command)
+  return normalized === 'list'
+    || normalized === 'version'
+    || normalized === 'tps'
+    || normalized === 'weather'
+    || normalized === 'weather query'
+    || normalized === 'weather query daytime'
+    || normalized === 'time query daytime'
+    || normalized === 'difficulty'
+    || normalized === 'whitelist list'
+}
+
+function getCachedRconResult(cacheKey: string) {
+  const now = Date.now()
+  const cached = readOnlyRconCache.get(cacheKey)
+  if (!cached) return null
+  if (cached.expiresAt <= now) {
+    readOnlyRconCache.delete(cacheKey)
+    return null
+  }
+  return cached.promise
+}
+
+function setCachedRconResult(cacheKey: string, promise: Promise<RconResult>) {
+  readOnlyRconCache.set(cacheKey, {
+    expiresAt: Date.now() + READ_ONLY_RCON_CACHE_TTL_MS,
+    promise,
+  })
+  promise.catch(() => {
+    const cached = readOnlyRconCache.get(cacheKey)
+    if (cached?.promise === promise) {
+      readOnlyRconCache.delete(cacheKey)
+    }
+  })
+  return promise
+}
+
 async function resolveSessionUser(req: NextRequest): Promise<{ userId: string | null; activeServerId: string | null }> {
   const token = await getToken({
     req,
@@ -71,7 +122,7 @@ export async function getSessionActiveServerId(req: NextRequest): Promise<string
 // ── Public helper — resolves auth, rate-limits, dispatches RCON ──────────────
 
 export async function rconForRequest(req: NextRequest, cmd: string): Promise<RconResult> {
-  const { userId } = await resolveSessionUser(req)
+  const { userId, activeServerId } = await resolveSessionUser(req)
 
   if (!userId) {
     return { ok: false, stdout: '', error: 'Not authenticated' }
@@ -93,7 +144,18 @@ export async function rconForRequest(req: NextRequest, cmd: string): Promise<Rco
     return { ok: false, stdout: '', error: 'No server configured' }
   }
 
-  return rconDirect(activeServer.host, activeServer.port, activeServer.password, cmd)
+  const cacheable = req.method === 'GET' && isCacheableReadOnlyCommand(cmd)
+  const cacheKey = cacheable && activeServerId ? `${activeServerId}:${normalizeRconCommand(cmd)}` : null
+
+  if (cacheKey) {
+    const cached = getCachedRconResult(cacheKey)
+    if (cached) {
+      return cached
+    }
+  }
+
+  const request = rconDirect(activeServer.host, activeServer.port, activeServer.password, cmd)
+  return cacheKey ? setCachedRconResult(cacheKey, request) : request
 }
 
 // ── Test a connection without saving it ──────────────────────────────────────
