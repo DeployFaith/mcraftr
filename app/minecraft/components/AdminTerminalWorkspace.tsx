@@ -723,9 +723,9 @@ export default function AdminTerminalWorkspace({
   const rootClassName = cn(
     'flex min-h-0 flex-col overflow-visible rounded-[24px] border border-[var(--border)] md:overflow-hidden',
     standalone
-      ? 'min-h-[calc(100vh-8.5rem)] md:h-[calc(100vh-8.5rem)]'
+      ? 'min-h-[calc(100dvh-8.5rem)] md:min-h-[calc(100dvh-8.5rem)]'
       : fullPage
-        ? 'min-h-[calc(100vh-10.5rem)] md:h-[calc(100vh-10.5rem)]'
+        ? 'min-h-[calc(100dvh-10.5rem)] md:min-h-[calc(100dvh-10.5rem)]'
         : 'min-h-[70vh] md:h-[min(78vh,860px)]',
     effectiveMode === 'maximized' && !standalone && 'fixed inset-2 z-50 h-auto min-h-0 md:inset-4',
   )

@@ -48,6 +48,16 @@ export async function GET(req: NextRequest) {
   const command = world ? `entities live ${world}` : 'entities live'
   const bridge = await runBridgeJson<LiveEntityResponse>(req, command)
   if (!bridge.ok || bridge.data.ok === false) {
+    if (!bridge.ok && bridge.code === 'bridge_json_parse_failed') {
+      return Response.json({
+        ok: true,
+        entities: [],
+        totalEntities: 0,
+        truncated: false,
+        warning: 'Live entity targeting is temporarily unavailable because the Relay entity list is too large to parse right now. Player teleports still work.',
+        warningCode: bridge.code,
+      })
+    }
     return Response.json({
       ok: false,
       error: bridge.ok ? bridge.data.error || 'Failed to load live entities' : bridge.error,

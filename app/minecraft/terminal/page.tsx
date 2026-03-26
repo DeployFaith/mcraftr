@@ -11,7 +11,7 @@ export default async function MinecraftTerminalPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-4">
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-4 pb-24">
       <div className="space-y-1">
         <div className="font-mono text-[12px] tracking-[0.18em] text-[var(--text-dim)]">SERVER TERMINAL</div>
         <div className="text-[14px] text-[var(--text-dim)]">Standalone terminal workspace for server command discovery, execution, docs, and favorites.</div>

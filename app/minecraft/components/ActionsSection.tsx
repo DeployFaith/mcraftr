@@ -442,6 +442,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
   const [tpLocing,    setTpLocing]    = useState(false)
   const [liveEntities, setLiveEntities] = useState<LiveEntity[]>([])
   const [liveEntitiesLoading, setLiveEntitiesLoading] = useState(false)
+  const [liveEntitiesWarning, setLiveEntitiesWarning] = useState<string | null>(null)
   const [entitySearch, setEntitySearch] = useState('')
   const [entityToPlayerId, setEntityToPlayerId] = useState('')
   const [playerToEntityId, setPlayerToEntityId] = useState('')
@@ -497,6 +498,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
     if (!relayEnabled) {
       setLiveEntities([])
       setLiveEntitiesLoading(false)
+      setLiveEntitiesWarning(null)
       return
     }
     setLiveEntitiesLoading(true)
@@ -505,11 +507,14 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
       const payload = await response.json()
       if (payload.ok) {
         setLiveEntities(Array.isArray(payload.entities) ? payload.entities as LiveEntity[] : [])
+        setLiveEntitiesWarning(typeof payload.warning === 'string' ? payload.warning : null)
         if (payload.warning) addToast('error', payload.warning)
       } else {
+        setLiveEntitiesWarning(null)
         addToast('error', payload.error || 'Failed to load live entities')
       }
     } catch (error) {
+      setLiveEntitiesWarning(null)
       addToast('error', error instanceof Error ? error.message : 'Failed to load live entities')
     } finally {
       setLiveEntitiesLoading(false)
@@ -1114,6 +1119,11 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
             ? (liveEntitiesLoading ? 'Loading live entities…' : `${liveEntities.length} live entit${liveEntities.length === 1 ? 'y' : 'ies'} available for actor-based teleport controls.`)
             : 'Player teleport stays available with raw RCON. Relay unlocks live entity targeting and actor-based teleport controls.'}
         </div>
+        {relayEnabled && liveEntitiesWarning && (
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-3 text-[12px] font-mono text-[var(--text-dim)]">
+            {liveEntitiesWarning}
+          </div>
+        )}
 
         {relayEnabled ? (
           <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-3">
