@@ -95,6 +95,11 @@ type PluginStackData = {
   code?: string
   requirement?: 'relay' | 'beacon' | 'full'
   error?: string
+  relay?: {
+    ok?: boolean
+    error?: string
+    serverVersion?: string | null
+  }
   bridge: {
     ok?: boolean
     error?: string
@@ -1285,10 +1290,10 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
             <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4">
               <div className="text-[13px] font-mono text-[var(--text-dim)] tracking-widest mb-1">RELAY STATUS</div>
               <div className="text-[13px] font-mono text-[var(--text)]">
-                {pluginStack.bridge?.ok === false ? pluginStack.bridge.error : 'Connected'}
+                {(pluginStack.relay ?? pluginStack.bridge)?.ok === false ? (pluginStack.relay ?? pluginStack.bridge)?.error : 'Connected'}
               </div>
               <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">
-                {pluginStack.bridge?.serverVersion ? `Paper ${pluginStack.bridge.serverVersion}` : 'Server version unavailable'}
+                {(pluginStack.relay ?? pluginStack.bridge)?.serverVersion ? `Paper ${(pluginStack.relay ?? pluginStack.bridge)?.serverVersion}` : 'Server version unavailable'}
               </div>
             </div>
             <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4">

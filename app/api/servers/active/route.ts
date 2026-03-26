@@ -3,6 +3,14 @@ import { getUserById, setActiveUserServer } from '@/lib/users'
 import { getSessionUserId } from '@/lib/rcon'
 import { getServerStackDescription, getServerStackLabel } from '@/lib/server-stack'
 
+function publicMinecraftVersion(version: { override: string | null; resolved: string | null; source: string | null; detectedAt: number | null } | null) {
+  if (!version) return version
+  return {
+    ...version,
+    source: version.source === 'bridge' ? 'relay' : version.source,
+  }
+}
+
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +39,7 @@ export async function POST(req: NextRequest) {
                   stackMode: server.stackMode,
                   stackLabel: getServerStackLabel(server.stackMode),
                   stackDescription: getServerStackDescription(server.stackMode),
-                  minecraftVersion: server.minecraftVersion,
+                  minecraftVersion: publicMinecraftVersion(server.minecraftVersion),
                   bridgeEnabled: server.bridge.enabled,
                   sidecarEnabled: server.sidecar.enabled,
                 }
@@ -66,7 +74,7 @@ export async function GET(req: NextRequest) {
           stackMode: activeServer.stackMode,
           stackLabel: getServerStackLabel(activeServer.stackMode),
           stackDescription: getServerStackDescription(activeServer.stackMode),
-          minecraftVersion: activeServer.minecraftVersion,
+          minecraftVersion: publicMinecraftVersion(activeServer.minecraftVersion),
           bridgeEnabled: activeServer.bridge.enabled,
           sidecarEnabled: activeServer.sidecar.enabled,
         }

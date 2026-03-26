@@ -5,6 +5,15 @@ import { getActiveServer, updateServerMinecraftVersion } from '@/lib/users'
 import { resolveMinecraftVersion } from '@/lib/minecraft-version'
 import { callSidecarForRequest, runBridgeJson } from '@/lib/server-bridge'
 
+const IS_PUBLIC_DEMO = process.env.MCRAFTR_PUBLIC_DEMO === 'true'
+
+function publicMinecraftVersion(version: { override: string | null; resolved: string | null; source: string | null; detectedAt: number | null }) {
+  return {
+    ...version,
+    source: version.source === 'bridge' ? 'relay' : version.source,
+  }
+}
+
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
@@ -82,14 +91,25 @@ export async function GET(req: NextRequest) {
       label: activeServer.label,
       host: activeServer.host,
       port: activeServer.port,
-      minecraftVersion: effectiveMinecraftVersion,
+      minecraftVersion: publicMinecraftVersion(effectiveMinecraftVersion),
     },
-    bridge: bridge.ok ? bridge.data : { ok: false, error: bridge.error },
+    bridge: bridge.ok
+      ? {
+          ...bridge.data,
+          plugins: IS_PUBLIC_DEMO ? [] : bridge.data.plugins,
+        }
+      : { ok: false, error: bridge.error },
+    relay: bridge.ok
+      ? {
+          ...bridge.data,
+          plugins: IS_PUBLIC_DEMO ? [] : bridge.data.plugins,
+        }
+      : { ok: false, error: bridge.error },
     sidecar: sidecar.ok
       ? {
           ok: true,
           capabilities: sidecar.data.capabilities ?? activeServer.sidecar.capabilities,
-          plugins: sidecar.data.plugins ?? [],
+          plugins: IS_PUBLIC_DEMO ? [] : (sidecar.data.plugins ?? []),
         }
       : {
           ok: false,
