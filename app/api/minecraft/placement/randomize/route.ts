@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getSessionUserId } from '@/lib/rcon'
+import { checkFeatureAccess, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
 import { getActiveServer } from '@/lib/users'
 import { randomizePlacementCoordinates, type PlacementKind } from '@/lib/placement-randomize'
 import { runBridgeJson } from '@/lib/server-bridge'
@@ -29,6 +29,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_randomized_placement')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
   const kind = body.kind === 'structure' ? 'structure' : 'entity'
   let world = typeof body.world === 'string' ? body.world.trim() : ''
   const player = typeof body.player === 'string' ? body.player.trim() : ''

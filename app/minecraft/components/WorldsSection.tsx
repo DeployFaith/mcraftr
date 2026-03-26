@@ -515,6 +515,15 @@ export default function WorldsSection({
   const canStructureCatalog = features?.enable_structure_catalog ?? true
   const canEntityCatalog = features?.enable_entity_catalog ?? true
   const canWorldControls = features?.enable_world ?? true
+  const canWorldManagement = canWorldControls && (features?.enable_world_management ?? true)
+  const canStructurePlace = canStructureCatalog && (features?.enable_structure_place ?? true)
+  const canStructureRemove = canStructureCatalog && (features?.enable_structure_remove ?? true)
+  const canStructureUpload = canStructureCatalog && (features?.enable_structure_upload ?? true)
+  const canEntitySpawn = canEntityCatalog && (features?.enable_entity_spawn ?? true)
+  const canEntityLiveTools = canEntityCatalog && (features?.enable_entity_live_tools ?? true)
+  const canEntityPresets = canEntityCatalog && (features?.enable_entity_presets ?? true)
+  const canRandomizedPlacement = features?.enable_randomized_placement ?? true
+  const canPlacementValidation = features?.enable_placement_validation ?? true
   const activeWorldEntry = worldsData?.worlds.find(world => world.name === activeWorld) ?? worldsData?.worlds[0] ?? null
 
   const loadFeatures = useCallback(async () => {
@@ -588,7 +597,7 @@ export default function WorldsSection({
       }
     }
 
-    if (canEntityCatalog) {
+    if (canEntityCatalog && canEntityLiveTools) {
       try {
         const res = await fetch('/api/minecraft/entities', { cache: 'no-store' })
         const data = await res.json()
@@ -631,7 +640,7 @@ export default function WorldsSection({
 
     setError(nextErrors[0] ?? null)
     setLoading(false)
-  }, [canEntityCatalog, canSpawnTools, canStructureCatalog, canWorldInventory, stackMode])
+  }, [canEntityCatalog, canEntityLiveTools, canSpawnTools, canStructureCatalog, canWorldInventory, stackMode])
 
   const runWorldCommand = useCallback(async (kind: 'time' | 'weather', value: string) => {
     if (!activeWorld) {
@@ -989,7 +998,7 @@ export default function WorldsSection({
             rotation: Number(structureRotation),
             includeAir: structureIncludeAir,
           }
-      if (!playerTarget) {
+      if (!playerTarget && canPlacementValidation) {
         const placementCheck = await validatePlacement('structure', structureWorld, Number(structureX), Number(structureY), Number(structureZ), {
           width: selectedStructure.dimensions?.width ?? 1,
           height: selectedStructure.dimensions?.height ?? 1,
@@ -1094,7 +1103,7 @@ export default function WorldsSection({
             z: Number(entityZ),
             count: Number(entityCount) || 1,
           }
-      if (!playerTarget) {
+      if (!playerTarget && canPlacementValidation) {
         const placementCheck = await validatePlacement('entity', entityWorld, Number(entityX), Number(entityY), Number(entityZ))
         setEntityPlacementCheck(placementCheck)
         if (placementCheck.status === 'bad') {
@@ -1202,7 +1211,7 @@ export default function WorldsSection({
   const worldSpawnFor = useCallback((worldName: string) => worldsData?.worlds.find(entry => entry.name === worldName)?.spawn ?? null, [worldsData])
 
   const handleRandomizeStructureCoords = async () => {
-    if (!structureWorld || !selectedStructure) return
+    if (!canRandomizedPlacement || !structureWorld || !selectedStructure) return
     setStructureRandomizeBusy(true)
     try {
       const spawn = worldSpawnFor(structureWorld)
@@ -1228,7 +1237,7 @@ export default function WorldsSection({
   }
 
   const handleRandomizeEntityCoords = async () => {
-    if (!entityWorld) return
+    if (!canRandomizedPlacement || !entityWorld) return
     setEntityRandomizeBusy(true)
     try {
       const spawn = worldSpawnFor(entityWorld)
@@ -1306,6 +1315,7 @@ export default function WorldsSection({
           <button
             type="button"
             onClick={() => {
+              if (!canStructurePlace) return
               setStructureModalMode('place')
               setPlacementToRemove(null)
               setSelectedStructure({ ...entry, summary: inferSummary(entry) })
@@ -1378,10 +1388,11 @@ export default function WorldsSection({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => {
-              setEntityCount(String(entry.defaultCount ?? 1))
-              setSelectedEntity({ ...entry, summary: inferSummary(entry) })
-            }}
+              onClick={() => {
+                if (!canEntitySpawn) return
+                setEntityCount(String(entry.defaultCount ?? 1))
+                setSelectedEntity({ ...entry, summary: inferSummary(entry) })
+              }}
             className="rounded-xl border px-3 py-2 text-[11px] font-mono"
             style={{ borderColor: palette.frame, background: palette.badge, color: palette.badgeText }}
           >
@@ -1391,6 +1402,7 @@ export default function WorldsSection({
             <button
               type="button"
               onClick={() => {
+                if (!canEntityPresets) return
                 setEditingPreset(entry)
                 setPresetEditorOpen(true)
               }}
@@ -1402,8 +1414,9 @@ export default function WorldsSection({
           {entry.editable && entry.relativePath && (
             <button
               type="button"
-              onClick={() => void handleDeletePreset(entry)}
+              onClick={() => canEntityPresets && void handleDeletePreset(entry)}
               className="rounded-xl border border-red-900 px-3 py-2 text-[11px] font-mono text-red-400"
+              disabled={!canEntityPresets}
             >
               Delete
             </button>
@@ -1485,7 +1498,7 @@ export default function WorldsSection({
         </div>
       </CollapsibleCard>
 
-      {canWorldControls && (
+      {canWorldManagement && (
         <CollapsibleCard title="WEATHER / TIME" storageKey="worlds:weather-time" bodyClassName="p-4 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
           <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 space-y-4">
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_14rem]">
@@ -1817,12 +1830,12 @@ export default function WorldsSection({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                disabled={catalogBusy}
+                disabled={catalogBusy || !canStructureUpload}
                 onClick={() => structureUploadRef.current?.click()}
                 className="rounded-lg border border-[var(--accent-mid)] px-3 py-2 text-[12px] font-mono text-[var(--accent)] disabled:opacity-40"
                 style={{ background: 'var(--accent-dim)' }}
               >
-                Upload Schematic
+                {canStructureUpload ? 'Upload Schematic' : 'Structure Upload Disabled'}
               </button>
             </div>
           </div>
@@ -1976,8 +1989,9 @@ export default function WorldsSection({
             {visiblePlacements.map(entry => (
               <button
                 key={entry.id}
-                onClick={() => handleOpenRemoval(entry)}
+                onClick={() => canStructureRemove && handleOpenRemoval(entry)}
                 className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4 text-left transition-all hover:border-[var(--accent-mid)]"
+                disabled={!canStructureRemove}
               >
                 <div className="text-[13px] font-mono text-[var(--text)]">{entry.structure_label}</div>
                 <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">
@@ -2012,6 +2026,7 @@ export default function WorldsSection({
               <button
                 type="button"
                 onClick={() => {
+                  if (!canEntityPresets) return
                   setEditingPreset(null)
                   setPresetEditorOpen(true)
                 }}
@@ -2022,11 +2037,11 @@ export default function WorldsSection({
               </button>
               <button
                 type="button"
-                disabled={catalogBusy}
+                disabled={catalogBusy || !canEntityPresets}
                 onClick={() => entityUploadRef.current?.click()}
                 className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] disabled:opacity-40"
               >
-                Upload JSON
+                {canEntityPresets ? 'Upload JSON' : 'Preset Upload Disabled'}
               </button>
             </div>
           </div>
@@ -2266,7 +2281,7 @@ export default function WorldsSection({
           }}
           randomizeBusy={structureRandomizeBusy}
           placementCheck={structurePlacementCheck}
-          onRandomize={() => void handleRandomizeStructureCoords()}
+          onRandomize={canRandomizedPlacement ? () => void handleRandomizeStructureCoords() : undefined}
           rotation={structureRotation}
           onRotationChange={setStructureRotation}
           includeAir={structureIncludeAir}
@@ -2330,7 +2345,7 @@ export default function WorldsSection({
           }}
           randomizeBusy={entityRandomizeBusy}
           placementCheck={entityPlacementCheck}
-          onRandomize={() => void handleRandomizeEntityCoords()}
+          onRandomize={canRandomizedPlacement ? () => void handleRandomizeEntityCoords() : undefined}
           count={entityCount}
           onCountChange={setEntityCount}
           confirmLabel={`Spawn ${selectedEntity.label}`}

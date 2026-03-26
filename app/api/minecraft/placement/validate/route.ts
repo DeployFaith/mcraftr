@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getSessionUserId } from '@/lib/rcon'
+import { checkFeatureAccess, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
 import { getActiveServer } from '@/lib/users'
 import { validatePlacementCoordinates, type PlacementKind } from '@/lib/placement-randomize'
 
@@ -22,6 +22,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_placement_validation')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
   const kind = body.kind === 'structure' ? 'structure' : 'entity'
   const world = typeof body.world === 'string' ? body.world.trim() : ''
   const x = Number(body.x)

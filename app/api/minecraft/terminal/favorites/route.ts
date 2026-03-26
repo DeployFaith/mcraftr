@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { requireTerminalAccess, requireTerminalReadAccess } from '@/lib/terminal-access'
 import { listTerminalFavorites, saveTerminalFavorite } from '@/lib/terminal'
+import { checkFeatureAccess, getUserFeatureFlags } from '@/lib/rcon'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -8,6 +9,11 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: NextRequest) {
   const access = await requireTerminalReadAccess(req)
   if (!access.ok) return access.response
+
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_rcon') || !checkFeatureAccess(features, 'enable_terminal_favorites')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
 
   return Response.json({
     ok: true,
@@ -18,6 +24,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const access = await requireTerminalAccess(req)
   if (!access.ok) return access.response
+
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_rcon') || !checkFeatureAccess(features, 'enable_terminal_favorites')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
 
   const body = await req.json().catch(() => ({}))
   const command = typeof body.command === 'string' ? body.command : ''

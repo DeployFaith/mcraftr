@@ -3,6 +3,7 @@ import { requireTerminalAccess } from '@/lib/terminal-access'
 import { LOCAL_TERMINAL_COMMANDS, normalizeServerCommand, normalizeTerminalCommand } from '@/lib/terminal-shared'
 import { requireServerCapability } from '@/lib/server-capability'
 import { runBridgeJson } from '@/lib/server-bridge'
+import { checkFeatureAccess, getUserFeatureFlags } from '@/lib/rcon'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,6 +18,11 @@ type BridgeCompleteResponse = {
 export async function POST(req: NextRequest) {
   const access = await requireTerminalAccess(req)
   if (!access.ok) return access.response
+
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_rcon') || !checkFeatureAccess(features, 'enable_terminal_autocomplete')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
 
   const body = await req.json().catch(() => ({}))
   const line = typeof body.line === 'string' ? normalizeTerminalCommand(body.line) : ''

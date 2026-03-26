@@ -27,6 +27,9 @@ export async function POST(req: NextRequest) {
   if (!checkFeatureAccess(features, 'enable_entity_catalog')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+  if (!checkFeatureAccess(features, 'enable_entity_spawn')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
 
   const body = await req.json()
   const entityId = typeof body.entityId === 'string' ? body.entityId.trim() : ''

@@ -15,6 +15,9 @@ export async function POST(req: NextRequest) {
   if (!checkFeatureAccess(features, 'enable_structure_catalog')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+  if (!checkFeatureAccess(features, 'enable_structure_upload')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
 
   const body = await req.json()
   const sidecar = await callSidecarForRequest<UploadResponse>(req, '/structures/upload', {

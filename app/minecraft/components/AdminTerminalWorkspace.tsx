@@ -4,6 +4,7 @@ import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState
 import { ArrowUpRight, BookOpen, Command, ExternalLink, GripVertical, LayoutPanelLeft, LayoutPanelTop, Maximize2, Minimize2, Play, Plus, Search, Star, Trash2, X } from 'lucide-react'
 import ConfirmModal from './ConfirmModal'
 import CapabilityLockCard from './CapabilityLockCard'
+import type { FeatureKey } from '@/lib/features'
 import type {
   TerminalCatalogEntry,
   TerminalFavorite,
@@ -47,6 +48,8 @@ type WorldEditSchematic = {
   sizeBytes: number | null
   updatedAt: number | null
 }
+
+type FeatureFlags = Record<FeatureKey, boolean>
 
 type WizardTabId = NonNullable<TerminalState['activeInspectorTab']>
 
@@ -198,11 +201,24 @@ export default function AdminTerminalWorkspace({
   const [worldeditSchematics, setWorldeditSchematics] = useState<WorldEditSchematic[]>([])
   const [worldeditLoading, setWorldeditLoading] = useState(false)
   const [worldeditHint, setWorldeditHint] = useState<string | null>(null)
+  const [features, setFeatures] = useState<FeatureFlags | null>(null)
 
   const effectiveMode = standalone ? state.mode : (state.mode === 'popout' ? 'embedded' : state.mode)
   const selectedCommand = state.selectedCommand
   const commandDraft = state.commandDraft
   const selectedBase = useMemo(() => commandBaseName(selectedCommand ?? commandDraft), [selectedCommand, commandDraft])
+  const canCatalog = features ? features.enable_rcon && features.enable_terminal_catalog : true
+  const canDocs = features ? features.enable_rcon && features.enable_terminal_docs : true
+  const canWizards = features ? features.enable_rcon && features.enable_terminal_wizards : true
+  const canAutocomplete = features ? features.enable_rcon && features.enable_terminal_autocomplete : true
+  const canHistory = features ? features.enable_rcon && features.enable_terminal_history : true
+  const canFavorites = features ? features.enable_rcon && features.enable_terminal_favorites : true
+  const visibleInspectorTabs = RIGHT_TABS.filter(tab => {
+    if (tab === 'docs') return canDocs
+    if (tab === 'wizard') return canWizards
+    if (tab === 'favorites') return canFavorites
+    return true
+  })
 
   useEffect(() => {
     let mounted = true
@@ -212,15 +228,21 @@ export default function AdminTerminalWorkspace({
       setCatalogWarning(null)
       setCatalogWarningCode(null)
       try {
-        const [catalogRes, historyRes, favoritesRes, stateRes] = await Promise.all([
-          relayEnabled
+        const [prefsRes, catalogRes, historyRes, favoritesRes, stateRes] = await Promise.all([
+          fetch('/api/account/preferences', { cache: 'no-store' }),
+          relayEnabled && canCatalog
             ? fetch('/api/minecraft/terminal/catalog', { cache: 'no-store' })
             : Promise.resolve(new Response(JSON.stringify({ ok: false, error: 'This feature requires Mcraftr Relay.', code: 'requires_relay' }), { status: 409, headers: { 'Content-Type': 'application/json' } })),
-          fetch('/api/minecraft/terminal/history?limit=100', { cache: 'no-store' }),
-          fetch('/api/minecraft/terminal/favorites', { cache: 'no-store' }),
+          canHistory
+            ? fetch('/api/minecraft/terminal/history?limit=100', { cache: 'no-store' })
+            : Promise.resolve(new Response(JSON.stringify({ ok: true, entries: [] }), { headers: { 'Content-Type': 'application/json' } })),
+          canFavorites
+            ? fetch('/api/minecraft/terminal/favorites', { cache: 'no-store' })
+            : Promise.resolve(new Response(JSON.stringify({ ok: true, favorites: [] }), { headers: { 'Content-Type': 'application/json' } })),
           fetch('/api/minecraft/terminal/state', { cache: 'no-store' }),
         ])
-        const [catalogData, historyData, favoritesData, stateData] = await Promise.all([
+        const [prefsData, catalogData, historyData, favoritesData, stateData] = await Promise.all([
+          prefsRes.json(),
           catalogRes.json(),
           historyRes.json(),
           favoritesRes.json(),
@@ -228,27 +250,35 @@ export default function AdminTerminalWorkspace({
         ])
         if (!mounted) return
 
+        if (prefsData.ok && prefsData.features) {
+          setFeatures(prefsData.features)
+        }
+
         if (!historyData.ok) throw new Error(historyData.error || 'Failed to load terminal history')
         if (!favoritesData.ok) throw new Error(favoritesData.error || 'Failed to load favorites')
         if (!stateData.ok) throw new Error(stateData.error || 'Failed to load terminal state')
 
-        setCatalog(Array.isArray(catalogData.commands) ? catalogData.commands : [])
+        setCatalog(canCatalog && Array.isArray(catalogData.commands) ? catalogData.commands : [])
         setCatalogWarning(
-          typeof catalogData.warning === 'string' && catalogData.warning.trim()
+          !canCatalog
+            ? 'The command catalog is disabled by your feature policy. Manual execution still works.'
+            : typeof catalogData.warning === 'string' && catalogData.warning.trim()
             ? catalogData.warning.trim()
             : typeof catalogData.error === 'string' && catalogData.error.trim()
               ? catalogData.error.trim()
               : null,
         )
         setCatalogWarningCode(
-          typeof catalogData.warningCode === 'string'
+          !canCatalog
+            ? 'feature_disabled'
+            : typeof catalogData.warningCode === 'string'
             ? catalogData.warningCode
             : typeof catalogData.code === 'string'
               ? catalogData.code
               : null,
         )
-        setHistory(Array.isArray(historyData.entries) ? historyData.entries : [])
-        setFavorites(Array.isArray(favoritesData.favorites) ? favoritesData.favorites : [])
+        setHistory(canHistory && Array.isArray(historyData.entries) ? historyData.entries : [])
+        setFavorites(canFavorites && Array.isArray(favoritesData.favorites) ? favoritesData.favorites : [])
         setState(prev => ({
           ...prev,
           ...stateData.state,
@@ -266,7 +296,7 @@ export default function AdminTerminalWorkspace({
     }
     void load()
     return () => { mounted = false }
-  }, [initialMode, relayEnabled, standalone])
+  }, [canCatalog, canFavorites, canHistory, initialMode, relayEnabled, standalone])
 
   useEffect(() => {
     if (readOnly) return
@@ -300,7 +330,7 @@ export default function AdminTerminalWorkspace({
       return
     }
 
-    if (!relayEnabled) {
+    if (!relayEnabled || !canAutocomplete) {
       setSuggestions([])
       setSuggestionIndex(0)
       setCompletionLoading(false)
@@ -337,7 +367,7 @@ export default function AdminTerminalWorkspace({
       controller.abort()
       window.clearTimeout(timer)
     }
-  }, [commandDraft, relayEnabled])
+  }, [canAutocomplete, commandDraft, relayEnabled])
 
   useEffect(() => {
     if (!transcriptRef.current) return
@@ -838,7 +868,7 @@ export default function AdminTerminalWorkspace({
 
   const inspectorTabs = (
     <div className="grid grid-cols-3 gap-2">
-      {RIGHT_TABS.map(tab => (
+      {visibleInspectorTabs.map(tab => (
         <button
           key={tab}
           type="button"
@@ -863,7 +893,12 @@ export default function AdminTerminalWorkspace({
           <BookOpen size={16} strokeWidth={1.8} className="text-[var(--accent)]" />
           <div className="font-mono text-[11px] tracking-[0.16em] text-[var(--text-dim)]">COMMAND DOCS</div>
         </div>
-        {!relayEnabled && !selectedLocalCommand ? (
+        {!canDocs ? (
+          <div className="mt-3 space-y-3">
+            <CapabilityLockCard requirement="relay" feature="Structured command docs" compact />
+            <div className="text-[13px] text-[var(--text-dim)]">Command docs are disabled by your feature policy.</div>
+          </div>
+        ) : !relayEnabled && !selectedLocalCommand ? (
           <div className="mt-3 space-y-3">
             <CapabilityLockCard requirement="relay" feature="Structured command docs" compact />
             <div className="text-[13px] text-[var(--text-dim)]">Relay unlocks the command docs pane for server-provided commands. Local terminal shortcuts still work without it.</div>
@@ -942,7 +977,12 @@ export default function AdminTerminalWorkspace({
           <LayoutPanelTop size={16} strokeWidth={1.8} className="text-[var(--accent)]" />
           <div className="font-mono text-[11px] tracking-[0.16em] text-[var(--text-dim)]">COMMAND WIZARD</div>
         </div>
-        {!relayEnabled ? (
+        {!canWizards ? (
+          <div className="mt-3 space-y-3">
+            <CapabilityLockCard requirement="relay" feature="Guided command wizards" compact />
+            <div className="text-[13px] text-[var(--text-dim)]">Command wizards are disabled by your feature policy.</div>
+          </div>
+        ) : !relayEnabled ? (
           <div className="mt-3 space-y-3">
             <CapabilityLockCard requirement="relay" feature="Guided command wizards" compact />
             <div className="text-[13px] text-[var(--text-dim)]">Wizards are powered by Relay-backed command metadata. Raw commands and saved favorites still work without it.</div>
@@ -1173,10 +1213,13 @@ export default function AdminTerminalWorkspace({
           <div className="font-mono text-[11px] tracking-[0.16em] text-[var(--text-dim)]">SAVED COMMANDS</div>
         </div>
         <div className="mt-3 space-y-2">
-          {favorites.length === 0 && (
+          {!canFavorites && (
+            <div className="text-[13px] text-[var(--text-dim)]">Favorites are disabled by your feature policy.</div>
+          )}
+          {canFavorites && favorites.length === 0 && (
             <div className="text-[13px] text-[var(--text-dim)]">No favorites yet.</div>
           )}
-          {favorites.map(favorite => (
+          {canFavorites && favorites.map(favorite => (
             <div key={favorite.id} className="rounded-2xl border border-[var(--border)] px-3 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">

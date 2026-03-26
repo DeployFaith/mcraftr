@@ -4,6 +4,7 @@ import { mapTerminalCatalogEntries } from '@/lib/terminal'
 import { LOCAL_TERMINAL_COMMANDS } from '@/lib/terminal-shared'
 import { requireServerCapability } from '@/lib/server-capability'
 import { runBridgeJson } from '@/lib/server-bridge'
+import { checkFeatureAccess, getUserFeatureFlags } from '@/lib/rcon'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,6 +18,11 @@ type BridgeCatalogResponse = {
 export async function GET(req: NextRequest) {
   const access = await requireTerminalReadAccess(req)
   if (!access.ok) return access.response
+
+  const features = await getUserFeatureFlags(req)
+  if (!checkFeatureAccess(features, 'enable_rcon') || !checkFeatureAccess(features, 'enable_terminal_catalog')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
 
   const capability = await requireServerCapability(req, 'relay')
   if (!capability.ok) return capability.response

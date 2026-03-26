@@ -1,8 +1,10 @@
 export const FEATURE_CATEGORIES = [
   { id: 'tabs', label: 'Navigation Tabs', desc: 'Show or hide top-level tabs' },
   { id: 'actions', label: 'Actions', desc: 'Control actions and utility tools' },
+  { id: 'worlds', label: 'Worlds', desc: 'Control world, structure, entity, and placement tools' },
   { id: 'players', label: 'Players', desc: 'Control player panel detail sections' },
   { id: 'chat', label: 'Chat', desc: 'Control chat visibility and messaging' },
+  { id: 'terminal', label: 'Terminal', desc: 'Control command explorer, docs, history, and favorites' },
   { id: 'admin', label: 'Admin', desc: 'Control admin tools and sections' },
 ] as const
 
@@ -31,6 +33,16 @@ export const FEATURE_DEFS = [
   { key: 'enable_structure_catalog', label: 'Structure Catalog', desc: 'Allow browsing, placing, and removing structures', category: 'actions' },
   { key: 'enable_entity_catalog', label: 'Entity Catalog', desc: 'Allow browsing and spawning entities', category: 'actions' },
 
+  { key: 'enable_world_management', label: 'World Management', desc: 'Allow create, clone, load, unload, and environment actions', category: 'worlds' },
+  { key: 'enable_structure_place', label: 'Structure Placement', desc: 'Allow opening placement flows and placing structures', category: 'worlds' },
+  { key: 'enable_structure_remove', label: 'Structure Removal', desc: 'Allow removing tracked placed structures', category: 'worlds' },
+  { key: 'enable_structure_upload', label: 'Structure Uploads', desc: 'Allow uploading schematics and structure files', category: 'worlds' },
+  { key: 'enable_entity_spawn', label: 'Entity Spawning', desc: 'Allow opening entity spawn flows and spawning entities', category: 'worlds' },
+  { key: 'enable_entity_live_tools', label: 'Live Entity Tools', desc: 'Allow live entity targeting and actor-based tools', category: 'worlds' },
+  { key: 'enable_entity_presets', label: 'Entity Presets', desc: 'Allow creating, uploading, and editing entity presets', category: 'worlds' },
+  { key: 'enable_randomized_placement', label: 'Randomized Placement', desc: 'Allow safer randomized coordinates in structure/entity placement modals', category: 'worlds' },
+  { key: 'enable_placement_validation', label: 'Placement Validation', desc: 'Validate coordinate placement before entity/structure placement', category: 'worlds' },
+
   { key: 'enable_player_session', label: 'Player Session', desc: 'Show online time, ping, dimension and gamemode', category: 'players' },
   { key: 'enable_player_vitals', label: 'Player Vitals', desc: 'Show health, hunger and experience', category: 'players' },
   { key: 'enable_player_location', label: 'Player Location', desc: 'Show current and spawn coordinates', category: 'players' },
@@ -38,6 +50,13 @@ export const FEATURE_DEFS = [
 
   { key: 'enable_chat_read', label: 'View Chat Logs', desc: 'Allow reading chat history', category: 'chat' },
   { key: 'enable_chat_write', label: 'Send Chat Messages', desc: 'Allow broadcast and private messages', category: 'chat' },
+
+  { key: 'enable_terminal_catalog', label: 'Command Catalog', desc: 'Allow the terminal explorer and command catalog', category: 'terminal' },
+  { key: 'enable_terminal_docs', label: 'Command Docs', desc: 'Allow the terminal docs pane', category: 'terminal' },
+  { key: 'enable_terminal_wizards', label: 'Command Wizards', desc: 'Allow guided command wizards in the terminal', category: 'terminal' },
+  { key: 'enable_terminal_autocomplete', label: 'Autocomplete', desc: 'Allow Relay-backed terminal completions', category: 'terminal' },
+  { key: 'enable_terminal_history', label: 'History', desc: 'Allow reading terminal history and transcript state', category: 'terminal' },
+  { key: 'enable_terminal_favorites', label: 'Favorites', desc: 'Allow saving and loading terminal favorites', category: 'terminal' },
 
   { key: 'enable_admin_server_info', label: 'Server Info', desc: 'Show live server status and TPS', category: 'admin' },
   { key: 'enable_admin_rules', label: 'Rules & Difficulty', desc: 'Manage difficulty and gamerules', category: 'admin' },

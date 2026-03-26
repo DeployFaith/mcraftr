@@ -40,6 +40,9 @@ export async function GET(req: NextRequest) {
   if (!checkFeatureAccess(features, 'enable_entity_catalog')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+  if (!checkFeatureAccess(features, 'enable_entity_live_tools')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
 
   const capability = await requireServerCapability(req, 'relay')
   if (!capability.ok) return capability.response

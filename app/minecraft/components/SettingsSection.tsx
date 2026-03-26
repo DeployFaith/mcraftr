@@ -15,8 +15,10 @@ const SETTINGS_COLLAPSIBLE_GROUP = 'settings-tab'
 const FEATURE_CATEGORY_GROUP_STATE: Record<FeatureCategory, boolean> = {
   tabs: true,
   actions: true,
+  worlds: true,
   players: true,
   chat: true,
+  terminal: true,
   admin: true,
 }
 
@@ -224,8 +226,10 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
   const [expandedCategories, setExpandedCategories] = useState<Record<FeatureCategory, boolean>>({
     tabs: false,
     actions: true,
+    worlds: false,
     players: false,
     chat: false,
+    terminal: false,
     admin: false,
   })
   const [collapseAllActive, setCollapseAllActive] = useState(false)
@@ -234,8 +238,10 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
     const grouped: Record<FeatureCategory, Array<{ key: FeatureKey; label: string; desc: string; category: FeatureCategory }>> = {
       tabs: [],
       actions: [],
+      worlds: [],
       players: [],
       chat: [],
+      terminal: [],
       admin: [],
     }
     for (const def of FEATURE_DEFS) {
@@ -274,11 +280,13 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
     setCollapsibleGroupState(SETTINGS_COLLAPSIBLE_GROUP, nextOpen)
     setExpandedCategories(nextOpen
       ? FEATURE_CATEGORY_GROUP_STATE
-      : {
+        : {
           tabs: false,
           actions: false,
+          worlds: false,
           players: false,
           chat: false,
+          terminal: false,
           admin: false,
         })
     setCollapseAllActive(!collapseAllActive)
@@ -1120,13 +1128,13 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <button
-              onClick={() => setExpandedCategories({ tabs: true, actions: true, players: true, chat: true, admin: true })}
+              onClick={() => setExpandedCategories({ tabs: true, actions: true, worlds: true, players: true, chat: true, terminal: true, admin: true })}
               className="text-[11px] font-mono text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border)] rounded px-2 py-1"
             >
               Expand all
             </button>
             <button
-              onClick={() => setExpandedCategories({ tabs: false, actions: false, players: false, chat: false, admin: false })}
+              onClick={() => setExpandedCategories({ tabs: false, actions: false, worlds: false, players: false, chat: false, terminal: false, admin: false })}
               className="text-[11px] font-mono text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border)] rounded px-2 py-1"
             >
               Collapse all

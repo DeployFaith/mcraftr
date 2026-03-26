@@ -19,6 +19,9 @@ export async function POST(req: NextRequest) {
   if (!checkFeatureAccess(features, 'enable_structure_catalog')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+  if (!checkFeatureAccess(features, 'enable_structure_remove')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
 
   const capability = await requireServerCapability(req, 'full')
   if (!capability.ok) return capability.response

@@ -23,6 +23,9 @@ export async function POST(req: NextRequest) {
   if (!checkFeatureAccess(features, 'enable_world_build_tools')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+  if (!checkFeatureAccess(features, 'enable_world_management')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
 
   const capability = await requireServerCapability(req, 'full')
   if (!capability.ok) return capability.response

@@ -22,6 +22,9 @@ export async function POST(req: NextRequest) {
   if (!checkFeatureAccess(features, 'enable_entity_catalog')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
+  if (!checkFeatureAccess(features, 'enable_entity_presets')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
 
   const body = await req.json()
   const preset = normalizeEntityPresetInput(body.preset ?? {})
@@ -47,6 +50,9 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const features = await getUserFeatureFlags(req)
   if (!checkFeatureAccess(features, 'enable_entity_catalog')) {
+    return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
+  }
+  if (!checkFeatureAccess(features, 'enable_entity_presets')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
 
