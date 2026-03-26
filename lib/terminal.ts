@@ -84,6 +84,21 @@ function extractJsonPayload(raw: string): TerminalStructuredOutput {
   return null
 }
 
+function resolveCatalogWizardId(row: Record<string, unknown>) {
+  const candidates = [
+    typeof row.name === 'string' ? row.name : null,
+    typeof row.namespacedName === 'string' ? row.namespacedName : null,
+    ...(Array.isArray(row.aliases) ? row.aliases.filter((entry): entry is string => typeof entry === 'string') : []),
+  ]
+
+  for (const candidate of candidates) {
+    const wizardId = candidate ? wizardIdForCommand(candidate) : null
+    if (wizardId) return wizardId
+  }
+
+  return null
+}
+
 function truncateOutput(value: string) {
   const bytes = Buffer.byteLength(value, 'utf8')
   if (bytes <= MAX_OUTPUT_BYTES) {
@@ -331,7 +346,7 @@ export function mapTerminalCatalogEntries(raw: unknown): TerminalCatalogEntry[] 
       permission: typeof row.permission === 'string' && row.permission.trim() ? row.permission.trim() : null,
       source: typeof row.source === 'string' && row.source.trim() ? sanitizePublicText(row.source.trim()) : null,
       riskLevel: classifyCommandRisk(name),
-      wizardId: wizardIdForCommand(name),
+      wizardId: resolveCatalogWizardId(row),
     })
   }
   return entries.sort((a, b) => a.name.localeCompare(b.name))

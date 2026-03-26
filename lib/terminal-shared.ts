@@ -151,13 +151,19 @@ export function getDefaultTerminalState(): TerminalState {
 }
 
 export function wizardIdForCommand(commandName: string): string | null {
-  const normalized = commandName.trim().toLowerCase()
-  if (normalized === 'mcraftr') return 'mcraftr-root'
-  if (normalized === 'tp' || normalized === 'teleport') return 'teleport'
-  if (normalized === 'whitelist') return 'whitelist'
-  if (normalized === 'kick') return 'kick'
-  if (normalized === 'ban' || normalized === 'ban-ip') return 'ban'
-  if (normalized === 'op' || normalized === 'deop') return 'operator'
-  if (normalized === 'give') return 'give'
+  const normalized = commandName.trim().replace(/^\/+/, '').toLowerCase()
+  const token = normalized.split(/\s+/)[0] ?? ''
+  const bare = token.includes(':') ? token.split(':').pop() ?? token : token
+  if (bare === 'mcraftr' || bare === 'relay') return 'relay-root'
+  if (bare === 'tp' || bare === 'teleport') return 'teleport'
+  if (bare === 'whitelist') return 'whitelist'
+  if (bare === 'kick') return 'kick'
+  if (bare === 'ban' || bare === 'ban-ip') return 'ban'
+  if (bare === 'op' || bare === 'deop') return 'operator'
+  if (bare === 'give') return 'give'
+  if (bare === 'gamerule') return 'gamerule'
+  if (bare === 'say' || bare === 'broadcast') return 'broadcast'
+  if (bare === 'msg' || bare === 'tell' || bare === 'w') return 'msg'
+  if (bare === 'worldedit') return 'worldedit-basic'
   return null
 }

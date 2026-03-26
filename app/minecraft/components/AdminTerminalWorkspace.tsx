@@ -41,6 +41,13 @@ type WorkspaceProps = {
   relayEnabled?: boolean
 }
 
+type WorldEditSchematic = {
+  name: string
+  path: string
+  sizeBytes: number | null
+  updatedAt: number | null
+}
+
 type WizardTabId = NonNullable<TerminalState['activeInspectorTab']>
 
 const RIGHT_TABS: WizardTabId[] = ['docs', 'wizard', 'favorites']
@@ -92,6 +99,15 @@ function initialWizardDraft(commandName: string | null) {
       return { action: 'op', player: '' }
     case 'give':
       return { player: '', item: 'minecraft:stone', amount: '1' }
+    case 'gamerule':
+      return { rule: 'keepInventory', value: 'true' }
+    case 'broadcast':
+      return { message: '' }
+    case 'msg':
+      return { player: '', message: '' }
+    case 'worldedit-basic':
+      return { player: '', action: 'info', source: '', target: '', amount: '1', schematic: '' }
+    case 'relay-root':
     case 'mcraftr-root':
       return { subcommand: 'stack status', args: '' }
     default:
@@ -102,6 +118,35 @@ function initialWizardDraft(commandName: string | null) {
 function commandBaseName(command: string) {
   const normalized = normalizeServerCommand(command).replace(/^\/+/, '')
   return normalized.split(/\s+/)[0]?.toLowerCase() || null
+}
+
+function wizardLabel(wizardId: string | null) {
+  switch (wizardId) {
+    case 'relay-root':
+      return 'Relay wizard available'
+    case 'teleport':
+      return 'Teleport wizard available'
+    case 'whitelist':
+      return 'Whitelist wizard available'
+    case 'kick':
+      return 'Kick wizard available'
+    case 'ban':
+      return 'Ban wizard available'
+    case 'operator':
+      return 'Operator wizard available'
+    case 'give':
+      return 'Give wizard available'
+    case 'gamerule':
+      return 'Gamerule wizard available'
+    case 'broadcast':
+      return 'Broadcast wizard available'
+    case 'msg':
+      return 'Message wizard available'
+    case 'worldedit-basic':
+      return 'WorldEdit wizard available'
+    default:
+      return 'Docs only'
+  }
 }
 
 function applyCompletion(current: string, completion: string) {
@@ -150,6 +195,9 @@ export default function AdminTerminalWorkspace({
   const [favoriteLabel, setFavoriteLabel] = useState('')
   const [favoriteDescription, setFavoriteDescription] = useState('')
   const [favoriteBusy, setFavoriteBusy] = useState(false)
+  const [worldeditSchematics, setWorldeditSchematics] = useState<WorldEditSchematic[]>([])
+  const [worldeditLoading, setWorldeditLoading] = useState(false)
+  const [worldeditHint, setWorldeditHint] = useState<string | null>(null)
 
   const effectiveMode = standalone ? state.mode : (state.mode === 'popout' ? 'embedded' : state.mode)
   const selectedCommand = state.selectedCommand
@@ -275,7 +323,7 @@ export default function AdminTerminalWorkspace({
         }
         setSuggestions(Array.isArray(data.matches) ? data.matches : [])
         setSuggestionIndex(0)
-      } catch (error) {
+      } catch {
         if (!controller.signal.aborted) {
           setSuggestions([])
           setSuggestionIndex(0)
@@ -312,6 +360,9 @@ export default function AdminTerminalWorkspace({
     for (const entry of catalog) {
       map.set(entry.name.toLowerCase(), entry)
       if (entry.namespacedName) map.set(entry.namespacedName.toLowerCase(), entry)
+      for (const alias of entry.aliases) {
+        map.set(alias.toLowerCase(), entry)
+      }
     }
     return map
   }, [catalog])
@@ -327,6 +378,47 @@ export default function AdminTerminalWorkspace({
   const currentWizardId = state.wizardId
     ?? selectedCatalogEntry?.wizardId
     ?? (selectedBase ? wizardIdForCommand(selectedBase) : null)
+
+  const openWizard = (command: string | null, wizardId = currentWizardId) => {
+    if (!wizardId) return
+    updateState({
+      inspectorOpen: true,
+      activeInspectorTab: 'wizard',
+      selectedCommand: command,
+      wizardId,
+      wizardDraft: initialWizardDraft(wizardId),
+    })
+  }
+
+  useEffect(() => {
+    if (!relayEnabled || currentWizardId !== 'worldedit-basic') return
+    let cancelled = false
+    const loadWorldEditContext = async () => {
+      setWorldeditLoading(true)
+      setWorldeditHint(null)
+      try {
+        const response = await fetch('/api/minecraft/worldedit', { cache: 'no-store' })
+        const data = await response.json()
+        if (cancelled) return
+        if (!response.ok || data.ok === false) {
+          setWorldeditSchematics([])
+          setWorldeditHint(typeof data.error === 'string' ? data.error : 'WorldEdit context unavailable')
+          return
+        }
+        setWorldeditSchematics(Array.isArray(data.schematics) ? data.schematics : [])
+        setWorldeditHint(typeof data.bridge?.note === 'string' ? data.bridge.note : null)
+      } catch {
+        if (!cancelled) {
+          setWorldeditSchematics([])
+          setWorldeditHint('WorldEdit context unavailable')
+        }
+      } finally {
+        if (!cancelled) setWorldeditLoading(false)
+      }
+    }
+    void loadWorldEditContext()
+    return () => { cancelled = true }
+  }, [currentWizardId, relayEnabled])
 
   const setupHint = useMemo(() => {
     if (!catalogWarning) return null
@@ -368,17 +460,6 @@ export default function AdminTerminalWorkspace({
   const updateState = (patch: Partial<TerminalState>) => {
     startTransition(() => {
       setState(prev => ({ ...prev, ...patch }))
-    })
-  }
-
-  const selectCommand = (command: string, options?: { draft?: string; tab?: WizardTabId }) => {
-    const nextBase = command.startsWith(':') ? null : command.replace(/^\/+/, '').split(/\s+/)[0]?.toLowerCase() ?? null
-    updateState({
-      selectedCommand: command,
-      activeInspectorTab: options?.tab ?? state.activeInspectorTab,
-      wizardId: nextBase ? wizardIdForCommand(nextBase) : null,
-      wizardDraft: nextBase ? initialWizardDraft(wizardIdForCommand(nextBase)) : null,
-      commandDraft: options?.draft ?? state.commandDraft,
     })
   }
 
@@ -535,7 +616,7 @@ export default function AdminTerminalWorkspace({
       return
     }
 
-    if (classifyCommandRisk(normalized) === 'high' && !meta?.wizardId && confirmCommand !== normalized) {
+    if (classifyCommandRisk(normalized) === 'high' && confirmCommand !== normalized) {
       setConfirmCommand(normalized)
       return
     }
@@ -546,15 +627,6 @@ export default function AdminTerminalWorkspace({
   }
 
   const activeSuggestion = suggestions[suggestionIndex] ?? null
-  const canLoadWizard = Boolean(currentWizardId)
-
-  const acceptSuggestion = (completion = activeSuggestion) => {
-    if (!completion) return
-    setSuggestionIndex(0)
-    setState(prev => ({ ...prev, commandDraft: applyCompletion(prev.commandDraft, completion) }))
-    window.setTimeout(() => commandInputRef.current?.focus(), 0)
-  }
-
   const onCommandKeyDown = async (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       event.preventDefault()
@@ -595,6 +667,10 @@ export default function AdminTerminalWorkspace({
   const wizardCommand = useMemo(() => {
     const draft = state.wizardDraft ?? initialWizardDraft(currentWizardId)
     switch (currentWizardId) {
+      case 'relay-root': {
+        const prefix = selectedBase || 'relay'
+        return normalizeServerCommand(`/${prefix} ${String(draft.subcommand ?? '').trim()} ${String(draft.args ?? '').trim()}`.trim())
+      }
       case 'mcraftr-root':
         return normalizeServerCommand(`/mcraftr ${String(draft.subcommand ?? '').trim()} ${String(draft.args ?? '').trim()}`.trim())
       case 'teleport':
@@ -612,10 +688,28 @@ export default function AdminTerminalWorkspace({
         return normalizeServerCommand(`/${draft.action === 'deop' ? 'deop' : 'op'} ${String(draft.player ?? '').trim()}`.trim())
       case 'give':
         return normalizeServerCommand(`/give ${String(draft.player ?? '').trim()} ${String(draft.item ?? '').trim()} ${String(draft.amount ?? '1').trim()}`.trim())
+      case 'gamerule':
+        return normalizeServerCommand(`/gamerule ${String(draft.rule ?? '').trim()} ${String(draft.value ?? '').trim()}`.trim())
+      case 'broadcast':
+        return normalizeServerCommand(`/say ${String(draft.message ?? '').trim()}`.trim())
+      case 'msg':
+        return normalizeServerCommand(`/msg ${String(draft.player ?? '').trim()} ${String(draft.message ?? '').trim()}`.trim())
+      case 'worldedit-basic': {
+        const prefix = selectedBase || 'relay'
+        const player = String(draft.player ?? '').trim()
+        const action = String(draft.action ?? 'info').trim()
+        if (!player) return ''
+        const parts = [`/${prefix}`, 'worldedit', 'run', player, action]
+        if (String(draft.source ?? '').trim()) parts.push(String(draft.source ?? '').trim())
+        if (String(draft.target ?? '').trim()) parts.push(String(draft.target ?? '').trim())
+        if (String(draft.amount ?? '').trim()) parts.push(String(draft.amount ?? '').trim())
+        if (String(draft.schematic ?? '').trim()) parts.push(String(draft.schematic ?? '').trim())
+        return normalizeServerCommand(parts.join(' ').trim())
+      }
       default:
         return ''
     }
-  }, [currentWizardId, state.wizardDraft])
+  }, [currentWizardId, selectedBase, state.wizardDraft])
 
   const setWizardValue = (key: string, value: string) => {
     updateState({
@@ -699,7 +793,7 @@ export default function AdminTerminalWorkspace({
                       setState(prev => ({
                         ...prev,
                         selectedCommand: `/${entry.name}`,
-                        activeInspectorTab: 'docs',
+                        activeInspectorTab: entry.wizardId ? 'wizard' : 'docs',
                         wizardId: entry.wizardId,
                         wizardDraft: entry.wizardId ? initialWizardDraft(entry.wizardId) : null,
                         commandDraft: `/${entry.name} `,
@@ -710,14 +804,24 @@ export default function AdminTerminalWorkspace({
                   >
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-mono text-[12px] tracking-[0.14em] text-[var(--text)]">/{entry.name}</span>
-                      <span className={cn(
-                        'rounded-full px-2 py-0.5 font-mono text-[10px] tracking-[0.16em]',
-                        entry.riskLevel === 'high' && 'bg-red-500/15 text-red-300',
-                        entry.riskLevel === 'medium' && 'bg-amber-500/15 text-amber-200',
-                        entry.riskLevel === 'low' && 'bg-emerald-500/15 text-emerald-200',
-                      )}>
-                        {entry.riskLevel.toUpperCase()}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          'rounded-full px-2 py-0.5 font-mono text-[10px] tracking-[0.16em]',
+                          entry.wizardId
+                            ? 'bg-[var(--accent-dim)] text-[var(--accent)]'
+                            : 'border border-[var(--border)] text-[var(--text-dim)]',
+                        )}>
+                          {entry.wizardId ? 'WIZARD' : 'DOCS'}
+                        </span>
+                        <span className={cn(
+                          'rounded-full px-2 py-0.5 font-mono text-[10px] tracking-[0.16em]',
+                          entry.riskLevel === 'high' && 'bg-red-500/15 text-red-300',
+                          entry.riskLevel === 'medium' && 'bg-amber-500/15 text-amber-200',
+                          entry.riskLevel === 'low' && 'bg-emerald-500/15 text-emerald-200',
+                        )}>
+                          {entry.riskLevel.toUpperCase()}
+                        </span>
+                      </div>
                     </div>
                     {entry.description && (
                       <div className="mt-1 line-clamp-2 text-[12px] text-[var(--text-dim)]">{entry.description}</div>
@@ -787,9 +891,15 @@ export default function AdminTerminalWorkspace({
               <div>Source: <span className="font-mono text-[var(--text)]">{selectedCatalogEntry.source ?? 'minecraft'}</span></div>
               <div>Permission: <span className="font-mono text-[var(--text)]">{selectedCatalogEntry.permission ?? 'none'}</span></div>
               <div>Risk: <span className="font-mono text-[var(--text)]">{selectedCatalogEntry.riskLevel}</span></div>
+              <div>Status: <span className="font-mono text-[var(--text)]">{wizardLabel(currentWizardId)}</span></div>
               {selectedCatalogEntry.aliases.length > 0 && (
                 <div>Aliases: <span className="font-mono text-[var(--text)]">{selectedCatalogEntry.aliases.join(', ')}</span></div>
               )}
+            </div>
+            <div className="rounded-2xl border border-[var(--border)] bg-black/10 px-3 py-3 text-[12px] text-[var(--text-dim)]">
+              {currentWizardId
+                ? 'This command has a guided wizard. You can still insert it into the prompt or run it manually if you prefer.'
+                : 'This command is documented here, but still uses manual execution today. Use the prompt directly until a wizard is added.'}
             </div>
             <div className="flex gap-2">
               <button
@@ -799,6 +909,15 @@ export default function AdminTerminalWorkspace({
               >
                 INSERT
               </button>
+              {currentWizardId && (
+                <button
+                  type="button"
+                  onClick={() => openWizard(`/${selectedCatalogEntry.name}`, currentWizardId)}
+                  className="flex-1 rounded-2xl border border-[var(--border)] px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-[var(--text-dim)] transition-all hover:border-[var(--accent-mid)] hover:text-[var(--text)]"
+                >
+                  OPEN WIZARD
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => void submitCommand(`/${selectedCatalogEntry.name}`)}
@@ -829,10 +948,16 @@ export default function AdminTerminalWorkspace({
             <div className="text-[13px] text-[var(--text-dim)]">Wizards are powered by Relay-backed command metadata. Raw commands and saved favorites still work without it.</div>
           </div>
         ) : !currentWizardId ? (
-          <div className="mt-3 text-[13px] text-[var(--text-dim)]">No structured wizard is attached to the selected command yet.</div>
+          <div className="mt-3 space-y-2 text-[13px] text-[var(--text-dim)]">
+            <div>No wizard yet for this command.</div>
+            <div>You can still use the docs pane and run the command manually from the prompt.</div>
+          </div>
         ) : (
           <div className="mt-3 space-y-3">
-            {currentWizardId === 'mcraftr-root' && (
+            <div className="rounded-2xl border border-[var(--border)] bg-black/10 px-3 py-3 text-[12px] text-[var(--text-dim)]">
+              Wizards are best for high-risk or multi-field commands. Mcraftr still shows the generated command so you can review exactly what will run.
+            </div>
+            {(currentWizardId === 'mcraftr-root' || currentWizardId === 'relay-root') && (
               <>
                 <input value={String(state.wizardDraft?.subcommand ?? 'stack status')} onChange={event => setWizardValue('subcommand', event.target.value)} placeholder="stack status"
                   className="w-full rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none" />
@@ -916,6 +1041,76 @@ export default function AdminTerminalWorkspace({
                   className="w-full rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none" />
                 <input value={String(state.wizardDraft?.amount ?? '1')} onChange={event => setWizardValue('amount', event.target.value)} placeholder="1"
                   className="w-full rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none" />
+              </>
+            )}
+            {currentWizardId === 'gamerule' && (
+              <>
+                <input value={String(state.wizardDraft?.rule ?? 'keepInventory')} onChange={event => setWizardValue('rule', event.target.value)} placeholder="keepInventory"
+                  className="w-full rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none" />
+                <select value={String(state.wizardDraft?.value ?? 'true')} onChange={event => setWizardValue('value', event.target.value)}
+                  className="w-full rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none">
+                  <option value="true">true</option>
+                  <option value="false">false</option>
+                </select>
+              </>
+            )}
+            {currentWizardId === 'broadcast' && (
+              <textarea value={String(state.wizardDraft?.message ?? '')} onChange={event => setWizardValue('message', event.target.value)} placeholder="Message to send to the whole server"
+                className="h-24 w-full resize-none rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none" />
+            )}
+            {currentWizardId === 'msg' && (
+              <>
+                <input value={String(state.wizardDraft?.player ?? '')} onChange={event => setWizardValue('player', event.target.value)} placeholder="Player"
+                  className="w-full rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none" />
+                <textarea value={String(state.wizardDraft?.message ?? '')} onChange={event => setWizardValue('message', event.target.value)} placeholder="Private message"
+                  className="h-24 w-full resize-none rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none" />
+              </>
+            )}
+            {currentWizardId === 'worldedit-basic' && (
+              <>
+                <select value={String(state.wizardDraft?.action ?? 'info')} onChange={event => setWizardValue('action', event.target.value)}
+                  className="w-full rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none">
+                  <option value="info">worldedit info</option>
+                  <option value="undo">worldedit undo</option>
+                  <option value="redo">worldedit redo</option>
+                  <option value="paste">worldedit paste</option>
+                  <option value="set">worldedit set</option>
+                  <option value="replace">worldedit replace</option>
+                </select>
+                <input value={String(state.wizardDraft?.player ?? '')} onChange={event => setWizardValue('player', event.target.value)} placeholder="Player"
+                  className="w-full rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none" />
+                {String(state.wizardDraft?.action ?? 'info') !== 'info' && (
+                  <input value={String(state.wizardDraft?.source ?? '')} onChange={event => setWizardValue('source', event.target.value)} placeholder="Source (optional)"
+                    className="w-full rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none" />
+                )}
+                {(String(state.wizardDraft?.action ?? 'info') === 'set' || String(state.wizardDraft?.action ?? 'info') === 'replace') && (
+                  <input value={String(state.wizardDraft?.target ?? '')} onChange={event => setWizardValue('target', event.target.value)} placeholder={String(state.wizardDraft?.action ?? 'info') === 'replace' ? 'Replacement block or pattern' : 'Target block or pattern'}
+                    className="w-full rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none" />
+                )}
+                {(String(state.wizardDraft?.action ?? 'info') === 'undo' || String(state.wizardDraft?.action ?? 'info') === 'redo') && (
+                  <input value={String(state.wizardDraft?.amount ?? '1')} onChange={event => setWizardValue('amount', event.target.value)} placeholder="1"
+                    className="w-full rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none" />
+                )}
+                {String(state.wizardDraft?.action ?? 'info') === 'paste' && (
+                  <>
+                    <input value={String(state.wizardDraft?.schematic ?? '')} onChange={event => setWizardValue('schematic', event.target.value)} placeholder="Schematic name (optional)"
+                      className="w-full rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none" />
+                    {worldeditSchematics.length > 0 && (
+                      <select value={String(state.wizardDraft?.schematic ?? '')} onChange={event => setWizardValue('schematic', event.target.value)}
+                        className="w-full rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none">
+                        <option value="">Clipboard / no schematic override</option>
+                        {worldeditSchematics.map(schematic => (
+                          <option key={schematic.path} value={schematic.name}>{schematic.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </>
+                )}
+                <div className="rounded-2xl border border-[var(--border)] bg-black/10 px-3 py-3 text-[12px] text-[var(--text-dim)]">
+                  {worldeditLoading
+                    ? 'Loading WorldEdit context…'
+                    : worldeditHint || 'Use this wizard for a small, safe set of WorldEdit-style Relay flows. Paste can optionally use a Beacon-discovered schematic, while the other actions stay narrow on purpose for release.'}
+                </div>
               </>
             )}
 
@@ -1134,12 +1329,12 @@ export default function AdminTerminalWorkspace({
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setState(prev => ({ ...prev, commandDraft: wizardCommand || prev.commandDraft }))}
-                  disabled={!relayEnabled || !wizardCommand}
-                  className="tap-target rounded-2xl border px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-[var(--text-dim)] transition-all hover:border-[var(--accent-mid)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  LOAD WIZARD
-                </button>
+                    onClick={() => openWizard(selectedCommand ?? (selectedBase ? `/${selectedBase}` : null))}
+                    disabled={!relayEnabled || !currentWizardId}
+                    className="tap-target rounded-2xl border px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-[var(--text-dim)] transition-all hover:border-[var(--accent-mid)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    OPEN WIZARD
+                  </button>
                 <button
                   type="button"
                   onClick={() => void persistFavorite()}

@@ -13,6 +13,7 @@ import Toasts from './Toasts'
 import ConfirmModal from './ConfirmModal'
 import type { ConfirmModalProps } from './ConfirmModal'
 import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
+import CapabilityLockCard from './CapabilityLockCard'
 import ScheduleSection from './ScheduleSection'
 
 const ADMIN_COLLAPSIBLE_GROUP = 'admin-tab'
@@ -22,7 +23,7 @@ type ServerInfo = {
   tps: number | null; weather: string | null; timeOfDay: string | null
 }
 
-type Props = { players: string[]; readOnly?: boolean }
+type Props = { players: string[]; readOnly?: boolean; relayEnabled?: boolean }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -84,7 +85,7 @@ function StatTile({ label, value, sub }: { label: string; value: React.ReactNode
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function AdminSection({ players, readOnly = false }: Props) {
+export default function AdminSection({ players, readOnly = false, relayEnabled = true }: Props) {
   const { toasts, addToast } = useToast()
   const [confirmModal, setConfirmModal] = useState<Omit<ConfirmModalProps, 'onCancel'> | null>(null)
   const [features, setFeatures] = useState<Record<FeatureKey, boolean> | null>(null)
@@ -643,14 +644,22 @@ export default function AdminSection({ players, readOnly = false }: Props) {
         <div>
           <div className="flex items-center justify-between mb-2">
             <SectionLabel>CORE GAMERULES</SectionLabel>
-            <button onClick={fetchGamerules} disabled={gamerulesLoading}
+            <button onClick={fetchGamerules} disabled={gamerulesLoading || !relayEnabled}
               className="text-[13px] font-mono text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity">
               {gamerulesLoading ? '…' : gamerules === null ? 'Load' : 'Refresh'}
             </button>
           </div>
-          {gamerules === null ? (
+          {!relayEnabled && (
+            <div className="space-y-3">
+              <CapabilityLockCard requirement="relay" feature="Structured gamerule controls" compact />
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[12px] font-mono text-[var(--text-dim)]">
+                Difficulty and basic server controls still work here. Relay unlocks Mcraftr&apos;s curated gamerule reads and toggles.
+              </div>
+            </div>
+          )}
+          {relayEnabled && gamerules === null ? (
             <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">Click Load to fetch gamerules from the server</div>
-          ) : (
+          ) : relayEnabled && gamerules ? (
             <div className="space-y-1.5">
               {(['keepInventory', 'mobGriefing', 'pvp', 'doDaylightCycle', 'doWeatherCycle', 'doFireTick', 'doMobSpawning', 'naturalRegeneration'] as const).map(rule => {
                 const val = gamerules[rule]
@@ -674,7 +683,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
                 )
               })}
             </div>
-          )}
+          ) : null}
         </div>
         )}
 
