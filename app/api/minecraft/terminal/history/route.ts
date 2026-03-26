@@ -1,12 +1,12 @@
 import type { NextRequest } from 'next/server'
-import { requireTerminalAccess } from '@/lib/terminal-access'
+import { requireTerminalReadAccess } from '@/lib/terminal-access'
 import { listTerminalHistory } from '@/lib/terminal'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
-  const access = await requireTerminalAccess(req)
+  const access = await requireTerminalReadAccess(req)
   if (!access.ok) return access.response
 
   const { searchParams } = new URL(req.url)

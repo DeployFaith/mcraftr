@@ -1,12 +1,12 @@
 import type { NextRequest } from 'next/server'
-import { requireTerminalAccess } from '@/lib/terminal-access'
+import { requireTerminalAccess, requireTerminalReadAccess } from '@/lib/terminal-access'
 import { listTerminalFavorites, saveTerminalFavorite } from '@/lib/terminal'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
-  const access = await requireTerminalAccess(req)
+  const access = await requireTerminalReadAccess(req)
   if (!access.ok) return access.response
 
   return Response.json({

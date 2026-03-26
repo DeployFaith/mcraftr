@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server'
-import { requireTerminalAccess } from '@/lib/terminal-access'
+import { requireTerminalReadAccess } from '@/lib/terminal-access'
 import { mapTerminalCatalogEntries } from '@/lib/terminal'
 import { LOCAL_TERMINAL_COMMANDS } from '@/lib/terminal-shared'
 import { requireServerCapability } from '@/lib/server-capability'
@@ -15,7 +15,7 @@ type BridgeCatalogResponse = {
 }
 
 export async function GET(req: NextRequest) {
-  const access = await requireTerminalAccess(req)
+  const access = await requireTerminalReadAccess(req)
   if (!access.ok) return access.response
 
   const capability = await requireServerCapability(req, 'relay')
@@ -23,6 +23,15 @@ export async function GET(req: NextRequest) {
 
   const bridge = await runBridgeJson<BridgeCatalogResponse>(req, 'commands catalog')
   if (!bridge.ok || bridge.data.ok === false) {
+    if (!bridge.ok && bridge.code === 'bridge_json_parse_failed') {
+      return Response.json({
+        ok: true,
+        commands: [],
+        localCommands: LOCAL_TERMINAL_COMMANDS,
+        warning: 'Relay command catalog is too large to parse right now. Raw commands, docs-only commands, and manual terminal execution still work.',
+        warningCode: bridge.code,
+      })
+    }
     return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || 'Relay command catalog unavailable' : bridge.error, code: bridge.ok ? null : bridge.code }, { status: 502 })
   }
 

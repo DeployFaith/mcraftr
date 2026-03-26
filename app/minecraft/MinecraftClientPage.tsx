@@ -36,7 +36,7 @@ const ALL_TABS: {
   { id: 'worlds', label: 'Worlds', Icon: Trees, shortcut: '4', requirement: 'full' },
   { id: 'chat', label: 'Chat', Icon: MessageSquare, shortcut: '5' },
   { id: 'admin', label: 'Admin', Icon: Shield, adminOnly: true, shortcut: '6' },
-  { id: 'terminal', label: 'Terminal', Icon: SquareTerminal, adminOnly: true, shortcut: '7' },
+  { id: 'terminal', label: 'Terminal', Icon: SquareTerminal, shortcut: '7' },
   { id: 'settings', label: 'Settings', Icon: Settings, shortcut: '8' },
 ]
 
@@ -160,10 +160,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
         features.enable_entity_catalog
       if (!hasAnyWorldFeature) return false
     }
-    if (t.id === 'terminal') {
-      if (role !== 'admin') return false
-      if (features && !features.enable_rcon) return false
-    }
+      if (t.id === 'terminal' && features && !features.enable_rcon) return false
     if (t.id === 'admin') {
       if (role !== 'admin') return false
       if (features && !features.enable_admin) return false
@@ -385,7 +382,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
                   <div className="font-mono text-[12px] tracking-[0.18em] text-[var(--text-dim)]">TERMINAL</div>
                   <div className="text-[13px] text-[var(--text-dim)]">Dedicated server terminal with transcript, command catalog, docs, wizards, and favorites.</div>
                 </div>
-              <AdminTerminalWorkspace fullPage readOnly={false} relayEnabled={bridgeEnabled} />
+            <AdminTerminalWorkspace fullPage readOnly={role !== 'admin'} relayEnabled={bridgeEnabled} />
               </div>
             </div>
           )}

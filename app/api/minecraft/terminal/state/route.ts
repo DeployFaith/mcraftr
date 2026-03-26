@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { getTerminalState, saveTerminalState } from '@/lib/terminal'
-import { requireTerminalAccess } from '@/lib/terminal-access'
+import { requireTerminalAccess, requireTerminalReadAccess } from '@/lib/terminal-access'
 import { getDefaultTerminalState, type TerminalState } from '@/lib/terminal-shared'
 
 export const runtime = 'nodejs'
@@ -33,7 +33,7 @@ function sanitizeStatePatch(input: unknown): Partial<TerminalState> {
 }
 
 export async function GET(req: NextRequest) {
-  const access = await requireTerminalAccess(req)
+  const access = await requireTerminalReadAccess(req)
   if (!access.ok) return access.response
 
   return Response.json({

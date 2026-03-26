@@ -5,11 +5,9 @@ import AdminTerminalWorkspace from '../components/AdminTerminalWorkspace'
 
 export default async function MinecraftTerminalPage() {
   const session = await nodeAuth()
-  if (!session?.user?.id || !getUserById(session.user.id)) {
+  const user = session?.user?.id ? getUserById(session.user.id) : null
+  if (!session?.user?.id || !user) {
     redirect('/login')
-  }
-  if (session.role !== 'admin') {
-    redirect('/minecraft?tab=dashboard')
   }
 
   return (
@@ -18,7 +16,7 @@ export default async function MinecraftTerminalPage() {
         <div className="font-mono text-[12px] tracking-[0.18em] text-[var(--text-dim)]">SERVER TERMINAL</div>
         <div className="text-[14px] text-[var(--text-dim)]">Standalone terminal workspace for server command discovery, execution, docs, and favorites.</div>
       </div>
-      <AdminTerminalWorkspace initialMode="popout" standalone readOnly={false} />
+      <AdminTerminalWorkspace initialMode="popout" standalone readOnly={session.role !== 'admin'} relayEnabled={Boolean(user.activeServerId)} />
     </div>
   )
 }

@@ -7,7 +7,7 @@ export type TerminalAccessContext = {
   serverId: string
 }
 
-export async function requireTerminalAccess(req: NextRequest): Promise<
+async function resolveTerminalAccess(req: NextRequest, adminRequired: boolean): Promise<
   | { ok: true; context: TerminalAccessContext }
   | { ok: false; response: Response }
 > {
@@ -28,9 +28,9 @@ export async function requireTerminalAccess(req: NextRequest): Promise<
 
   const user = getUserById(userId)
   if (!user) {
-    return { ok: false, response: Response.json({ ok: false, error: 'Admin access required' }, { status: 403 }) }
+    return { ok: false, response: Response.json({ ok: false, error: adminRequired ? 'Admin access required' : 'User not found' }, { status: 403 }) }
   }
-  if (user.role !== 'admin') {
+  if (adminRequired && user.role !== 'admin') {
     return { ok: false, response: Response.json({ ok: false, error: 'Admin access required' }, { status: 403 }) }
   }
 
@@ -38,4 +38,12 @@ export async function requireTerminalAccess(req: NextRequest): Promise<
     ok: true,
     context: { userId, serverId },
   }
+}
+
+export async function requireTerminalReadAccess(req: NextRequest) {
+  return resolveTerminalAccess(req, false)
+}
+
+export async function requireTerminalAccess(req: NextRequest) {
+  return resolveTerminalAccess(req, true)
 }
