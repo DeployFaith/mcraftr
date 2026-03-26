@@ -70,6 +70,101 @@ There are also convenience paths routed through Relay, including things like:
 
 The exact command surface should be treated as the current app contract, not yet a finalized long-term public API.
 
+## Terminal Catalog
+
+`commands catalog` should return a lightweight summary list for terminal explorer, wizard discovery, and basic docs previews.
+
+Recommended response shape:
+
+```json
+{
+  "ok": true,
+  "commands": [
+    {
+      "name": "gamerule",
+      "aliases": ["gr"],
+      "description": "View or update gamerules",
+      "permission": "minecraft.command.gamerule",
+      "source": "minecraft"
+    }
+  ]
+}
+```
+
+Recommended fields:
+
+- `name`
+- `aliases`
+- `description`
+- `permission`
+- `source`
+
+Optional fields:
+
+- `wizardId`
+- `riskLevel`
+
+Implementation guidance:
+
+- keep `commands catalog` intentionally small
+- avoid long docs prose and large examples arrays
+- avoid nested metadata that is only needed when a single command is selected
+- avoid repeated provider metadata on every command row
+
+Reason:
+
+- Mcraftr loads this list for terminal explorer and command discovery
+- oversized Relay catalog payloads become fragile over the current transport and can force Mcraftr to fall back to local/manual terminal mode
+
+## Future Command Detail Direction
+
+For richer terminal docs, a Relay integration may later support:
+
+```text
+<relay-prefix> commands describe <command>
+```
+
+Suggested response shape:
+
+```json
+{
+  "ok": true,
+  "command": {
+    "name": "gamerule",
+    "aliases": ["gr"],
+    "description": "View or update gamerules",
+    "usage": "/gamerule <rule> [value]",
+    "permission": "minecraft.command.gamerule",
+    "source": "minecraft",
+    "examples": [
+      "/gamerule keepInventory true",
+      "/gamerule doDaylightCycle false"
+    ],
+    "notes": [
+      "Boolean and numeric values depend on the selected rule"
+    ]
+  }
+}
+```
+
+Suggested detail fields:
+
+- `name`
+- `aliases`
+- `description`
+- `usage`
+- `permission`
+- `source`
+- `examples`
+- `notes`
+- optional `wizardId`
+
+Guidance:
+
+- keep `commands catalog` lightweight
+- load richer command detail on demand
+- let Mcraftr infer wizard support from names and aliases unless a stable provider-side `wizardId` is cheap to maintain
+
 ## Response Expectations
 
 Mcraftr expects Relay responses to be machine-readable.
