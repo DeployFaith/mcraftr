@@ -17,6 +17,15 @@ type BridgeResponse = {
   error?: string
 }
 
+type LiveEntitiesResponse = {
+  ok: boolean
+  entities?: Array<{
+    id: string
+    world: string
+    location?: { x: number; y: number; z: number } | null
+  }>
+}
+
 function shouldUseVanillaEntitySpawnFallback(code: BridgeErrorCode | undefined) {
   return code === 'bridge_json_parse_failed'
     || code === 'bridge_non_json_response'
@@ -50,6 +59,28 @@ async function runNativeEntitySpawnFallback(req: NextRequest, options: {
     provider: 'vanilla-rcon',
     warning: 'Relay spawn fallback was used because Relay data could not be parsed reliably.',
   }
+}
+
+function nearTarget(entity: { id: string; location?: { x: number; y: number; z: number } | null }, entityId: string, x: number, y: number, z: number) {
+  if (entity.id !== entityId || !entity.location) return false
+  return Math.abs(entity.location.x - x) <= 6
+    && Math.abs(entity.location.y - y) <= 6
+    && Math.abs(entity.location.z - z) <= 6
+}
+
+async function verifyEntitySpawn(req: NextRequest, options: { world: string; entityId: string; x: number; y: number; z: number }) {
+  const live = await runBridgeJson<LiveEntitiesResponse>(req, `entities live ${options.world}`)
+  if (!live.ok || live.data.ok === false) {
+    return {
+      verified: false,
+      warning: 'Spawn command completed, but Mcraftr could not verify the entity because Relay live-entity data was unavailable for that world.',
+    }
+  }
+  const entities = Array.isArray(live.data.entities) ? live.data.entities : []
+  const matched = entities.some(entity => nearTarget(entity, options.entityId, options.x, options.y, options.z))
+  return matched
+    ? { verified: true, warning: null }
+    : { verified: false, warning: `Spawn command completed, but Mcraftr could not verify ${options.entityId} near ${options.world} ${options.x} ${options.y} ${options.z}.` }
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -90,7 +121,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: 'World and coordinates are required' }, { status: 400 })
   }
 
-  if (sourceKind !== 'native') {
+    if (sourceKind !== 'native') {
     const preset = normalizeEntityPresetInput(body)
     const snbt = buildPresetSnbt(preset)
     const command = locationMode === 'player'
@@ -105,7 +136,11 @@ export async function POST(req: NextRequest) {
     if (userId) {
       logAudit(userId, 'entity_spawn', preset.label, `${locationMode === 'player' ? player : world} count=${count}`.trim(), serverId)
     }
-    return Response.json({ ok: true, entity: preset.entityId, count, world: locationMode === 'coords' ? world : null })
+    if (locationMode === 'coords') {
+      const verification = await verifyEntitySpawn(req, { world, entityId: preset.entityId, x, y, z })
+      return Response.json({ ok: true, entity: preset.entityId, count, world, origin: { x, y, z }, provider: 'vanilla-rcon', verified: verification.verified, warning: verification.warning })
+    }
+    return Response.json({ ok: true, entity: preset.entityId, count, world: null, provider: 'vanilla-rcon', verified: true, warning: null })
   }
 
   const capability = await requireServerCapability(req, 'relay')
@@ -123,19 +158,27 @@ export async function POST(req: NextRequest) {
     if (!bridge.ok && shouldUseVanillaEntitySpawnFallback(bridge.code)) {
       const fallback = await runNativeEntitySpawnFallback(req, { entityId, count, locationMode, player, world, x, y, z })
       if (fallback.ok) {
+        const verification = locationMode === 'coords'
+          ? await verifyEntitySpawn(req, { world, entityId, x, y, z })
+          : { verified: true, warning: fallback.warning }
         if (userId) {
           logAudit(userId, 'entity_spawn', entityId, `${locationMode === 'player' ? player : world} count=${count} provider=vanilla-rcon`.trim(), serverId)
         }
-        return Response.json({ ok: true, entity: entityId, count, world: locationMode === 'coords' ? world : null, provider: fallback.provider, fallbackUsed: true, warning: fallback.warning })
+        return Response.json({ ok: true, entity: entityId, count, world: locationMode === 'coords' ? world : null, origin: locationMode === 'coords' ? { x, y, z } : null, provider: fallback.provider, fallbackUsed: true, verified: verification.verified, warning: verification.warning ?? fallback.warning })
       }
-      return Response.json({ ok: false, error: `Relay spawn failed and vanilla fallback also failed: ${fallback.error}` }, { status: 502 })
+      return Response.json({ ok: false, error: `Failed to spawn ${entityId} in ${world} at ${x} ${y} ${z}: Relay failed and vanilla fallback also failed: ${fallback.error}` }, { status: 502 })
     }
-    return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || 'Failed to spawn entity' : bridge.error, failureCode: bridge.ok ? 'relay_place_failed' : bridge.code }, { status: 502 })
+    return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || `Failed to spawn ${entityId} in ${world} at ${x} ${y} ${z}.` : `Failed to spawn ${entityId} in ${world} at ${x} ${y} ${z}: ${bridge.error}`, failureCode: bridge.ok ? 'relay_place_failed' : bridge.code }, { status: 502 })
   }
 
   if (userId) {
     logAudit(userId, 'entity_spawn', entityId, `${bridge.data.world ?? ''} count=${count} provider=relay`.trim(), serverId)
   }
 
-  return Response.json({ ok: true, entity: bridge.data.entity ?? entityId, count: bridge.data.count ?? count, world: bridge.data.world ?? null, provider: 'relay', fallbackUsed: false })
+  if (locationMode === 'coords') {
+    const verification = await verifyEntitySpawn(req, { world, entityId, x, y, z })
+    return Response.json({ ok: true, entity: bridge.data.entity ?? entityId, count: bridge.data.count ?? count, world: bridge.data.world ?? world, origin: { x, y, z }, provider: 'relay', fallbackUsed: false, verified: verification.verified, warning: verification.warning })
+  }
+
+  return Response.json({ ok: true, entity: bridge.data.entity ?? entityId, count: bridge.data.count ?? count, world: bridge.data.world ?? null, provider: 'relay', fallbackUsed: false, verified: true, warning: null })
 }

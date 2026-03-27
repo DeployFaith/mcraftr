@@ -859,11 +859,25 @@ export default function WorldsSection({
     const firstWorld = worldsData?.worlds?.[0]?.name ?? ''
     const defaultWorld = worldsData?.defaultWorld?.trim() || firstWorld
     if (!activeWorld && defaultWorld) setActiveWorld(defaultWorld)
-    if (!spawnWorld && firstWorld) setSpawnWorld(firstWorld)
-    if (!structureWorld && firstWorld) setStructureWorld(firstWorld)
-    if (!entityWorld && firstWorld) setEntityWorld(firstWorld)
+    if (!spawnWorld && defaultWorld) setSpawnWorld(defaultWorld)
+    if (!structureWorld && defaultWorld) setStructureWorld(defaultWorld)
+    if (!entityWorld && defaultWorld) setEntityWorld(defaultWorld)
     if (!placementWorldFilter && firstWorld) setPlacementWorldFilter(firstWorld)
   }, [activeWorld, entityWorld, placementWorldFilter, spawnWorld, structureWorld, worldsData])
+
+  useEffect(() => {
+    if (!worldsData?.worlds?.length) return
+    const fallbackWorld = worldsData.defaultWorld?.trim() || worldsData.worlds[0]?.name || ''
+    if (!structureWorld || !worldsData.worlds.some(world => world.name === structureWorld)) {
+      setStructureWorld(fallbackWorld)
+    }
+    if (!entityWorld || !worldsData.worlds.some(world => world.name === entityWorld)) {
+      setEntityWorld(fallbackWorld)
+    }
+    if (!spawnWorld || !worldsData.worlds.some(world => world.name === spawnWorld)) {
+      setSpawnWorld(fallbackWorld)
+    }
+  }, [entityWorld, spawnWorld, structureWorld, worldsData])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -1182,7 +1196,13 @@ export default function WorldsSection({
         }
       }
       const data = await postJson('/api/minecraft/structures/place', payload)
-      setStatus(`Placed ${selectedStructure.label}${data.world ? ` in ${data.world}` : ''}.`)
+      const targetWorld = playerTarget ? playerTarget.world : structureWorld
+      if (targetWorld) setPlacementWorldFilter(targetWorld)
+      setStatus(
+        data.verified === false
+          ? `${selectedStructure.label} placement command completed${data.world ? ` in ${data.world}` : targetWorld ? ` in ${targetWorld}` : ''}, but Mcraftr could not verify the final placement.${data.warning ? ` ${data.warning}` : ''}`
+          : `Placed ${selectedStructure.label}${data.world ? ` in ${data.world}` : targetWorld ? ` in ${targetWorld}` : ''}.${data.warning ? ` ${data.warning}` : ''}`,
+      )
       setSelectedStructure(null)
       await loadData(false)
     } catch (nextError) {
@@ -1358,10 +1378,14 @@ export default function WorldsSection({
         }
       }
       const data = await postJson('/api/minecraft/entities/spawn', payload)
-      setStatus(`Spawned ${data.count} ${selectedEntity.label}${data.world ? ` in ${data.world}` : ''}.`)
-      if (typeof data.world === 'string' && data.world.trim()) {
-        setLiveEntityWorldFilter(data.world.trim())
-      }
+      const targetWorld = playerTarget ? playerTarget.world : entityWorld
+      const resolvedWorld = typeof data.world === 'string' && data.world.trim() ? data.world.trim() : targetWorld
+      if (resolvedWorld) setLiveEntityWorldFilter(resolvedWorld)
+      setStatus(
+        data.verified === false
+          ? `Spawn command completed for ${selectedEntity.label}${resolvedWorld ? ` in ${resolvedWorld}` : ''}, but Mcraftr could not verify it near the target coordinates.${data.warning ? ` ${data.warning}` : ''}`
+          : `Spawned ${data.count} ${selectedEntity.label}${resolvedWorld ? ` in ${resolvedWorld}` : ''}.${data.warning ? ` ${data.warning}` : ''}`,
+      )
       setSelectedEntity(null)
       await loadData(false)
     } catch (nextError) {

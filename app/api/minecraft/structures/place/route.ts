@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
           : `execute in ${world} run place template ${bridgeRef} ${x} ${y} ${z} ${rotationKeyword(rotation)} none 1.0 0`)
     const placed = await rconForRequest(req, vanillaCommand)
     if (!placed.ok) {
-      return Response.json({ ok: false, placed: false, tracked: false, provider: 'vanilla-rcon', placementKind, error: placed.error || 'Failed to place native structure' }, { status: 502 })
+      return Response.json({ ok: false, placed: false, tracked: false, provider: 'vanilla-rcon', placementKind, error: placed.error || `Failed to place ${structureLabel} in ${world} at ${x} ${y} ${z}.` }, { status: 502 })
     }
 
     if (placementKind === 'native-template' && userId && serverId) {
@@ -244,7 +244,7 @@ export async function POST(req: NextRequest) {
           `${trackedPlacement.world} @ ${trackedPlacement.origin.x},${trackedPlacement.origin.y},${trackedPlacement.origin.z}`,
           serverId,
         )
-        return Response.json({ ok: true, placed: true, tracked: true, provider: 'vanilla-rcon', placementKind, placementId, world: trackedPlacement.world, origin: trackedPlacement.origin, bounds: trackedPlacement.bounds })
+        return Response.json({ ok: true, placed: true, tracked: true, verified: true, provider: 'vanilla-rcon', placementKind, placementId, world: trackedPlacement.world, origin: trackedPlacement.origin, bounds: trackedPlacement.bounds, warning: null })
       }
     }
 
@@ -252,10 +252,11 @@ export async function POST(req: NextRequest) {
       if (userId) {
         logAudit(userId, 'structure_place', structureLabel, `${world} @ ${x},${y},${z}`, serverId)
       }
-      return Response.json({ ok: true, placed: true, tracked: false, provider: 'vanilla-rcon', placementKind, warning: 'Structure placed successfully, but precise tracked bounds could not be resolved.', world, origin: { x, y, z }, bounds: null })
+      const verified = placementKind === 'native-template'
+      return Response.json({ ok: true, placed: true, tracked: false, verified, provider: 'vanilla-rcon', placementKind, warning: verified ? 'Structure placed successfully, but precise tracked bounds could not be resolved.' : 'Placement command succeeded, but Mcraftr could not verify the final worldgen structure placement.', world, origin: { x, y, z }, bounds: null })
     }
 
-    return Response.json({ ok: true, placed: true, tracked: false, provider: 'vanilla-rcon', placementKind, warning: 'Structure placed successfully, but precise tracked bounds could not be resolved.', world: null, origin: null, bounds: null })
+    return Response.json({ ok: true, placed: true, tracked: false, verified: false, provider: 'vanilla-rcon', placementKind, warning: 'Placement command succeeded, but Mcraftr could not verify the final structure placement.', world: null, origin: null, bounds: null })
   }
 
   let command = `structures place ${bridgeRef} ${rotation} ${includeAir ? 'air' : 'noair'}`
@@ -274,7 +275,7 @@ export async function POST(req: NextRequest) {
       provider: 'relay',
       placementKind,
       failureCode: bridge.ok ? 'relay_place_failed' : bridge.code,
-      error: bridge.ok ? bridge.data.error || 'Failed to place structure' : relayStructureFailureMessage(bridge.code, bridge.error),
+      error: bridge.ok ? bridge.data.error || `Failed to place ${structureLabel} in ${world} at ${x} ${y} ${z}.` : `${relayStructureFailureMessage(bridge.code, bridge.error)} Target: ${world} @ ${x} ${y} ${z}.`,
     }, { status: 502 })
   }
 
@@ -316,9 +317,10 @@ export async function POST(req: NextRequest) {
         `${trackedPlacement.world} @ ${trackedPlacement.origin.x},${trackedPlacement.origin.y},${trackedPlacement.origin.z}`,
         serverId,
       )
-        return Response.json({ ok: true, placed: true, tracked: true, provider: 'relay', placementKind, placementId, world: trackedPlacement.world, origin: trackedPlacement.origin, bounds: trackedPlacement.bounds })
+        return Response.json({ ok: true, placed: true, tracked: true, verified: true, provider: 'relay', placementKind, placementId, world: trackedPlacement.world, origin: trackedPlacement.origin, bounds: trackedPlacement.bounds, warning: null })
      }
    }
 
-  return Response.json({ ok: true, placed: true, tracked: false, provider: 'relay', placementKind, warning: 'Structure placed successfully, but tracked bounds could not be resolved.', world: bridge.data.world ?? null, origin: bridge.data.origin ?? null, bounds: bridge.data.bounds ?? null })
+  const verified = Boolean(bridge.data.world && bridge.data.origin && bridge.data.bounds)
+  return Response.json({ ok: true, placed: true, tracked: false, verified, provider: 'relay', placementKind, warning: verified ? 'Structure placed successfully, but tracked bounds could not be resolved.' : 'Placement command succeeded, but Mcraftr could not verify the final Relay-backed structure placement.', world: bridge.data.world ?? null, origin: bridge.data.origin ?? null, bounds: bridge.data.bounds ?? null })
 }
