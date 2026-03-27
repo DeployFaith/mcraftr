@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import InvSlot, { slotLabel, buildInventoryLayout } from './InvSlot'
 import CatalogArtwork from './CatalogArtwork'
+import Toasts from './Toasts'
+import { useToast } from './useToast'
 import type { InvItem } from '../../api/minecraft/inventory/route'
 import ConfirmModal from './ConfirmModal'
 import type { ConfirmModalProps } from './ConfirmModal'
@@ -72,6 +74,16 @@ type PlayerStats = {
   spawnPos: { x: number; y: number; z: number } | null
 }
 
+type PlayerXpBooster = {
+  id: string
+  label: string
+  durationHours: number
+  bonusPoints: number
+  intervalSeconds: number
+  endsAt: number
+  lastRunAt: number | null
+}
+
 type Props = {
   onPlayersChange?: (players: string[]) => void
   minecraftVersion?: string | null
@@ -101,6 +113,26 @@ const DIMENSION_COLORS: Record<string, string> = {
   'Nether':    '#f97316',
   'The End':   '#a78bfa',
 }
+
+const GAMEMODE_OPTIONS = ['survival', 'creative', 'adventure', 'spectator'] as const
+const DIMENSION_OPTIONS = ['Overworld', 'Nether', 'The End'] as const
+const HUNGER_OPTIONS = [
+  { id: 'full', label: 'Full Belly', value: 20, note: 'Instant refill and clears hunger drain' },
+  { id: 'trail', label: 'Trail Rations', value: 14, note: 'Keeps them fed but not topped off' },
+  { id: 'low', label: 'Running Low', value: 8, note: 'Puts pressure on sprinting and regen' },
+  { id: 'starve', label: 'Near Starving', value: 2, note: 'Sharp survival pressure profile' },
+] as const
+const XP_BOOST_ACTIONS = [
+  { id: 'points-50', label: '+50 pts', mode: 'points', amount: 50, tone: '#4ade80' },
+  { id: 'points-200', label: '+200 pts', mode: 'points', amount: 200, tone: '#f59e0b' },
+  { id: 'levels-5', label: '+5 lv', mode: 'levels', amount: 5, tone: '#60a5fa' },
+] as const
+const XP_BOOSTER_PRESETS = [
+  { id: '1h', label: 'Spark Hour', copy: '1 hour of +40 xp points every 5 minutes', tone: '#4ade80' },
+  { id: '3h', label: 'Momentum Run', copy: '3 hours of +75 xp points every 5 minutes', tone: '#60a5fa' },
+  { id: '5h', label: 'Overdrive Shift', copy: '5 hours of +110 xp points every 5 minutes', tone: '#f472b6' },
+] as const
+
 const PLAYERS_COLLAPSIBLE_GROUP = 'players-tab'
 function buildInventoryItemLookup(minecraftVersion: string | null | undefined) {
   return new Map<string, {
@@ -132,6 +164,15 @@ function formatOnlineTime(joinedAtMs: number): string {
   const h = Math.floor(elapsed / 3600)
   const m = Math.floor((elapsed % 3600) / 60)
   return `${h}h ${m}m`
+}
+
+function formatRemainingTime(endsAtSec: number): string {
+  const remaining = Math.max(0, endsAtSec * 1000 - Date.now())
+  const totalMinutes = Math.floor(remaining / 60_000)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours > 0) return `${hours}h ${minutes}m left`
+  return `${minutes}m left`
 }
 
 function pingColor(ms: number): string {
@@ -241,6 +282,57 @@ function CoordBlock({ label, pos }: { label: string; pos: { x: number; y: number
   )
 }
 
+function ControlSurface({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={`rounded-[24px] border border-white/10 p-4 shadow-[0_22px_40px_rgba(0,0,0,0.24)] ${className}`}
+      style={{
+        background: 'linear-gradient(180deg, rgba(82,190,255,0.12), rgba(10,13,20,0.96))',
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function ControlHeader({ eyebrow, title, detail }: { eyebrow: string; title: string; detail: string }) {
+  return (
+    <div className="mb-3 space-y-1">
+      <div className="text-[10px] font-mono tracking-[0.38em] text-[var(--accent)]">{eyebrow}</div>
+      <div className="text-[16px] font-mono tracking-[0.08em] text-[var(--text)]">{title}</div>
+      <div className="text-[12px] font-mono leading-relaxed text-[var(--text-dim)]">{detail}</div>
+    </div>
+  )
+}
+
+function ControlButton({
+  active,
+  onClick,
+  children,
+  tone = 'var(--accent)',
+  disabled = false,
+}: {
+  active?: boolean
+  onClick: () => void
+  children: React.ReactNode
+  tone?: string
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-2xl border px-3 py-2 text-left text-[12px] font-mono transition-all disabled:cursor-not-allowed disabled:opacity-40"
+      style={active
+        ? { borderColor: tone, background: `${tone}22`, color: tone, boxShadow: `0 0 0 1px ${tone}22 inset` }
+        : { borderColor: 'var(--border)', background: 'rgba(255,255,255,0.03)', color: 'var(--text)' }}
+    >
+      {children}
+    </button>
+  )
+}
+
 // ── Online time ticker ────────────────────────────────────────────────────────
 
 function OnlineTimer({ joinedAtMs }: { joinedAtMs: number | null }) {
@@ -291,12 +383,21 @@ function PlayerPanel({
   })
   const [features, setFeatures]         = useState<FeatureFlags | null>(null)
   const [featuresLoaded, setFeaturesLoaded] = useState(false)
+  const { toasts, addToast } = useToast()
+  const [boosters, setBoosters] = useState<PlayerXpBooster[]>([])
+  const [controlBusy, setControlBusy] = useState<string | null>(null)
+  const [healthDraft, setHealthDraft] = useState('20')
+  const [xpLevelDraft, setXpLevelDraft] = useState('0')
+  const [xpProgressDraft, setXpProgressDraft] = useState('0')
+  const [selectedHungerProfile, setSelectedHungerProfile] = useState<(typeof HUNGER_OPTIONS)[number]['id']>('full')
 
   const canSession = features ? features.enable_player_session : true
   const canVitals = features ? features.enable_player_vitals : true
   const canLocation = features ? features.enable_player_location : true
   const canEffects = features ? features.enable_player_effects : true
   const canInventory = features ? features.enable_inventory : true
+  const canPlayerCommands = features ? features.enable_player_commands : true
+  const canControlDeck = canPlayerCommands || canVitals
 
   const loadFeatures = useCallback(async () => {
     try {
@@ -310,6 +411,23 @@ function PlayerPanel({
     }
   }, [])
 
+  const refreshBoosters = useCallback(async () => {
+    if (!canVitals) {
+      setBoosters([])
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/minecraft/player-control?player=${encodeURIComponent(player)}`)
+      const payload = await response.json()
+      if (payload.ok) {
+        setBoosters(payload.boosters ?? [])
+      }
+    } catch {
+      setBoosters([])
+    }
+  }, [canVitals, player])
+
   useEffect(() => {
     loadFeatures()
     const onFeatures = () => { void loadFeatures() }
@@ -321,6 +439,7 @@ function PlayerPanel({
     setStats(null); setEffects([]); setInventory([])
     setStatsLoading(true); setInvLoading(true); setStatsError(null)
     setRefreshing(true)
+    void refreshBoosters()
 
     const needsStats = canSession || canVitals || canLocation
     const needsEffects = canEffects
@@ -352,7 +471,7 @@ function PlayerPanel({
       .then(d => { if (d.ok) setInventory(d.items ?? []) })
       .catch(() => {})
       .finally(() => setInvLoading(false))
-  }, [player, canInventory, canEffects, canLocation, canSession, canVitals])
+  }, [player, canInventory, canEffects, canLocation, canSession, canVitals, refreshBoosters])
 
   const refreshInventory = useCallback(async () => {
     const response = await fetch(`/api/minecraft/inventory?player=${encodeURIComponent(player)}`)
@@ -391,6 +510,18 @@ function PlayerPanel({
       setSelectedSlot(refreshedSelection)
     }
   }, [inventory, selectedSlot])
+
+  useEffect(() => {
+    if (!stats) return
+    if (stats.health !== null) setHealthDraft(String(Math.round(stats.health * 2) / 2))
+    if (stats.xpLevel !== null) setXpLevelDraft(String(stats.xpLevel))
+    if (stats.xpP !== null) setXpProgressDraft(String(Math.round(stats.xpP * 100)))
+
+    if (stats.food !== null) {
+      const nextProfile = stats.food >= 18 ? 'full' : stats.food >= 12 ? 'trail' : stats.food >= 6 ? 'low' : 'starve'
+      setSelectedHungerProfile(nextProfile)
+    }
+  }, [stats])
 
   const deleteItem = async (item: InvItem) => {
     setDeletingSlot(item.slot)
@@ -481,6 +612,49 @@ function PlayerPanel({
     if (!currentSelected || targetSlot === undefined) return
     moveItem(currentSelected.slot, targetSlot)
   }
+
+  const runPlayerControl = useCallback(async (action: string, payload: Record<string, unknown>) => {
+    setControlBusy(action)
+    try {
+      const response = await fetch('/api/minecraft/player-control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, player, ...payload }),
+      })
+      const body = await response.json()
+      if (!body.ok) {
+        addToast('error', body.error || 'Action failed')
+        return false
+      }
+      addToast('ok', body.message || 'Updated player state')
+      refresh()
+      return true
+    } catch (error) {
+      addToast('error', error instanceof Error ? error.message : 'Network error')
+      return false
+    } finally {
+      setControlBusy(null)
+    }
+  }, [addToast, player, refresh])
+
+  const applyHealth = useCallback(() => {
+    const value = Number(healthDraft)
+    if (!Number.isFinite(value) || value < 1 || value > 20) {
+      addToast('error', 'Health must be between 1 and 20')
+      return
+    }
+    void runPlayerControl('set_health', { health: value })
+  }, [addToast, healthDraft, runPlayerControl])
+
+  const applyExperience = useCallback(() => {
+    const level = Number(xpLevelDraft)
+    const progress = Number(xpProgressDraft)
+    if (!Number.isFinite(level) || level < 0 || !Number.isFinite(progress) || progress < 0 || progress > 99) {
+      addToast('error', 'Use a level >= 0 and a progress between 0 and 99')
+      return
+    }
+    void runPlayerControl('set_experience', { level, progress })
+  }, [addToast, runPlayerControl, xpLevelDraft, xpProgressDraft])
 
   const { hotbar, main, armor, offhand } = buildInventoryLayout(inventory)
   const inventoryItemLookup = useMemo(() => buildInventoryItemLookup(minecraftVersion), [minecraftVersion])
@@ -605,6 +779,241 @@ function PlayerPanel({
               </div>
               )}
             </div>
+            )}
+
+            {canControlDeck && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <SectionTitle>CONTROL DECK</SectionTitle>
+                  <span className="rounded-full border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-2 py-0.5 text-[10px] font-mono tracking-[0.25em] text-[var(--accent)]">
+                    LIVE EDITS
+                  </span>
+                </div>
+
+                <div className="grid gap-3 xl:grid-cols-[1.25fr,1fr]">
+                  {(canPlayerCommands || canVitals) && (
+                    <ControlSurface>
+                      <ControlHeader
+                        eyebrow="PLAYER STATE"
+                        title="Instant profile tuning"
+                        detail="Everything here is made for quick touch-ups while the player is online: travel, role changes, vitals shaping, and progression edits without leaving the panel."
+                      />
+
+                      <div className="grid gap-3 lg:grid-cols-2">
+                        {canPlayerCommands && (
+                          <div className="space-y-3 rounded-[20px] border border-white/10 bg-black/10 p-3">
+                            <div className="text-[10px] font-mono tracking-[0.32em] text-[var(--text-dim)]">MODE SWAP</div>
+                            <div className="grid grid-cols-2 gap-2">
+                              {GAMEMODE_OPTIONS.map(mode => (
+                                <ControlButton
+                                  key={mode}
+                                  active={stats?.gamemode === mode}
+                                  disabled={controlBusy !== null}
+                                  onClick={() => void runPlayerControl('set_gamemode', { gamemode: mode })}
+                                  tone={GAMEMODE_COLORS[mode] ?? 'var(--accent)'}
+                                >
+                                  <div className="tracking-[0.18em]">{mode.toUpperCase()}</div>
+                                </ControlButton>
+                              ))}
+                            </div>
+
+                            <div className="pt-1 text-[10px] font-mono tracking-[0.32em] text-[var(--text-dim)]">DIMENSION HOP</div>
+                            <div className="grid gap-2">
+                              {DIMENSION_OPTIONS.map(dimension => (
+                                <ControlButton
+                                  key={dimension}
+                                  active={stats?.dimension === dimension}
+                                  disabled={controlBusy !== null || !stats?.pos}
+                                  onClick={() => void runPlayerControl('set_dimension', { dimension, pos: stats?.pos })}
+                                  tone={DIMENSION_COLORS[dimension] ?? 'var(--accent)'}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="tracking-[0.16em]">{dimension}</span>
+                                    <span className="text-[10px] opacity-60">{stats?.pos ? 'jump now' : 'needs coords'}</span>
+                                  </div>
+                                </ControlButton>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {canVitals && (
+                          <div className="space-y-3 rounded-[20px] border border-white/10 bg-black/10 p-3">
+                            <div className="text-[10px] font-mono tracking-[0.32em] text-[var(--text-dim)]">VITAL SHAPER</div>
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                              <div className="flex items-center justify-between text-[11px] font-mono text-[var(--text-dim)]">
+                                <span>Health</span>
+                                <span>{healthDraft}</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="1"
+                                max="20"
+                                step="0.5"
+                                value={healthDraft}
+                                onChange={event => setHealthDraft(event.target.value)}
+                                className="mt-3 w-full accent-[var(--accent)]"
+                              />
+                              <div className="mt-3 flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="20"
+                                  step="0.5"
+                                  value={healthDraft}
+                                  onChange={event => setHealthDraft(event.target.value)}
+                                  className="w-24 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[13px] font-mono text-[var(--text)]"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={applyHealth}
+                                  disabled={controlBusy !== null}
+                                  className="rounded-xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 text-[12px] font-mono tracking-[0.18em] text-[var(--accent)] disabled:opacity-40"
+                                >
+                                  {controlBusy === 'set_health' ? 'SYNCING' : 'SET HEALTH'}
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                              <div className="mb-2 text-[11px] font-mono text-[var(--text-dim)]">Hunger Profiles</div>
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                {HUNGER_OPTIONS.map(option => (
+                                  <ControlButton
+                                    key={option.id}
+                                    active={selectedHungerProfile === option.id}
+                                    disabled={controlBusy !== null}
+                                    onClick={() => {
+                                      setSelectedHungerProfile(option.id)
+                                      void runPlayerControl('set_hunger_profile', { profile: option.id })
+                                    }}
+                                    tone="#f59e0b"
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span>{option.label}</span>
+                                      <span className="text-[10px] opacity-70">{option.value}/20</span>
+                                    </div>
+                                    <div className="mt-1 text-[10px] leading-relaxed text-[var(--text-dim)]">{option.note}</div>
+                                  </ControlButton>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </ControlSurface>
+                  )}
+
+                  {canVitals && (
+                    <ControlSurface className="relative overflow-hidden">
+                      <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_70%)]" />
+                      <ControlHeader
+                        eyebrow="XP FOUNDRY"
+                        title="Progression without page hops"
+                        detail="Tune the live bar, fire one-shot boosts, or stage timed boosters that keep dripping extra experience while the player is online."
+                      />
+
+                      <div className="space-y-3">
+                        <div className="rounded-[20px] border border-white/10 bg-black/10 p-3">
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <label className="space-y-1 text-[11px] font-mono text-[var(--text-dim)]">
+                              <span>Level</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={xpLevelDraft}
+                                onChange={event => setXpLevelDraft(event.target.value)}
+                                className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[13px] font-mono text-[var(--text)]"
+                              />
+                            </label>
+                            <label className="space-y-1 text-[11px] font-mono text-[var(--text-dim)]">
+                              <span>Bar %</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="99"
+                                value={xpProgressDraft}
+                                onChange={event => setXpProgressDraft(event.target.value)}
+                                className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[13px] font-mono text-[var(--text)]"
+                              />
+                            </label>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={applyExperience}
+                            disabled={controlBusy !== null}
+                            className="mt-3 w-full rounded-xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 text-[12px] font-mono tracking-[0.2em] text-[var(--accent)] disabled:opacity-40"
+                          >
+                            {controlBusy === 'set_experience' ? 'UPDATING XP' : 'SET LIVE EXPERIENCE'}
+                          </button>
+                        </div>
+
+                        <div className="rounded-[20px] border border-white/10 bg-black/10 p-3">
+                          <div className="mb-2 text-[11px] font-mono text-[var(--text-dim)]">One-Time Boosts</div>
+                          <div className="grid gap-2 sm:grid-cols-3">
+                            {XP_BOOST_ACTIONS.map(boost => (
+                              <ControlButton
+                                key={boost.id}
+                                disabled={controlBusy !== null}
+                                onClick={() => void runPlayerControl('boost_xp', { mode: boost.mode, amount: boost.amount })}
+                                tone={boost.tone}
+                              >
+                                <div className="tracking-[0.16em]">{boost.label}</div>
+                                <div className="mt-1 text-[10px] text-[var(--text-dim)]">Instant progression spike</div>
+                              </ControlButton>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="rounded-[20px] border border-white/10 bg-black/10 p-3">
+                          <div className="mb-2 text-[11px] font-mono text-[var(--text-dim)]">Timed XP Boosters</div>
+                          <div className="grid gap-2">
+                            {XP_BOOSTER_PRESETS.map(preset => (
+                              <ControlButton
+                                key={preset.id}
+                                disabled={controlBusy !== null}
+                                onClick={() => void runPlayerControl('start_xp_booster', { tier: preset.id })}
+                                tone={preset.tone}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span>{preset.label}</span>
+                                  <span className="text-[10px] opacity-70">{preset.id}</span>
+                                </div>
+                                <div className="mt-1 text-[10px] leading-relaxed text-[var(--text-dim)]">{preset.copy}</div>
+                              </ControlButton>
+                            ))}
+                          </div>
+
+                          <div className="mt-3 space-y-2">
+                            {boosters.length === 0 ? (
+                              <div className="rounded-2xl border border-dashed border-white/10 px-3 py-3 text-[11px] font-mono text-[var(--text-dim)]">
+                                No timed boosters armed right now.
+                              </div>
+                            ) : boosters.map(booster => (
+                              <div key={booster.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
+                                <div>
+                                  <div className="text-[12px] font-mono text-[var(--text)]">{booster.label}</div>
+                                  <div className="mt-1 text-[10px] font-mono text-[var(--text-dim)]">
+                                    +{booster.bonusPoints} xp / {Math.round(booster.intervalSeconds / 60)}m • {formatRemainingTime(booster.endsAt)}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => void runPlayerControl('cancel_xp_booster', { boosterId: booster.id })}
+                                  disabled={controlBusy !== null}
+                                  className="rounded-xl border border-[#f87171] px-3 py-2 text-[11px] font-mono tracking-[0.18em] text-[#fca5a5] disabled:opacity-40"
+                                >
+                                  STOP
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </ControlSurface>
+                  )}
+                </div>
+              </div>
             )}
 
             {/* ACTIVE EFFECTS — only shown if any */}
@@ -833,6 +1242,7 @@ function PlayerPanel({
           onCancel={() => { setConfirmModal(null); setSelectedSlot(null) }}
         />
       )}
+      <Toasts toasts={toasts} />
     </div>
   )
 }

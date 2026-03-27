@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { rconForRequest, getSessionUserId } from '@/lib/rcon'
+import { ensurePlayerXpBoosterRunnerStarted } from '@/lib/player-xp-boosters'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -84,6 +85,7 @@ function parseUuid(stdout: string): string | null {
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
+  ensurePlayerXpBoosterRunnerStarted()
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   const player = req.nextUrl.searchParams.get('player')

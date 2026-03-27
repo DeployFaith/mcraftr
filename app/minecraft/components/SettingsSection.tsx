@@ -6,6 +6,8 @@ import { FEATURE_DEFS, FEATURE_CATEGORIES, type FeatureKey, type FeatureCategory
 import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
 import CapabilityLockCard from './CapabilityLockCard'
 import ColorPickerModal from './ColorPickerModal'
+import IntegrationCard from './IntegrationCard'
+import IntegrationRecommendationModal from './IntegrationRecommendationModal'
 import McraftrSwitch from './McraftrSwitch'
 import { sanitizeBridgePrefix, sanitizeBridgeProviderLabel } from '@/lib/public-branding'
 import { BUILTIN_MUSIC, BUILTIN_SOUNDS, DEFAULT_MUSIC_SETTINGS, DEFAULT_SOUND_SETTINGS, cleanupUnusedUploadedMedia, describeSource, loadMusicSettings, loadSoundSettings, playMediaSource, registerUploadedMediaIds, saveMusicSettings, saveSoundSettings, type MediaSource, type SoundEffectKey, type SoundSettings, type MusicSettings } from '@/app/components/soundfx'
@@ -114,6 +116,68 @@ type PluginStackData = {
   }
 }
 
+type IntegrationStatus = {
+  id: string
+  label: string
+  description: string
+  owner: 'mcraftr' | 'third-party'
+  kind: 'plugin' | 'service'
+  installed: boolean
+  installState: 'ready' | 'missing' | 'unsupported' | 'unknown'
+  detectedVersion: string | null
+  pinnedVersion: string
+  restartRequired: boolean
+  featureSummaries: string[]
+  supportedMinecraftVersions: string[]
+  notes: string[]
+  reasons: string[]
+}
+
+type IntegrationPreference = {
+  userId: string
+  serverId: string
+  preferenceKey: 'structure_editor_provider'
+  integrationId: string
+  reason: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+type IntegrationRecommendation = {
+  recommendedId: string | null
+  confidence: 'high' | 'medium' | 'low'
+  summary: string
+  reasons: string[]
+  alternatives: Array<{
+    id: string
+    acceptable: boolean
+    reason: string
+  }>
+  restartRequired: boolean
+  pinnedVersion: string | null
+}
+
+type IntegrationsData = {
+  ok: boolean
+  error?: string
+  server?: {
+    id: string
+    label: string | null
+    minecraftVersion: string | null
+    bridgeEnabled: boolean
+    sidecarEnabled: boolean
+  }
+  integrations?: IntegrationStatus[]
+  preferences?: {
+    all: IntegrationPreference[]
+    structureEditorProvider: IntegrationPreference | null
+    shouldPromptForStructureEditor: boolean
+  }
+  recommendations?: {
+    structureEditor: IntegrationRecommendation
+  }
+}
+
 const THEME_PACK_DOCS_URL = '/theme-packs'
 
 function normalizeMediaSourceInput(value: unknown, kind: 'sound' | 'music', fallback: MediaSource): MediaSource {
@@ -200,6 +264,10 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
   const [servers, setServers] = useState<SavedServerSummary[]>([])
   const [activeServerId, setActiveServerId] = useState<string | null>(null)
   const [pluginStack, setPluginStack] = useState<PluginStackData | null>(null)
+  const [integrationsData, setIntegrationsData] = useState<IntegrationsData | null>(null)
+  const [integrationsLoading, setIntegrationsLoading] = useState(true)
+  const [integrationPreferenceSaving, setIntegrationPreferenceSaving] = useState(false)
+  const [integrationRecommendationOpen, setIntegrationRecommendationOpen] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
   const { theme, setTheme, accent, setAccent, customAccent, setCustomAccent, themePack, setThemePack, font, setFont, fontSize, setFontSize } = useTheme()
   const [customAccentInput, setCustomAccentInput] = useState(customAccent)
@@ -372,6 +440,15 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
       .catch(() => setPluginStack({ ok: false, error: 'Failed to load stack status', bridge: {}, sidecar: {} }))
   }, [])
 
+  useEffect(() => {
+    setIntegrationsLoading(true)
+    fetch('/api/minecraft/integrations', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => setIntegrationsData(d))
+      .catch(() => setIntegrationsData({ ok: false, error: 'Failed to load integration status' }))
+      .finally(() => setIntegrationsLoading(false))
+  }, [])
+
   const disconnectServer = async () => {
     if (!confirm('Remove the current active server from this account?')) return
     setDisconnecting(true)
@@ -392,6 +469,46 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
   }
 
   const activeServer = servers.find(server => server.id === activeServerId) ?? null
+
+  const integrations = integrationsData?.integrations ?? []
+  const structureEditorPreference = integrationsData?.preferences?.structureEditorProvider ?? null
+  const structureEditorRecommendation = integrationsData?.recommendations?.structureEditor ?? null
+
+  const refreshIntegrations = async () => {
+    setIntegrationsLoading(true)
+    try {
+      const res = await fetch('/api/minecraft/integrations', { cache: 'no-store' })
+      const data = await res.json()
+      setIntegrationsData(data)
+    } catch {
+      setIntegrationsData({ ok: false, error: 'Failed to load integration status' })
+    } finally {
+      setIntegrationsLoading(false)
+    }
+  }
+
+  const saveStructureEditorPreference = async (integrationId: string, reason: string) => {
+    setIntegrationPreferenceSaving(true)
+    try {
+      const res = await fetch('/api/minecraft/integrations/preference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          preferenceKey: 'structure_editor_provider',
+          integrationId,
+          reason,
+        }),
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || 'Failed to save preference')
+      await refreshIntegrations()
+      setIntegrationRecommendationOpen(false)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to save provider preference')
+    } finally {
+      setIntegrationPreferenceSaving(false)
+    }
+  }
 
   // ── Change password ─────────────────────────────────────────────────────────
 
@@ -1374,6 +1491,127 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
         </div>
       </CollapsibleCard>
 
+      <CollapsibleCard title="INTEGRATIONS" storageKey="settings:integrations" groupKey={SETTINGS_COLLAPSIBLE_GROUP} bodyClassName="p-5 space-y-4">
+        <div className="rounded-[24px] border border-[var(--accent-mid)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--accent)_10%,transparent),rgba(8,12,18,0.55))] p-4">
+          <div className="text-[10px] font-mono tracking-[0.3em] text-[var(--accent)]">CURATED MODULES</div>
+          <div className="mt-1 text-[18px] font-mono text-[var(--text)]">Integration control room</div>
+          <div className="mt-2 max-w-3xl text-[12px] font-mono leading-relaxed text-[var(--text-dim)]">
+            Mcraftr keeps integrations modular. Review what is installed, see curated pinned support, and choose the provider you want when more than one integration can power the same workflow.
+          </div>
+        </div>
+
+        {integrationsLoading && (
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[12px] font-mono text-[var(--text-dim)]">
+            Loading curated integration status...
+          </div>
+        )}
+
+        {integrationsData?.ok === false && integrationsData.error && (
+          <div className="rounded-2xl border border-red-900 bg-red-950/30 px-4 py-3 text-[12px] font-mono text-red-300">
+            {integrationsData.error}
+          </div>
+        )}
+
+        {integrationsData?.ok && (
+          <>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
+                <div className="text-[10px] font-mono tracking-[0.22em] text-[var(--text-dim)]">ACTIVE SERVER</div>
+                <div className="mt-1 text-[13px] font-mono text-[var(--text)]">{integrationsData.server?.label?.trim() || 'Current active server'}</div>
+              </div>
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
+                <div className="text-[10px] font-mono tracking-[0.22em] text-[var(--text-dim)]">MINECRAFT VERSION</div>
+                <div className="mt-1 text-[13px] font-mono text-[var(--text)]">{integrationsData.server?.minecraftVersion || 'Unknown'}</div>
+              </div>
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
+                <div className="text-[10px] font-mono tracking-[0.22em] text-[var(--text-dim)]">STRUCTURE EDITOR</div>
+                <div className="mt-1 text-[13px] font-mono text-[var(--text)]">{structureEditorPreference?.integrationId || 'No provider chosen yet'}</div>
+                {structureEditorPreference && (
+                  <button
+                    type="button"
+                    disabled={integrationPreferenceSaving}
+                    onClick={async () => {
+                      setIntegrationPreferenceSaving(true)
+                      try {
+                        const res = await fetch('/api/minecraft/integrations/preference', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ preferenceKey: 'structure_editor_provider', clear: true }),
+                        })
+                        const data = await res.json()
+                        if (!data.ok) throw new Error(data.error || 'Failed to clear preference')
+                        await refreshIntegrations()
+                      } catch (error) {
+                        alert(error instanceof Error ? error.message : 'Failed to clear provider preference')
+                      } finally {
+                        setIntegrationPreferenceSaving(false)
+                      }
+                    }}
+                    className="mt-2 rounded-xl border border-[var(--border)] px-2 py-1 text-[10px] font-mono tracking-[0.16em] text-[var(--text-dim)] disabled:opacity-40"
+                  >
+                    RESET CHOICE
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {integrationsData.preferences?.shouldPromptForStructureEditor && (
+              <div className="rounded-[24px] border border-[var(--accent-mid)] bg-[var(--accent-dim)] p-4">
+                <div className="text-[10px] font-mono tracking-[0.28em] text-[var(--accent)]">PROVIDER CHOICE NEEDED</div>
+                <div className="mt-1 text-[15px] font-mono text-[var(--text)]">Both WorldEdit and FAWE are available</div>
+                <div className="mt-2 text-[12px] font-mono leading-relaxed text-[var(--text-dim)]">
+                  Pick the provider Mcraftr should use for overlapping structure workflows, or let Mcraftr explain its stability-first recommendation before you decide.
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={integrationPreferenceSaving}
+                    onClick={() => void saveStructureEditorPreference('worldedit', 'User selected WorldEdit as the structure editor provider.')}
+                    className="rounded-xl border border-[var(--border)] px-3 py-2 text-[11px] font-mono tracking-[0.18em] text-[var(--text)] disabled:opacity-40"
+                  >
+                    USE WORLDEDIT
+                  </button>
+                  <button
+                    type="button"
+                    disabled={integrationPreferenceSaving}
+                    onClick={() => void saveStructureEditorPreference('fawe', 'User selected FAWE as the structure editor provider.')}
+                    className="rounded-xl border border-[var(--border)] px-3 py-2 text-[11px] font-mono tracking-[0.18em] text-[var(--text)] disabled:opacity-40"
+                  >
+                    USE FAWE
+                  </button>
+                  <button
+                    type="button"
+                    disabled={integrationPreferenceSaving}
+                    onClick={() => setIntegrationRecommendationOpen(true)}
+                    className="rounded-xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 text-[11px] font-mono tracking-[0.18em] text-[var(--accent)] disabled:opacity-40"
+                  >
+                    LET MCRAFTR CHOOSE
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              {integrations.map(integration => (
+                <IntegrationCard
+                  key={integration.id}
+                  label={integration.label}
+                  description={integration.description}
+                  owner={integration.owner}
+                  installState={integration.installState}
+                  detectedVersion={integration.detectedVersion}
+                  pinnedVersion={integration.pinnedVersion}
+                  restartRequired={integration.restartRequired}
+                  featureSummaries={integration.featureSummaries}
+                  notes={integration.notes}
+                  isPreferred={structureEditorPreference?.integrationId === integration.id}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </CollapsibleCard>
+
       {/* Account Update */}
       <CollapsibleCard title="ACCOUNT UPDATE" storageKey="settings:account-update" groupKey={SETTINGS_COLLAPSIBLE_GROUP} bodyClassName="p-5 space-y-4">
         <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4 space-y-4">
@@ -1573,6 +1811,15 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
           }}
         />
       )}
+
+      <IntegrationRecommendationModal
+        open={integrationRecommendationOpen}
+        recommendation={structureEditorRecommendation ?? null}
+        onClose={() => setIntegrationRecommendationOpen(false)}
+        onChoose={(integrationId) => {
+          void saveStructureEditorPreference(integrationId, `Mcraftr recommendation flow selected ${integrationId} as the structure editor provider.`)
+        }}
+      />
 
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>

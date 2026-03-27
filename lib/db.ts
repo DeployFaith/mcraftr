@@ -310,6 +310,38 @@ export function getDb(): Database.Database {
 
     CREATE INDEX IF NOT EXISTS idx_terminal_saved_commands_server
       ON terminal_saved_commands(user_id, server_id, COALESCE(last_used_at, 0) DESC, updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS player_xp_boosters (
+      id               TEXT PRIMARY KEY,
+      user_id          TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      server_id        TEXT NOT NULL,
+      player_name      TEXT NOT NULL,
+      label            TEXT NOT NULL,
+      duration_hours   INTEGER NOT NULL,
+      bonus_points     INTEGER NOT NULL,
+      interval_seconds INTEGER NOT NULL DEFAULT 300,
+      ends_at          INTEGER NOT NULL,
+      last_run_at      INTEGER,
+      cancelled_at     INTEGER,
+      created_at       INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_player_xp_boosters_active
+      ON player_xp_boosters(user_id, server_id, player_name, cancelled_at, ends_at);
+
+    CREATE TABLE IF NOT EXISTS server_integration_preferences (
+      user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      server_id       TEXT NOT NULL,
+      preference_key  TEXT NOT NULL,
+      integration_id  TEXT NOT NULL,
+      reason          TEXT,
+      created_at      INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at      INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (user_id, server_id, preference_key)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_server_integration_preferences_lookup
+      ON server_integration_preferences(user_id, server_id, updated_at DESC);
   `)
 
   ensureColumn(_db, 'users', 'active_server_id', 'active_server_id TEXT')
