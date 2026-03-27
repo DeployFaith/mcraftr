@@ -123,7 +123,7 @@ type IntegrationStatus = {
   owner: 'mcraftr' | 'third-party'
   kind: 'plugin' | 'service'
   installed: boolean
-  installState: 'ready' | 'missing' | 'unsupported' | 'unknown'
+  installState: 'ready' | 'missing' | 'unsupported' | 'unknown' | 'outdated' | 'drifted' | 'user-managed'
   detectedVersion: string | null
   pinnedVersion: string
   restartRequired: boolean
@@ -131,6 +131,13 @@ type IntegrationStatus = {
   supportedMinecraftVersions: string[]
   notes: string[]
   reasons: string[]
+  source?: {
+    downloadUrl?: string | null
+    filename?: string | null
+    pluginPath?: string | null
+    backupPath?: string | null
+    managed?: boolean
+  }
 }
 
 type IntegrationPreference = {
@@ -268,6 +275,8 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
   const [integrationsLoading, setIntegrationsLoading] = useState(true)
   const [integrationPreferenceSaving, setIntegrationPreferenceSaving] = useState(false)
   const [integrationRecommendationOpen, setIntegrationRecommendationOpen] = useState(false)
+  const [integrationActionBusy, setIntegrationActionBusy] = useState<string | null>(null)
+  const [integrationActionStatus, setIntegrationActionStatus] = useState<{ ok: boolean; msg: string } | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
   const { theme, setTheme, accent, setAccent, customAccent, setCustomAccent, themePack, setThemePack, font, setFont, fontSize, setFontSize } = useTheme()
   const [customAccentInput, setCustomAccentInput] = useState(customAccent)
@@ -507,6 +516,26 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
       alert(error instanceof Error ? error.message : 'Failed to save provider preference')
     } finally {
       setIntegrationPreferenceSaving(false)
+    }
+  }
+
+  const runIntegrationAction = async (action: 'install' | 'remove' | 'repair', integrationId: string) => {
+    setIntegrationActionBusy(`${action}:${integrationId}`)
+    setIntegrationActionStatus(null)
+    try {
+      const res = await fetch(`/api/minecraft/integrations/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ integrationId }),
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || `Failed to ${action} integration`)
+      setIntegrationActionStatus({ ok: true, msg: data.message || `${integrationId} ${action} complete.` })
+      await refreshIntegrations()
+    } catch (error) {
+      setIntegrationActionStatus({ ok: false, msg: error instanceof Error ? error.message : `Failed to ${action} integration.` })
+    } finally {
+      setIntegrationActionBusy(null)
     }
   }
 
@@ -1514,6 +1543,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
 
         {integrationsData?.ok && (
           <>
+            {integrationActionStatus && <StatusMsg ok={integrationActionStatus.ok} msg={integrationActionStatus.msg} />}
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
                 <div className="text-[10px] font-mono tracking-[0.22em] text-[var(--text-dim)]">ACTIVE SERVER</div>
@@ -1605,6 +1635,16 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
                   featureSummaries={integration.featureSummaries}
                   notes={integration.notes}
                   isPreferred={structureEditorPreference?.integrationId === integration.id}
+                  actionBusy={integrationActionBusy === `install:${integration.id}` || integrationActionBusy === `remove:${integration.id}` || integrationActionBusy === `repair:${integration.id}`}
+                  onInstall={integration.owner === 'third-party' && integration.kind === 'plugin' && (integration.installState === 'missing' || integration.installState === 'unknown' || integration.installState === 'outdated')
+                    ? () => void runIntegrationAction('install', integration.id)
+                    : undefined}
+                  onRepair={integration.owner === 'third-party' && integration.kind === 'plugin' && (integration.installState === 'drifted' || integration.installState === 'ready' || integration.installState === 'outdated')
+                    ? () => void runIntegrationAction('repair', integration.id)
+                    : undefined}
+                  onRemove={integration.owner === 'third-party' && integration.kind === 'plugin' && integration.source?.managed
+                    ? () => void runIntegrationAction('remove', integration.id)
+                    : undefined}
                 />
               ))}
             </div>

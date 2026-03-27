@@ -1,7 +1,7 @@
 import type { IntegrationId } from './integrations'
 import { getIntegrationById, supportsMinecraftVersion } from './integrations'
 
-export type IntegrationInstallState = 'ready' | 'missing' | 'unsupported' | 'unknown'
+export type IntegrationInstallState = 'ready' | 'missing' | 'unsupported' | 'unknown' | 'outdated' | 'drifted' | 'user-managed'
 
 export type IntegrationStatusInput = {
   id: IntegrationId
@@ -56,6 +56,15 @@ function scoreCandidate(status: IntegrationStatusInput, minecraftVersion: string
   if (status.installState === 'ready') {
     score += 3
     reasons.push(`${integration.label} already looks ready on this server.`)
+  } else if (status.installState === 'user-managed') {
+    score += 2
+    reasons.push(`${integration.label} is already installed, but Mcraftr is not managing that jar yet.`)
+  } else if (status.installState === 'outdated') {
+    score += 1
+    reasons.push(`${integration.label} is installed, but it does not match the current curated pin.`)
+  } else if (status.installState === 'drifted') {
+    score -= 2
+    reasons.push(`${integration.label} has drifted away from the curated pinned state and may need repair.`)
   } else if (status.installState === 'missing') {
     score += 1
     reasons.push(`${integration.label} is not installed yet, but remains a valid curated option.`)

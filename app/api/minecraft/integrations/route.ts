@@ -23,19 +23,24 @@ type BridgeStackResponse = {
   }>
 }
 
-type SidecarStackResponse = {
+type SidecarIntegrationsResponse = {
   ok: boolean
   capabilities?: string[]
-  plugins?: Array<{
-    name: string
-    version: string | null
-    filename: string
-    detectedFrom: string
+  pluginRoot?: string
+  manifestPath?: string
+  backupRoot?: string
+  integrations?: Array<{
+    integrationId: string
+    installed: boolean
+    detectedVersion: string | null
+    pinnedVersion: string | null
+    pluginPath: string | null
+    managed: boolean
+    backupPath: string | null
+    restartRequired: boolean
+    state: IntegrationInstallState
+    warnings: string[]
   }>
-}
-
-function normalizePluginName(value: string) {
-  return value.trim().toLowerCase()
 }
 
 export async function GET(req: NextRequest) {
@@ -52,25 +57,22 @@ export async function GET(req: NextRequest) {
       ? runBridgeJson<BridgeStackResponse>(req, 'stack status')
       : Promise.resolve({ ok: false as const, error: 'Relay not configured' }),
     activeServer.sidecar.enabled
-      ? callSidecarForRequest<SidecarStackResponse>(req, '/plugin-stack')
+      ? callSidecarForRequest<SidecarIntegrationsResponse>(req, '/integrations')
       : Promise.resolve({ ok: false as const, error: 'Beacon not configured', status: 400 }),
   ])
 
   const minecraftVersion = activeServer.minecraftVersion.resolved
-  const sidecarPlugins = sidecar.ok ? (sidecar.data.plugins ?? []) : []
-  const bridgePlugins = bridge.ok ? (bridge.data.plugins ?? []) : []
-  const installedPluginNames = new Set([
-    ...sidecarPlugins.map(plugin => normalizePluginName(plugin.name)),
-    ...bridgePlugins.filter(plugin => plugin.installed).map(plugin => normalizePluginName(plugin.name)),
-  ])
+  const sidecarIntegrations = sidecar.ok ? (sidecar.data.integrations ?? []) : []
 
   const statuses = INTEGRATION_DEFINITIONS.map(definition => {
-    const bySidecar = sidecarPlugins.find(plugin => definition.detectPluginNames.some(name => normalizePluginName(name) === normalizePluginName(plugin.name)))
-    const byBridge = bridgePlugins.find(plugin => definition.detectPluginNames.some(name => normalizePluginName(name) === normalizePluginName(plugin.name)))
-    const detectedVersion = bySidecar?.version ?? byBridge?.version ?? null
+    const sidecarStatus = sidecarIntegrations.find(entry => entry.integrationId === definition.id)
 
     let installed = false
     let installState: IntegrationInstallState = 'missing'
+    const detectedVersion: string | null = sidecarStatus?.detectedVersion ?? null
+    const managed = sidecarStatus?.managed ?? false
+    const pluginPath: string | null = sidecarStatus?.pluginPath ?? null
+    const backupPath: string | null = sidecarStatus?.backupPath ?? null
     const reasons: string[] = []
 
     if (definition.id === 'mcraftr-relay') {
@@ -88,12 +90,16 @@ export async function GET(req: NextRequest) {
     } else if (!activeServer.sidecar.enabled) {
       installState = 'unknown'
       reasons.push('Beacon is not configured, so Mcraftr cannot verify plugin jars on disk yet.')
+    } else if (sidecarStatus) {
+      installed = sidecarStatus.installed
+      installState = sidecarStatus.state
+      reasons.push(...sidecarStatus.warnings)
+      reasons.push(sidecarStatus.installed
+        ? `${definition.label} was detected through Beacon's managed integrations scan.`
+        : `${definition.label} is not currently present in the Beacon-managed integrations scan.`)
     } else {
-      installed = definition.detectPluginNames.some(name => installedPluginNames.has(normalizePluginName(name)))
-      installState = installed ? 'ready' : 'missing'
-      reasons.push(installed
-        ? `${definition.label} was detected in the current plugin inventory.`
-        : `${definition.label} was not found in the current plugin inventory.`)
+      installState = 'unknown'
+      reasons.push('Beacon did not return an integration state for this curated plugin.')
     }
 
     if (!supportsMinecraftVersion(definition, minecraftVersion)) {
@@ -118,6 +124,9 @@ export async function GET(req: NextRequest) {
       source: {
         downloadUrl: definition.downloadUrl,
         filename: definition.filename,
+        pluginPath,
+        backupPath,
+        managed,
       },
       reasons,
     }
@@ -158,7 +167,13 @@ export async function GET(req: NextRequest) {
     },
     inventorySources: {
       bridge: bridge.ok ? { ok: true, serverVersion: bridge.data.serverVersion } : { ok: false, error: bridge.error },
-      sidecar: sidecar.ok ? { ok: true, capabilities: sidecar.data.capabilities ?? activeServer.sidecar.capabilities } : { ok: false, error: sidecar.error },
+      sidecar: sidecar.ok ? {
+        ok: true,
+        capabilities: sidecar.data.capabilities ?? activeServer.sidecar.capabilities,
+        pluginRoot: sidecar.data.pluginRoot ?? null,
+        manifestPath: sidecar.data.manifestPath ?? null,
+        backupRoot: sidecar.data.backupRoot ?? null,
+      } : { ok: false, error: sidecar.error },
     },
   })
 }

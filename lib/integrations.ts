@@ -14,7 +14,7 @@ export type IntegrationDefinition = {
   kind: IntegrationKind
   pinnedVersion: string
   downloadUrl: string | null
-  checksumSha256: string | null
+  checksum: { algorithm: 'sha512' | 'sha256' | 'sha1'; value: string } | null
   filename: string | null
   supportedServerTypes: SupportedServerType[]
   supportedMinecraftVersions: string[]
@@ -34,7 +34,7 @@ export const INTEGRATION_DEFINITIONS: IntegrationDefinition[] = [
     kind: 'plugin',
     pinnedVersion: 'managed-by-mcraftr',
     downloadUrl: null,
-    checksumSha256: null,
+    checksum: null,
     filename: null,
     supportedServerTypes: ['paper', 'spigot', 'purpur'],
     supportedMinecraftVersions: ['1.20', '1.21'],
@@ -59,7 +59,7 @@ export const INTEGRATION_DEFINITIONS: IntegrationDefinition[] = [
     kind: 'service',
     pinnedVersion: 'managed-by-mcraftr',
     downloadUrl: null,
-    checksumSha256: null,
+    checksum: null,
     filename: null,
     supportedServerTypes: ['paper', 'spigot', 'purpur'],
     supportedMinecraftVersions: ['1.20', '1.21'],
@@ -82,10 +82,10 @@ export const INTEGRATION_DEFINITIONS: IntegrationDefinition[] = [
     description: 'Permissions and groups platform for future Mcraftr roles, promotion flows, and policy-aware admin tooling.',
     owner: 'third-party',
     kind: 'plugin',
-    pinnedVersion: '5.4.x',
-    downloadUrl: 'https://luckperms.net/download',
-    checksumSha256: null,
-    filename: 'LuckPerms.jar',
+    pinnedVersion: '5.5.17',
+    downloadUrl: 'https://cdn.modrinth.com/data/Vebnzrzj/versions/OrIs0S6b/LuckPerms-Bukkit-5.5.17.jar',
+    checksum: { algorithm: 'sha512', value: '773895644260b338818bfeff0c78f8d4f590f56b0f711c378a4eec91be6e8b37354099b5db1ea5b2dce4c02486213297a6da09675c9bf6f014f9a400b5772cf3' },
+    filename: 'LuckPerms-Bukkit-5.5.17.jar',
     supportedServerTypes: ['paper', 'spigot', 'purpur'],
     supportedMinecraftVersions: ['1.20', '1.21'],
     restartRequired: true,
@@ -106,10 +106,10 @@ export const INTEGRATION_DEFINITIONS: IntegrationDefinition[] = [
     description: 'Baseline schematic and world editing plugin for build-oriented workflows.',
     owner: 'third-party',
     kind: 'plugin',
-    pinnedVersion: '7.3.x',
-    downloadUrl: 'https://enginehub.org/worldedit/',
-    checksumSha256: null,
-    filename: 'WorldEdit.jar',
+    pinnedVersion: '7.4.1',
+    downloadUrl: 'https://cdn.modrinth.com/data/1u6JkXh5/versions/JUWRHdru/worldedit-bukkit-7.4.1.jar',
+    checksum: { algorithm: 'sha512', value: '93407bede53159c7eb556547a448c42ed0bd2ab4564b1a4662839c76c359e13f284f6883756785c0a22df1cec526ef837d189a8af9204d2e99db75dc62b3a333' },
+    filename: 'worldedit-bukkit-7.4.1.jar',
     supportedServerTypes: ['paper', 'spigot', 'purpur'],
     supportedMinecraftVersions: ['1.20', '1.21'],
     restartRequired: true,
@@ -130,10 +130,10 @@ export const INTEGRATION_DEFINITIONS: IntegrationDefinition[] = [
     description: 'FastAsyncWorldEdit for higher-performance editing workflows on supported Paper-family servers.',
     owner: 'third-party',
     kind: 'plugin',
-    pinnedVersion: '2.x',
-    downloadUrl: 'https://intellectualsites.gitbook.io/fastasyncworldedit/',
-    checksumSha256: null,
-    filename: 'FastAsyncWorldEdit.jar',
+    pinnedVersion: '2.15.0',
+    downloadUrl: 'https://cdn.modrinth.com/data/z4HZZnLr/versions/MOe9fY3h/FastAsyncWorldEdit-Bukkit-2.15.0.jar',
+    checksum: { algorithm: 'sha512', value: '862177cc1acbae3cb094af3416ac378a547318a47e1751b197e126465977e3177949b3eefd3fd5f3a54740f4d09248e4ae2a7f7d31c688d0eccf5455bca1c88a' },
+    filename: 'FastAsyncWorldEdit-Bukkit-2.15.0.jar',
     supportedServerTypes: ['paper', 'spigot', 'purpur'],
     supportedMinecraftVersions: ['1.20', '1.21'],
     restartRequired: true,

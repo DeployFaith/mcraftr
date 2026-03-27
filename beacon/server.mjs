@@ -1,6 +1,7 @@
 import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
+import crypto from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { gunzipSync } from 'node:zlib'
 import { URL } from 'node:url'
@@ -19,6 +20,8 @@ const ENTITY_PRESET_DIRS = resolveEntityPresetDirs(process.env.MCRAFTR_ENTITY_PR
 const BLUEMAP_BASE_URL = (process.env.MCRAFTR_BLUEMAP_URL || '').trim().replace(/\/+$/, '')
 const DYNMAP_BASE_URL = (process.env.MCRAFTR_DYNMAP_URL || '').trim().replace(/\/+$/, '')
 const CACHE_DIR = '/tmp/mcraftr-beacon'
+const MANAGED_INTEGRATIONS_FILE = '.mcraftr-managed.json'
+const MANAGED_BACKUPS_DIR = '.mcraftr-backups'
 
 const BUILTIN_CAPABILITIES = [
   'health',
@@ -32,7 +35,44 @@ const BUILTIN_CAPABILITIES = [
   'entity-upload',
   'entity-delete',
   'clone-world',
+  'integrations',
+  'integration-install',
+  'integration-remove',
+  'integration-repair',
 ]
+
+const CURATED_PLUGIN_INTEGRATIONS = {
+  luckperms: {
+    id: 'luckperms',
+    label: 'LuckPerms',
+    pinnedVersion: '5.5.17',
+    filename: 'LuckPerms-Bukkit-5.5.17.jar',
+    downloadUrl: 'https://cdn.modrinth.com/data/Vebnzrzj/versions/OrIs0S6b/LuckPerms-Bukkit-5.5.17.jar',
+    checksum: { algorithm: 'sha512', value: '773895644260b338818bfeff0c78f8d4f590f56b0f711c378a4eec91be6e8b37354099b5db1ea5b2dce4c02486213297a6da09675c9bf6f014f9a400b5772cf3' },
+    detectNames: ['luckperms'],
+    restartRequired: true,
+  },
+  worldedit: {
+    id: 'worldedit',
+    label: 'WorldEdit',
+    pinnedVersion: '7.4.1',
+    filename: 'worldedit-bukkit-7.4.1.jar',
+    downloadUrl: 'https://cdn.modrinth.com/data/1u6JkXh5/versions/JUWRHdru/worldedit-bukkit-7.4.1.jar',
+    checksum: { algorithm: 'sha512', value: '93407bede53159c7eb556547a448c42ed0bd2ab4564b1a4662839c76c359e13f284f6883756785c0a22df1cec526ef837d189a8af9204d2e99db75dc62b3a333' },
+    detectNames: ['worldedit'],
+    restartRequired: true,
+  },
+  fawe: {
+    id: 'fawe',
+    label: 'FAWE',
+    pinnedVersion: '2.15.0',
+    filename: 'FastAsyncWorldEdit-Bukkit-2.15.0.jar',
+    downloadUrl: 'https://cdn.modrinth.com/data/z4HZZnLr/versions/MOe9fY3h/FastAsyncWorldEdit-Bukkit-2.15.0.jar',
+    checksum: { algorithm: 'sha512', value: '862177cc1acbae3cb094af3416ac378a547318a47e1751b197e126465977e3177949b3eefd3fd5f3a54740f4d09248e4ae2a7f7d31c688d0eccf5455bca1c88a' },
+    detectNames: ['fastasyncworldedit', 'fawe'],
+    restartRequired: true,
+  },
+}
 
 let nativeStructureCache = {
   key: '',
@@ -170,6 +210,350 @@ function listPlugins() {
       filename: name,
       detectedFrom: PLUGINS_DIR,
     }))
+}
+
+function getPluginRoot() {
+  const root = path.resolve(PLUGINS_DIR)
+  if (!isDirectory(root)) {
+    throw new Error(`Plugins directory is unavailable: ${root}`)
+  }
+  return root
+}
+
+function managedManifestPath() {
+  return safeJoin(getPluginRoot(), MANAGED_INTEGRATIONS_FILE)
+}
+
+function managedBackupRoot() {
+  return safeJoin(getPluginRoot(), MANAGED_BACKUPS_DIR)
+}
+
+function ensureManagedBackupRoot() {
+  const root = managedBackupRoot()
+  fs.mkdirSync(root, { recursive: true })
+  return root
+}
+
+function emptyManagedManifest() {
+  return {
+    version: 1,
+    updatedAt: Math.floor(Date.now() / 1000),
+    integrations: {},
+  }
+}
+
+function readManagedManifest() {
+  const file = managedManifestPath()
+  if (!fs.existsSync(file)) return emptyManagedManifest()
+  try {
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'))
+    if (!parsed || typeof parsed !== 'object' || typeof parsed.integrations !== 'object' || parsed.integrations === null) {
+      return emptyManagedManifest()
+    }
+    return {
+      version: typeof parsed.version === 'number' ? parsed.version : 1,
+      updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : Math.floor(Date.now() / 1000),
+      integrations: parsed.integrations,
+    }
+  } catch {
+    return emptyManagedManifest()
+  }
+}
+
+function writeManagedManifest(manifest) {
+  const file = managedManifestPath()
+  const payload = {
+    version: 1,
+    updatedAt: Math.floor(Date.now() / 1000),
+    integrations: manifest.integrations || {},
+  }
+  const tempFile = `${file}.${process.pid}.tmp`
+  fs.writeFileSync(tempFile, JSON.stringify(payload, null, 2))
+  fs.renameSync(tempFile, file)
+  return payload
+}
+
+function getManagedIntegrationEntry(manifest, integrationId) {
+  const entry = manifest.integrations?.[integrationId]
+  return entry && typeof entry === 'object' ? entry : null
+}
+
+function setManagedIntegrationEntry(manifest, integrationId, entry) {
+  manifest.integrations[integrationId] = entry
+  return writeManagedManifest(manifest)
+}
+
+function removeManagedIntegrationEntry(manifest, integrationId) {
+  delete manifest.integrations[integrationId]
+  return writeManagedManifest(manifest)
+}
+
+function curatedIntegrationById(integrationId) {
+  const integration = CURATED_PLUGIN_INTEGRATIONS[integrationId]
+  if (!integration) throw new Error(`Unsupported curated integration: ${integrationId}`)
+  return integration
+}
+
+function displayPluginPath(value) {
+  const absolute = path.resolve(value)
+  const root = getPluginRoot()
+  if (absolute === root) return 'plugins'
+  if (absolute.startsWith(root + path.sep)) return path.posix.join('plugins', absolute.slice(root.length + 1).split(path.sep).join('/'))
+  return absolute
+}
+
+function resolvePluginJarPath(filename) {
+  return safeJoin(getPluginRoot(), filename)
+}
+
+function resolveBackupJarPath(filename, timestamp) {
+  const ext = path.extname(filename) || '.jar'
+  const base = path.basename(filename, ext)
+  return safeJoin(ensureManagedBackupRoot(), `${base}-${timestamp}${ext}`)
+}
+
+function fileExists(entryPath) {
+  try {
+    return fs.statSync(entryPath).isFile()
+  } catch {
+    return false
+  }
+}
+
+function readFileHash(entryPath, algorithm) {
+  const hash = crypto.createHash(algorithm)
+  hash.update(fs.readFileSync(entryPath))
+  return hash.digest('hex')
+}
+
+function copyFileToBackup(sourcePath, backupPath) {
+  ensureManagedBackupRoot()
+  fs.copyFileSync(sourcePath, backupPath)
+}
+
+function removeFile(entryPath) {
+  if (fileExists(entryPath)) fs.rmSync(entryPath)
+}
+
+function normalizeName(value) {
+  return value.trim().toLowerCase()
+}
+
+function detectCuratedPlugin(integration) {
+  const jarPath = resolvePluginJarPath(integration.filename)
+  const plugins = listPlugins()
+  const byFilename = plugins.find(plugin => normalizeName(plugin.filename) === normalizeName(integration.filename))
+  const byName = plugins.find(plugin => integration.detectNames.some(name => normalizeName(name) === normalizeName(plugin.name)))
+  const matched = byFilename || byName || null
+  return {
+    installed: fileExists(jarPath) || !!matched,
+    pluginPath: fileExists(jarPath) ? jarPath : (matched ? safeJoin(getPluginRoot(), matched.filename) : null),
+    detectedVersion: matched?.version || null,
+  }
+}
+
+function evaluateCuratedIntegration(integrationId) {
+  const integration = curatedIntegrationById(integrationId)
+  const manifest = readManagedManifest()
+  const managedEntry = getManagedIntegrationEntry(manifest, integrationId)
+  const detected = detectCuratedPlugin(integration)
+  const warnings = []
+  let state = 'missing'
+  let managed = !!managedEntry?.managed
+
+  if (!detected.installed && !managedEntry) {
+    state = 'missing'
+  } else if (detected.installed && !managedEntry) {
+    state = 'user-managed'
+    warnings.push('Plugin detected on disk but not managed by Mcraftr.')
+  } else if (!detected.installed && managedEntry) {
+    state = 'drifted'
+    warnings.push('Managed metadata exists, but the plugin jar is missing from the plugins directory.')
+  } else if (detected.pluginPath && managedEntry) {
+    const checksumMatches = integration.checksum
+      ? readFileHash(detected.pluginPath, integration.checksum.algorithm) === integration.checksum.value
+      : true
+    if (!checksumMatches) {
+      state = 'drifted'
+      warnings.push('Managed jar checksum no longer matches the curated pinned artifact.')
+    } else if (managedEntry.pinnedVersion !== integration.pinnedVersion || (managedEntry.installedVersion && managedEntry.installedVersion !== integration.pinnedVersion)) {
+      state = 'outdated'
+      warnings.push('Managed integration does not match the currently curated pinned version.')
+    } else {
+      state = 'ready'
+    }
+  } else {
+    state = 'unknown'
+    warnings.push('Mcraftr could not determine the integration state safely.')
+  }
+
+  return {
+    integrationId,
+    installed: detected.installed,
+    detectedVersion: detected.detectedVersion,
+    pinnedVersion: integration.pinnedVersion,
+    pluginPath: detected.pluginPath ? displayPluginPath(detected.pluginPath) : null,
+    managed,
+    backupPath: managedEntry?.backupPath || null,
+    restartRequired: integration.restartRequired,
+    state,
+    warnings,
+  }
+}
+
+async function downloadCuratedArtifact(integration) {
+  const response = await fetch(integration.downloadUrl, { redirect: 'follow' })
+  if (!response.ok) throw new Error(`Download failed (${response.status})`)
+  const arrayBuffer = await response.arrayBuffer()
+  const buffer = Buffer.from(arrayBuffer)
+  if (integration.checksum) {
+    const actual = crypto.createHash(integration.checksum.algorithm).update(buffer).digest('hex')
+    if (actual !== integration.checksum.value) {
+      throw new Error('Checksum verification failed for curated artifact.')
+    }
+  }
+  return buffer
+}
+
+function integrationConflictWarnings(integrationId) {
+  if (integrationId === 'worldedit' && evaluateCuratedIntegration('fawe').installed) {
+    return ['FAWE is already present on this server. Mcraftr will not remove it automatically.']
+  }
+  if (integrationId === 'fawe' && evaluateCuratedIntegration('worldedit').installed) {
+    return ['WorldEdit is already present on this server. Mcraftr will not remove it automatically.']
+  }
+  return []
+}
+
+async function installCuratedIntegration(integrationId) {
+  const integration = curatedIntegrationById(integrationId)
+  const manifest = readManagedManifest()
+  const jarPath = resolvePluginJarPath(integration.filename)
+  const warnings = integrationConflictWarnings(integrationId)
+  let backupPath = null
+
+  if (fileExists(jarPath)) {
+    const backup = resolveBackupJarPath(integration.filename, Math.floor(Date.now() / 1000))
+    copyFileToBackup(jarPath, backup)
+    backupPath = displayPluginPath(backup)
+    warnings.push('Existing jar was backed up before replacement.')
+  }
+
+  const artifact = await downloadCuratedArtifact(integration)
+  fs.writeFileSync(jarPath, artifact)
+  setManagedIntegrationEntry(manifest, integrationId, {
+    managed: true,
+    installedVersion: integration.pinnedVersion,
+    pinnedVersion: integration.pinnedVersion,
+    filename: integration.filename,
+    pluginPath: displayPluginPath(jarPath),
+    backupPath,
+    checksum: integration.checksum,
+    installedAt: Math.floor(Date.now() / 1000),
+  })
+
+  return {
+    ok: true,
+    integrationId,
+    action: 'install',
+    installedVersion: integration.pinnedVersion,
+    pinnedVersion: integration.pinnedVersion,
+    filename: integration.filename,
+    pluginPath: displayPluginPath(jarPath),
+    backupPath,
+    restartRequired: integration.restartRequired,
+    managed: true,
+    warnings,
+  }
+}
+
+async function removeCuratedIntegration(integrationId) {
+  const integration = curatedIntegrationById(integrationId)
+  const manifest = readManagedManifest()
+  const managedEntry = getManagedIntegrationEntry(manifest, integrationId)
+  if (!managedEntry?.managed) {
+    return {
+      ok: false,
+      integrationId,
+      action: 'remove',
+      error: `${integration.label} is not managed by Mcraftr and will not be removed automatically.`,
+      warnings: ['Manual removal is required for user-managed plugins.'],
+    }
+  }
+
+  const jarPath = resolvePluginJarPath(integration.filename)
+  let backupPath = null
+  if (fileExists(jarPath)) {
+    const backup = resolveBackupJarPath(integration.filename, Math.floor(Date.now() / 1000))
+    copyFileToBackup(jarPath, backup)
+    backupPath = displayPluginPath(backup)
+    removeFile(jarPath)
+  }
+
+  removeManagedIntegrationEntry(manifest, integrationId)
+  return {
+    ok: true,
+    integrationId,
+    action: 'remove',
+    installedVersion: null,
+    pinnedVersion: integration.pinnedVersion,
+    filename: integration.filename,
+    pluginPath: null,
+    backupPath,
+    restartRequired: integration.restartRequired,
+    managed: false,
+    warnings: ['Managed jar removed and backed up.'],
+  }
+}
+
+async function repairCuratedIntegration(integrationId) {
+  const integration = curatedIntegrationById(integrationId)
+  const manifest = readManagedManifest()
+  const managedEntry = getManagedIntegrationEntry(manifest, integrationId)
+  if (!managedEntry?.managed) {
+    return {
+      ok: false,
+      integrationId,
+      action: 'repair',
+      error: `${integration.label} is present but not managed by Mcraftr.`,
+      warnings: ['Repair only applies to Mcraftr-managed integrations.'],
+    }
+  }
+
+  const jarPath = resolvePluginJarPath(integration.filename)
+  let backupPath = null
+  if (fileExists(jarPath)) {
+    const backup = resolveBackupJarPath(integration.filename, Math.floor(Date.now() / 1000))
+    copyFileToBackup(jarPath, backup)
+    backupPath = displayPluginPath(backup)
+  }
+
+  const artifact = await downloadCuratedArtifact(integration)
+  fs.writeFileSync(jarPath, artifact)
+  setManagedIntegrationEntry(manifest, integrationId, {
+    managed: true,
+    installedVersion: integration.pinnedVersion,
+    pinnedVersion: integration.pinnedVersion,
+    filename: integration.filename,
+    pluginPath: displayPluginPath(jarPath),
+    backupPath,
+    checksum: integration.checksum,
+    installedAt: Math.floor(Date.now() / 1000),
+  })
+
+  return {
+    ok: true,
+    integrationId,
+    action: 'repair',
+    installedVersion: integration.pinnedVersion,
+    pinnedVersion: integration.pinnedVersion,
+    filename: integration.filename,
+    pluginPath: displayPluginPath(jarPath),
+    backupPath,
+    restartRequired: integration.restartRequired,
+    managed: true,
+    warnings: ['Existing managed jar was replaced with the curated pinned build.'],
+  }
 }
 
 function extractVersion(name) {
@@ -1018,6 +1402,54 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && pathname === '/plugin-stack') {
       sendJson(res, 200, { ok: true, capabilities: BUILTIN_CAPABILITIES, plugins: listPlugins() })
+      return
+    }
+
+    if (req.method === 'GET' && pathname === '/integrations') {
+      sendJson(res, 200, {
+        ok: true,
+        capabilities: BUILTIN_CAPABILITIES,
+        pluginRoot: 'plugins',
+        manifestPath: 'plugins/.mcraftr-managed.json',
+        backupRoot: 'plugins/.mcraftr-backups',
+        integrations: Object.keys(CURATED_PLUGIN_INTEGRATIONS).map(evaluateCuratedIntegration),
+      })
+      return
+    }
+
+    if (req.method === 'POST' && pathname === '/integrations/install') {
+      const body = await readBody(req)
+      const integrationId = String(body.integrationId || '').trim()
+      if (!CURATED_PLUGIN_INTEGRATIONS[integrationId]) {
+        sendJson(res, 400, { ok: false, error: 'Unsupported curated integration', capabilities: BUILTIN_CAPABILITIES })
+        return
+      }
+      const result = await installCuratedIntegration(integrationId)
+      sendJson(res, result.ok ? 200 : 400, { ...result, capabilities: BUILTIN_CAPABILITIES })
+      return
+    }
+
+    if (req.method === 'POST' && pathname === '/integrations/remove') {
+      const body = await readBody(req)
+      const integrationId = String(body.integrationId || '').trim()
+      if (!CURATED_PLUGIN_INTEGRATIONS[integrationId]) {
+        sendJson(res, 400, { ok: false, error: 'Unsupported curated integration', capabilities: BUILTIN_CAPABILITIES })
+        return
+      }
+      const result = await removeCuratedIntegration(integrationId)
+      sendJson(res, result.ok ? 200 : 400, { ...result, capabilities: BUILTIN_CAPABILITIES })
+      return
+    }
+
+    if (req.method === 'POST' && pathname === '/integrations/repair') {
+      const body = await readBody(req)
+      const integrationId = String(body.integrationId || '').trim()
+      if (!CURATED_PLUGIN_INTEGRATIONS[integrationId]) {
+        sendJson(res, 400, { ok: false, error: 'Unsupported curated integration', capabilities: BUILTIN_CAPABILITIES })
+        return
+      }
+      const result = await repairCuratedIntegration(integrationId)
+      sendJson(res, result.ok ? 200 : 400, { ...result, capabilities: BUILTIN_CAPABILITIES })
       return
     }
 
