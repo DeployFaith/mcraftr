@@ -127,6 +127,27 @@ export function listStructurePlacements(serverId: string, world?: string, locati
   `).all(serverId, limit) as StructurePlacement[]
 }
 
+export function listAllStructurePlacements(serverId: string, world?: string): StructurePlacement[] {
+  const db = getDb()
+  if (world) {
+    return db.prepare(`
+      SELECT *
+      FROM world_structure_placements
+      WHERE server_id = ?
+        AND world = ?
+        AND removed_at IS NULL
+      ORDER BY created_at DESC
+    `).all(serverId, world) as StructurePlacement[]
+  }
+  return db.prepare(`
+    SELECT *
+    FROM world_structure_placements
+    WHERE server_id = ?
+      AND removed_at IS NULL
+    ORDER BY created_at DESC
+  `).all(serverId) as StructurePlacement[]
+}
+
 export function markStructurePlacementRemoved(id: string, serverId: string): void {
   const db = getDb()
   db.prepare('UPDATE world_structure_placements SET removed_at = unixepoch() WHERE id = ? AND server_id = ?').run(id, serverId)

@@ -7,7 +7,7 @@ export type AuditAction =
   | 'whitelist_add' | 'whitelist_remove' | 'broadcast' | 'msg' | 'cmd'
   | 'world_create' | 'world_clone' | 'world_load' | 'world_unload' | 'world_tp' | 'world_spawn' | 'world_setting' | 'world_delete' | 'worldedit'
   | 'structure_place' | 'structure_remove' | 'structure_clear'
-  | 'entity_spawn'
+  | 'entity_spawn' | 'entity_remove' | 'entity_clear'
   | 'terminal_cmd'
   | 'create_user' | 'delete_user' | 'set_role'
   | 'schedule_create' | 'schedule_update' | 'schedule_delete' | 'schedule_run'

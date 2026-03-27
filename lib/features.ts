@@ -35,10 +35,10 @@ export const FEATURE_DEFS = [
 
   { key: 'enable_world_management', label: 'World Management', desc: 'Allow create, clone, load, unload, and environment actions', category: 'worlds' },
   { key: 'enable_structure_place', label: 'Structure Placement', desc: 'Allow opening placement flows and placing structures', category: 'worlds' },
-  { key: 'enable_structure_remove', label: 'Structure Removal', desc: 'Allow removing tracked placed structures', category: 'worlds' },
+  { key: 'enable_structure_remove', label: 'Structure Removal', desc: 'Allow removing and bulk-clearing tracked placed structures', category: 'worlds' },
   { key: 'enable_structure_upload', label: 'Structure Uploads', desc: 'Allow uploading schematics and structure files', category: 'worlds' },
   { key: 'enable_entity_spawn', label: 'Entity Spawning', desc: 'Allow opening entity spawn flows and spawning entities', category: 'worlds' },
-  { key: 'enable_entity_live_tools', label: 'Live Entity Tools', desc: 'Allow live entity targeting and actor-based tools', category: 'worlds' },
+  { key: 'enable_entity_live_tools', label: 'Live Entity Tools', desc: 'Allow live entity targeting, deletion, and actor-based tools', category: 'worlds' },
   { key: 'enable_entity_presets', label: 'Entity Presets', desc: 'Allow creating, uploading, and editing entity presets', category: 'worlds' },
   { key: 'enable_randomized_placement', label: 'Randomized Placement', desc: 'Allow safer randomized coordinates in structure/entity placement modals', category: 'worlds' },
   { key: 'enable_placement_validation', label: 'Placement Validation', desc: 'Validate coordinate placement before entity/structure placement', category: 'worlds' },

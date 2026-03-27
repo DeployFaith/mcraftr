@@ -127,6 +127,11 @@ type LiveEntityEntry = {
   health?: number | null
 }
 
+type LiveEntityLoadSummary = {
+  totalEntities: number
+  warning: string | null
+}
+
 const WORLDS_COLLAPSIBLE_GROUP = 'worlds-tab'
 const WORLD_CATEGORY_PAGE_SIZE = 8
 const WORLD_GAMERULE_LABELS: Record<string, string> = {
@@ -444,6 +449,7 @@ export default function WorldsSection({
   const [placements, setPlacements] = useState<PlacementEntry[]>([])
   const [worldDetails, setWorldDetails] = useState<Record<string, WorldSettingsEntry>>({})
   const [liveEntities, setLiveEntities] = useState<LiveEntityEntry[]>([])
+  const [liveEntitySummary, setLiveEntitySummary] = useState<LiveEntityLoadSummary>({ totalEntities: 0, warning: null })
   const [playerWorlds, setPlayerWorlds] = useState<Record<string, string | null>>({})
   const [structureScan, setStructureScan] = useState<StructureScanData | null>(null)
   const [entityScan, setEntityScan] = useState<EntityScanData | null>(null)
@@ -501,6 +507,8 @@ export default function WorldsSection({
   const [entityCategoryPage, setEntityCategoryPage] = useState(0)
   const [liveEntityWorldFilter, setLiveEntityWorldFilter] = useState('')
   const [worldCommandBusy, setWorldCommandBusy] = useState<string | null>(null)
+  const [liveEntityActionBusy, setLiveEntityActionBusy] = useState<string | null>(null)
+  const [placementActionBusy, setPlacementActionBusy] = useState<string | null>(null)
 
   const [placementWorldFilter, setPlacementWorldFilter] = useState('')
   const [placementMode, setPlacementMode] = useState<LocationMode>('coords')
@@ -622,9 +630,21 @@ export default function WorldsSection({
       try {
         const res = await fetch('/api/minecraft/entities/live', { cache: 'no-store' })
         const data = await res.json()
-        setLiveEntities(data.ok ? (data.entities ?? []) : [])
+        if (data.ok) {
+          const entities = Array.isArray(data.entities) ? data.entities : []
+          const totalEntities = typeof data.totalEntities === 'number' ? data.totalEntities : entities.length
+          setLiveEntities(entities)
+          setLiveEntitySummary({
+            totalEntities,
+            warning: typeof data.warning === 'string' && data.warning.trim() ? data.warning.trim() : null,
+          })
+        } else {
+          setLiveEntities([])
+          setLiveEntitySummary({ totalEntities: 0, warning: data.error || null })
+        }
       } catch {
         setLiveEntities([])
+        setLiveEntitySummary({ totalEntities: 0, warning: null })
       }
     }
 
@@ -830,6 +850,8 @@ export default function WorldsSection({
   const visibleLiveEntities = useMemo(() => {
     return liveEntities.filter(entry => !liveEntityWorldFilter || entry.world === liveEntityWorldFilter)
   }, [liveEntities, liveEntityWorldFilter])
+
+  const isLiveEntityListLimited = liveEntitySummary.totalEntities > liveEntities.length
 
   const structureCategoryPageCount = Math.max(1, Math.ceil(groupedStructures.length / WORLD_CATEGORY_PAGE_SIZE))
   const entityCategoryPageCount = Math.max(1, Math.ceil(groupedNativeEntities.length / WORLD_CATEGORY_PAGE_SIZE))
@@ -1037,6 +1059,33 @@ export default function WorldsSection({
     }
   }
 
+  const handleClearTrackedStructures = async (scope: 'world' | 'all') => {
+    const world = scope === 'world' ? placementWorldFilter.trim() : ''
+    if (scope === 'world' && !world) {
+      setError('Choose a world filter before clearing tracked structures.')
+      return
+    }
+    const label = scope === 'world' ? `tracked structures in ${world}` : 'all tracked structures'
+    if (typeof window !== 'undefined' && !window.confirm(`Remove ${label}? This will delete every tracked placement that Mcraftr can identify in that scope.`)) {
+      return
+    }
+
+    setPlacementActionBusy(scope)
+    try {
+      const data = await postJson('/api/minecraft/structures/placements/clear', { world: world || null })
+      setStatus(
+        data.warning
+          ? `Removed ${data.removedCount} tracked structure placement(s). ${data.warning}`
+          : `Removed ${data.removedCount} tracked structure placement(s).`,
+      )
+      await loadData(false)
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Failed to clear tracked structures')
+    } finally {
+      setPlacementActionBusy(null)
+    }
+  }
+
   const handleFindPlacements = async () => {
     try {
       let world = placementWorldFilter
@@ -1117,6 +1166,64 @@ export default function WorldsSection({
       setError(nextError instanceof Error ? nextError.message : 'Failed to spawn entity')
     } finally {
       setEntityBusy(false)
+    }
+  }
+
+  const handleRemoveLiveEntity = async (entry: LiveEntityEntry) => {
+    if (typeof window !== 'undefined' && !window.confirm(`Remove ${entry.label} from ${entry.world}?`)) {
+      return
+    }
+    setLiveEntityActionBusy(entry.uuid)
+    try {
+      await postJson('/api/minecraft/entities/remove', {
+        uuid: entry.uuid,
+        label: entry.label,
+        world: entry.world,
+      })
+      setStatus(`Removed ${entry.label} from ${entry.world}.`)
+      await loadData(false)
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Failed to remove live entity')
+    } finally {
+      setLiveEntityActionBusy(null)
+    }
+  }
+
+  const handleClearLiveEntities = async (scope: 'world' | 'all') => {
+    const entries = scope === 'world' ? visibleLiveEntities : liveEntities
+    const scopeLabel = scope === 'world'
+      ? (liveEntityWorldFilter ? `${liveEntityWorldFilter}` : 'the selected world')
+      : 'all loaded worlds'
+
+    if (entries.length === 0) {
+      setError(scope === 'world' ? 'No listed entities match the current world filter.' : 'No listed live entities are available to remove.')
+      return
+    }
+
+    const limitedNotice = isLiveEntityListLimited || liveEntitySummary.warning
+      ? ' Only the entities currently listed in Mcraftr will be removed.'
+      : ''
+
+    if (typeof window !== 'undefined' && !window.confirm(`Remove ${entries.length} listed live entities from ${scopeLabel}?${limitedNotice}`)) {
+      return
+    }
+
+    setLiveEntityActionBusy(scope)
+    try {
+      const data = await postJson('/api/minecraft/entities/clear', {
+        world: scope === 'world' ? liveEntityWorldFilter || null : null,
+        uuids: entries.map(entry => entry.uuid),
+      })
+      setStatus(
+        data.warning
+          ? `Removed ${data.removedCount} listed live entit${data.removedCount === 1 ? 'y' : 'ies'}. ${data.warning}`
+          : `Removed ${data.removedCount} listed live entit${data.removedCount === 1 ? 'y' : 'ies'}.`,
+      )
+      await loadData(false)
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Failed to clear listed live entities')
+    } finally {
+      setLiveEntityActionBusy(null)
     }
   }
 
@@ -1946,7 +2053,30 @@ export default function WorldsSection({
       {canStructureCatalog && (
         <CollapsibleCard title="PLACED STRUCTURES" storageKey="worlds:placements" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
           <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[11px] font-mono text-[var(--text-dim)]">
-            This section tracks structure placements Mcraftr can reliably identify. Native worldgen structure instance discovery is not yet available from the current bridge surface.
+            This section tracks structure placements Mcraftr can reliably identify. Native worldgen structure instance discovery is not yet available from the current bridge surface, so bulk actions here apply to tracked placements only.
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-[12px] font-mono text-[var(--text-dim)]">
+              {placementWorldFilter ? `${visiblePlacements.length} tracked placement(s) shown in ${placementWorldFilter}` : `${placements.length} tracked placement(s) loaded`}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void handleClearTrackedStructures('world')}
+                disabled={!canStructureRemove || !placementWorldFilter || placementActionBusy !== null}
+                className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] disabled:opacity-40 hover:border-[var(--accent-mid)]"
+              >
+                {placementActionBusy === 'world' ? 'Clearing…' : 'Clear Tracked World'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleClearTrackedStructures('all')}
+                disabled={!canStructureRemove || placementActionBusy !== null}
+                className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] disabled:opacity-40 hover:border-[var(--accent-mid)]"
+              >
+                {placementActionBusy === 'all' ? 'Clearing…' : 'Clear All Tracked'}
+              </button>
+            </div>
           </div>
           <div className="flex gap-2">
             {(['coords', 'player'] as const).map(mode => (
@@ -2201,17 +2331,46 @@ export default function WorldsSection({
         <CollapsibleCard title="PLACED ENTITIES" storageKey="worlds:entities-live" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-[12px] font-mono text-[var(--text-dim)]">
-              {liveEntities.length} live entities detected across loaded worlds
+              {isLiveEntityListLimited
+                ? `${liveEntities.length} of ${liveEntitySummary.totalEntities} live entities loaded across loaded worlds`
+                : `${liveEntities.length} live entities detected across loaded worlds`}
             </div>
-            <select
-              value={liveEntityWorldFilter}
-              onChange={event => setLiveEntityWorldFilter(event.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--bg2)] px-3 py-2 text-[12px] font-mono text-[var(--text)]"
-            >
-              <option value="">All worlds</option>
-              {worldNames.map(world => <option key={world} value={world}>{world}</option>)}
-            </select>
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={liveEntityWorldFilter}
+                onChange={event => setLiveEntityWorldFilter(event.target.value)}
+                className="rounded-lg border border-[var(--border)] bg-[var(--bg2)] px-3 py-2 text-[12px] font-mono text-[var(--text)]"
+              >
+                <option value="">All worlds</option>
+                {worldNames.map(world => <option key={world} value={world}>{world}</option>)}
+              </select>
+              <button
+                type="button"
+                onClick={() => void handleClearLiveEntities('world')}
+                disabled={!canEntityLiveTools || !liveEntityWorldFilter || visibleLiveEntities.length === 0 || liveEntityActionBusy !== null}
+                className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] disabled:opacity-40 hover:border-[var(--accent-mid)]"
+              >
+                {liveEntityActionBusy === 'world'
+                  ? 'Removing…'
+                  : (isLiveEntityListLimited || liveEntitySummary.warning ? 'Clear Listed World' : 'Clear World')}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleClearLiveEntities('all')}
+                disabled={!canEntityLiveTools || liveEntities.length === 0 || liveEntityActionBusy !== null}
+                className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] disabled:opacity-40 hover:border-[var(--accent-mid)]"
+              >
+                {liveEntityActionBusy === 'all'
+                  ? 'Removing…'
+                  : (isLiveEntityListLimited || liveEntitySummary.warning ? 'Clear Listed Worlds' : 'Clear All Worlds')}
+              </button>
+            </div>
           </div>
+          {liveEntitySummary.warning && (
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[11px] font-mono text-[var(--text-dim)]">
+              {liveEntitySummary.warning}
+            </div>
+          )}
           <div className="space-y-3">
             {visibleLiveEntities.map(entry => (
               <CollapsibleCard
@@ -2235,6 +2394,16 @@ export default function WorldsSection({
                   <div>Location: <span className="text-[var(--text)]">{entry.location ? `${Math.round(entry.location.x)}, ${Math.round(entry.location.y)}, ${Math.round(entry.location.z)}` : '—'}</span></div>
                   <div>Health: <span className="text-[var(--text)]">{entry.health ?? '—'}</span></div>
                   <div>Name: <span className="text-[var(--text)]">{entry.customName ?? '—'}</span></div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleRemoveLiveEntity(entry)}
+                    disabled={!canEntityLiveTools || liveEntityActionBusy !== null}
+                    className="rounded-lg border border-[var(--border)] px-3 py-2 text-[11px] font-mono text-[var(--text-dim)] disabled:opacity-40 hover:border-[var(--accent-mid)]"
+                  >
+                    {liveEntityActionBusy === entry.uuid ? 'Removing…' : 'Delete Entity'}
+                  </button>
                 </div>
               </CollapsibleCard>
             ))}
