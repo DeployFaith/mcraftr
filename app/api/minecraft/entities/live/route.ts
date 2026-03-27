@@ -30,6 +30,9 @@ type LiveEntityResponse = {
     gravity?: boolean
     health?: number | null
   }>
+  totalEntities?: number
+  truncated?: boolean
+  limit?: number
   error?: string
 }
 
@@ -48,6 +51,17 @@ function normalizeLiveEntities(payload: LiveEntityResponse | undefined | null) {
   return Array.isArray(payload?.entities) ? payload.entities : []
 }
 
+function resolveLiveEntityTotal(payload: LiveEntityResponse | undefined | null) {
+  if (typeof payload?.totalEntities === 'number' && Number.isFinite(payload.totalEntities)) {
+    return Math.max(0, Math.floor(payload.totalEntities))
+  }
+  return normalizeLiveEntities(payload).length
+}
+
+function isLiveEntityPayloadTruncated(payload: LiveEntityResponse | undefined | null) {
+  return payload?.truncated === true
+}
+
 async function loadLiveEntitiesByWorld(req: NextRequest) {
   const worlds = await runBridgeJson<WorldsListResponse>(req, 'worlds list')
   if (!worlds.ok || worlds.data.ok === false) {
@@ -59,7 +73,7 @@ async function loadLiveEntitiesByWorld(req: NextRequest) {
     .map(world => world.name.trim())
 
   if (loadedWorlds.length === 0) {
-    return { entities: [], partial: false }
+    return { entities: [], totalEntities: 0, truncated: false, partial: false }
   }
 
   const results = await Promise.all(loadedWorlds.map(async world => ({
@@ -72,6 +86,14 @@ async function loadLiveEntitiesByWorld(req: NextRequest) {
       ? normalizeLiveEntities(entry.result.data)
       : []
   ))
+  const totalEntities = results.reduce((sum, entry) => (
+    entry.result.ok && entry.result.data.ok !== false
+      ? sum + resolveLiveEntityTotal(entry.result.data)
+      : sum
+  ), 0)
+  const truncated = results.some(entry => (
+    entry.result.ok && entry.result.data.ok !== false && isLiveEntityPayloadTruncated(entry.result.data)
+  ))
 
   const successfulWorlds = results.filter(entry => entry.result.ok && entry.result.data.ok !== false).length
 
@@ -81,6 +103,8 @@ async function loadLiveEntitiesByWorld(req: NextRequest) {
 
   return {
     entities,
+    totalEntities,
+    truncated,
     partial: successfulWorlds < loadedWorlds.length,
   }
 }
@@ -105,15 +129,17 @@ export async function GET(req: NextRequest) {
       const fallback = await loadLiveEntitiesByWorld(req)
       if (fallback) {
         const limitedEntities = fallback.entities.slice(0, MAX_LIVE_ENTITIES)
+        const totalEntities = Math.max(fallback.totalEntities, fallback.entities.length)
+        const responseTruncated = fallback.truncated || totalEntities > limitedEntities.length
         return Response.json({
           ok: true,
           entities: limitedEntities,
-          totalEntities: fallback.entities.length,
-          truncated: fallback.entities.length > limitedEntities.length,
+          totalEntities,
+          truncated: responseTruncated,
           warning: fallback.partial
             ? 'Some worlds returned too much Relay data, so the live entity picker is showing the worlds that responded successfully.'
-            : (fallback.entities.length > limitedEntities.length
-                ? `Showing the first ${limitedEntities.length} live entities out of ${fallback.entities.length}.`
+            : (responseTruncated
+                ? `Showing the first ${limitedEntities.length} live entities out of ${totalEntities}.`
                 : null),
           warningCode: fallback.partial ? 'bridge_json_parse_failed' : null,
         })
@@ -135,16 +161,18 @@ export async function GET(req: NextRequest) {
     }, { status: 502 })
   }
 
-  const entities = Array.isArray(bridge.data.entities) ? bridge.data.entities : []
+  const entities = normalizeLiveEntities(bridge.data)
+  const totalEntities = Math.max(resolveLiveEntityTotal(bridge.data), entities.length)
   const limitedEntities = entities.slice(0, MAX_LIVE_ENTITIES)
+  const truncated = isLiveEntityPayloadTruncated(bridge.data) || totalEntities > limitedEntities.length
 
   return Response.json({
     ok: true,
     entities: limitedEntities,
-    totalEntities: entities.length,
-    truncated: entities.length > limitedEntities.length,
-    warning: entities.length > limitedEntities.length
-      ? `Showing the first ${limitedEntities.length} live entities out of ${entities.length}.`
+    totalEntities,
+    truncated,
+    warning: truncated
+      ? `Showing the first ${limitedEntities.length} live entities out of ${totalEntities}.`
       : null,
   })
 }

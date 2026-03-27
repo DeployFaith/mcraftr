@@ -52,6 +52,11 @@ type LiveEntity = {
   location?: { x: number; y: number; z: number } | null
 }
 
+type PlayerLocationResponse = {
+  ok: boolean
+  world?: string | null
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const GAMEMODE_CMDS: { id: string; Icon: LucideIcon; label: string }[] = [
@@ -443,6 +448,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
   const [liveEntities, setLiveEntities] = useState<LiveEntity[]>([])
   const [liveEntitiesLoading, setLiveEntitiesLoading] = useState(false)
   const [liveEntitiesWarning, setLiveEntitiesWarning] = useState<string | null>(null)
+  const [liveEntityWorld, setLiveEntityWorld] = useState<string | null>(null)
   const [entitySearch, setEntitySearch] = useState('')
   const [entityToPlayerId, setEntityToPlayerId] = useState('')
   const [playerToEntityId, setPlayerToEntityId] = useState('')
@@ -499,27 +505,51 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
       setLiveEntities([])
       setLiveEntitiesLoading(false)
       setLiveEntitiesWarning(null)
+      setLiveEntityWorld(null)
+      return
+    }
+    if (!selectedPlayer) {
+      setLiveEntities([])
+      setLiveEntitiesLoading(false)
+      setLiveEntitiesWarning('Choose an active player to load live entities from that player\'s current world.')
+      setLiveEntityWorld(null)
       return
     }
     setLiveEntitiesLoading(true)
     try {
-      const response = await fetch('/api/minecraft/entities/live')
+      const locationResponse = await fetch(`/api/minecraft/player-location?player=${encodeURIComponent(selectedPlayer)}`, { cache: 'no-store' })
+      const locationPayload = await locationResponse.json() as PlayerLocationResponse
+      const world = typeof locationPayload.world === 'string' && locationPayload.world.trim()
+        ? locationPayload.world.trim()
+        : null
+
+      if (!locationPayload.ok || !world) {
+        setLiveEntities([])
+        setLiveEntityWorld(null)
+        setLiveEntitiesWarning('Live entity targeting needs the selected player\'s current world, but Relay could not resolve it right now.')
+        return
+      }
+
+      const response = await fetch(`/api/minecraft/entities/live?world=${encodeURIComponent(world)}`)
       const payload = await response.json()
       if (payload.ok) {
         setLiveEntities(Array.isArray(payload.entities) ? payload.entities as LiveEntity[] : [])
+        setLiveEntityWorld(world)
         setLiveEntitiesWarning(typeof payload.warning === 'string' ? payload.warning : null)
         if (payload.warning) addToast('error', payload.warning)
       } else {
         setLiveEntitiesWarning(null)
+        setLiveEntityWorld(world)
         addToast('error', payload.error || 'Failed to load live entities')
       }
     } catch (error) {
       setLiveEntitiesWarning(null)
+      setLiveEntityWorld(null)
       addToast('error', error instanceof Error ? error.message : 'Failed to load live entities')
     } finally {
       setLiveEntitiesLoading(false)
     }
-  }, [addToast, relayEnabled])
+  }, [addToast, relayEnabled, selectedPlayer])
 
   const teleportActor = async (payload: Record<string, unknown>, reset?: () => void) => {
     setActorTping(true)
@@ -1014,7 +1044,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
   const allSectionsDisabled = !canPlayerCmd && !canTeleport && !canKits && !canCatalog && !canInventory
   useEffect(() => {
     if (canTeleport && relayEnabled) {
-      loadLiveEntities()
+      void loadLiveEntities()
     } else if (!relayEnabled) {
       setLiveEntities([])
       setLiveEntitiesLoading(false)
@@ -1116,7 +1146,11 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
       <CollapsibleCard title="TELEPORT" storageKey="actions:teleport" groupKey={ACTIONS_COLLAPSIBLE_GROUP} bodyClassName="p-4 space-y-4">
         <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-3 text-[12px] font-mono text-[var(--text-dim)]">
           {relayEnabled
-            ? (liveEntitiesLoading ? 'Loading live entities…' : `${liveEntities.length} live entit${liveEntities.length === 1 ? 'y' : 'ies'} available for actor-based teleport controls.`)
+            ? (liveEntitiesLoading
+                ? 'Loading live entities…'
+                : liveEntityWorld
+                    ? `${liveEntities.length} live entit${liveEntities.length === 1 ? 'y' : 'ies'} available in ${liveEntityWorld} for actor-based teleport controls.`
+                    : `${liveEntities.length} live entit${liveEntities.length === 1 ? 'y' : 'ies'} available for actor-based teleport controls.`)
             : 'Player teleport stays available with raw RCON. Relay unlocks live entity targeting and actor-based teleport controls.'}
         </div>
         {relayEnabled && liveEntitiesWarning && (
