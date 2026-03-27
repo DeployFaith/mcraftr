@@ -15,6 +15,12 @@ type BridgeResponse = {
   error?: string
 }
 
+type RelayStructuresResponse = {
+  ok: boolean
+  items?: Array<{ id?: string }>
+  error?: string
+}
+
 async function removeTrackedFallback(req: NextRequest, placementId: string, serverId: string) {
   const placement = getStructurePlacementById(placementId, serverId)
   if (!placement || placement.removed_at) return null
@@ -29,6 +35,20 @@ async function removeTrackedFallback(req: NextRequest, placementId: string, serv
 
   markStructurePlacementRemoved(placement.id, serverId)
   return { placement, world: bridge.data.world ?? placement.world }
+}
+
+async function verifyStructureRemoved(req: NextRequest, placementId: string, serverId: string, world: string | null, origin?: { x: number; y: number; z: number } | null) {
+  const tracked = getStructurePlacementById(placementId, serverId)
+  if (tracked && !tracked.removed_at) return false
+  if (!world) return true
+  const radius = 4
+  const command = origin
+    ? `structures list ${world} radius ${origin.x} ${origin.y} ${origin.z} ${radius}`
+    : `structures list ${world}`
+  const bridge = await runBridgeJson<RelayStructuresResponse>(req, command)
+  if (!bridge.ok || bridge.data.ok === false) return true
+  const items = Array.isArray(bridge.data.items) ? bridge.data.items : []
+  return !items.some(item => item.id === placementId)
 }
 
 async function removePlacementFromPayload(req: NextRequest, payload: {
@@ -87,9 +107,37 @@ export async function POST(req: NextRequest) {
 
   const bridge = await runBridgeJson<BridgeResponse>(req, `structures remove ${placementId}`)
   let resolvedWorld: string | null = null
+  const origin = typeof body.originX === 'number' && typeof body.originY === 'number' && typeof body.originZ === 'number'
+    ? { x: body.originX, y: body.originY, z: body.originZ }
+    : null
 
   if (bridge.ok && bridge.data.ok !== false) {
     resolvedWorld = bridge.data.world ?? (typeof world === 'string' ? world : null)
+    markStructurePlacementRemoved(placementId, serverId)
+    const verified = await verifyStructureRemoved(req, placementId, serverId, resolvedWorld, origin)
+    if (!verified) {
+      const trackedFallback = await removeTrackedFallback(req, placementId, serverId)
+      const payloadFallback = trackedFallback ?? await removePlacementFromPayload(req, {
+        sourceKind: typeof body.sourceKind === 'string' ? body.sourceKind : null,
+        bridgeRef: typeof body.bridgeRef === 'string' && body.bridgeRef.trim() ? body.bridgeRef.trim() : null,
+        world: typeof world === 'string' ? world.trim() : null,
+        originX: typeof body.originX === 'number' ? body.originX : null,
+        originY: typeof body.originY === 'number' ? body.originY : null,
+        originZ: typeof body.originZ === 'number' ? body.originZ : null,
+        minX: typeof body.minX === 'number' ? body.minX : null,
+        minY: typeof body.minY === 'number' ? body.minY : null,
+        minZ: typeof body.minZ === 'number' ? body.minZ : null,
+        maxX: typeof body.maxX === 'number' ? body.maxX : null,
+        maxY: typeof body.maxY === 'number' ? body.maxY : null,
+        maxZ: typeof body.maxZ === 'number' ? body.maxZ : null,
+        rotation: typeof body.rotation === 'number' ? body.rotation : null,
+        includeAir: body.includeAir === true || body.includeAir === 1,
+      })
+      if (!payloadFallback) {
+        return Response.json({ ok: false, error: 'Structure removal command completed, but the placement is still present.' }, { status: 409 })
+      }
+      resolvedWorld = payloadFallback.world
+    }
   } else {
     const fallback = await removeTrackedFallback(req, placementId, serverId)
     const payloadFallback = fallback ?? await removePlacementFromPayload(req, {
@@ -115,6 +163,7 @@ export async function POST(req: NextRequest) {
       )
     }
     resolvedWorld = payloadFallback.world
+    markStructurePlacementRemoved(placementId, serverId)
   }
 
   const userId = await getSessionUserId(req)
