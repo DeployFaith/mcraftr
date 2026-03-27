@@ -100,6 +100,19 @@ type PlacementEntry = {
   created_at: number
 }
 
+type StructureIndexingWorld = {
+  world: string
+  phase: string
+  processed: number
+  total: number
+}
+
+type StructureLoadSummary = {
+  total: number
+  warning: string | null
+  indexing: StructureIndexingWorld[]
+}
+
 type WorldSettingsEntry = WorldEntry & {
   gamerules?: Record<string, boolean | null> | null
 }
@@ -447,6 +460,7 @@ export default function WorldsSection({
   const [structures, setStructures] = useState<StructureCatalogEntry[]>([])
   const [entities, setEntities] = useState<EntityCatalogEntry[]>(DEFAULT_ENTITY_CATALOG)
   const [placements, setPlacements] = useState<PlacementEntry[]>([])
+  const [structureSummary, setStructureSummary] = useState<StructureLoadSummary>({ total: 0, warning: null, indexing: [] })
   const [worldDetails, setWorldDetails] = useState<Record<string, WorldSettingsEntry>>({})
   const [liveEntities, setLiveEntities] = useState<LiveEntityEntry[]>([])
   const [liveEntitySummary, setLiveEntitySummary] = useState<LiveEntityLoadSummary>({ totalEntities: 0, warning: null })
@@ -652,9 +666,36 @@ export default function WorldsSection({
       try {
         const res = await fetch('/api/minecraft/structures/placements', { cache: 'no-store' })
         const data = await res.json()
-        setPlacements(data.ok ? data.placements ?? [] : [])
+        if (data.ok) {
+          const placements = Array.isArray(data.placements) ? data.placements : []
+          const indexing = data.indexing && typeof data.indexing === 'object' && Array.isArray((data.indexing as { worlds?: unknown[] }).worlds)
+            ? (data.indexing as { worlds: unknown[] }).worlds
+                .map(entry => {
+                  if (!entry || typeof entry !== 'object') return null
+                  const row = entry as Record<string, unknown>
+                  if (typeof row.world !== 'string' || !row.world.trim()) return null
+                  return {
+                    world: row.world.trim(),
+                    phase: typeof row.phase === 'string' && row.phase.trim() ? row.phase.trim() : 'idle',
+                    processed: typeof row.processed === 'number' ? row.processed : 0,
+                    total: typeof row.total === 'number' ? row.total : 0,
+                  } satisfies StructureIndexingWorld
+                })
+                .filter((entry): entry is StructureIndexingWorld => !!entry)
+            : []
+          setPlacements(placements)
+          setStructureSummary({
+            total: typeof data.total === 'number' ? data.total : placements.length,
+            warning: typeof data.warning === 'string' && data.warning.trim() ? data.warning.trim() : null,
+            indexing,
+          })
+        } else {
+          setPlacements([])
+          setStructureSummary({ total: 0, warning: data.error || null, indexing: [] })
+        }
       } catch {
         setPlacements([])
+        setStructureSummary({ total: 0, warning: null, indexing: [] })
       }
     }
 
@@ -1047,7 +1088,11 @@ export default function WorldsSection({
     if (!placementToRemove) return
     setStructureBusy(true)
     try {
-      await postJson('/api/minecraft/structures/remove', { placementId: placementToRemove.id })
+      await postJson('/api/minecraft/structures/remove', {
+        placementId: placementToRemove.id,
+        structureLabel: placementToRemove.structure_label,
+        world: placementToRemove.world,
+      })
       setStatus(`Removed ${placementToRemove.structure_label}.`)
       setPlacementToRemove(null)
       setSelectedStructure(null)
@@ -1059,28 +1104,69 @@ export default function WorldsSection({
     }
   }
 
-  const handleClearTrackedStructures = async (scope: 'world' | 'all') => {
-    const world = scope === 'world' ? placementWorldFilter.trim() : ''
-    if (scope === 'world' && !world) {
-      setError('Choose a world filter before clearing tracked structures.')
+  const handleClearStructures = async (mode: 'listed' | 'world' | 'all' | 'radius', radius?: 10 | 25 | 50) => {
+    const listedEntries = placementWorldFilter ? visiblePlacements : placements
+    const world = placementWorldFilter.trim() || null
+
+    if (mode === 'listed' && listedEntries.length === 0) {
+      setError('No listed structures are available to remove.')
       return
     }
-    const label = scope === 'world' ? `tracked structures in ${world}` : 'all tracked structures'
-    if (typeof window !== 'undefined' && !window.confirm(`Remove ${label}? This will delete every tracked placement that Mcraftr can identify in that scope.`)) {
+    if (mode === 'world' && !world) {
+      setError('Choose a world filter before clearing a world of structures.')
+      return
+    }
+    if (mode === 'radius' && !selectedPlayer) {
+      setError('Pick an active player first.')
       return
     }
 
-    setPlacementActionBusy(scope)
+    const confirmLabel =
+      mode === 'listed'
+        ? `${listedEntries.length} listed structure${listedEntries.length === 1 ? '' : 's'}`
+        : mode === 'world'
+          ? `every indexed structure in ${world}`
+          : mode === 'all'
+            ? 'every indexed structure in all worlds'
+            : `every indexed structure within ${radius} blocks of ${selectedPlayer}`
+    if (typeof window !== 'undefined' && !window.confirm(`Remove ${confirmLabel}?`)) {
+      return
+    }
+
+    const busyKey = mode === 'radius' ? `radius:${radius}` : mode
+    setPlacementActionBusy(busyKey)
     try {
-      const data = await postJson('/api/minecraft/structures/placements/clear', { world: world || null })
+      let data: { removedCount: number; warning?: string | null }
+      if (mode === 'listed') {
+        data = await postJson('/api/minecraft/structures/placements/clear', {
+          mode: 'listed',
+          world,
+          structureIds: listedEntries.map(entry => entry.id),
+        })
+      } else if (mode === 'radius') {
+        const playerTarget = await resolvePlayerTarget(selectedPlayer)
+        data = await postJson('/api/minecraft/structures/placements/clear', {
+          mode: 'radius',
+          world: playerTarget.world,
+          x: playerTarget.location.x,
+          y: playerTarget.location.y,
+          z: playerTarget.location.z,
+          radius,
+        })
+      } else {
+        data = await postJson('/api/minecraft/structures/placements/clear', {
+          mode,
+          world,
+        })
+      }
       setStatus(
         data.warning
-          ? `Removed ${data.removedCount} tracked structure placement(s). ${data.warning}`
-          : `Removed ${data.removedCount} tracked structure placement(s).`,
+          ? `Removed ${data.removedCount} structure${data.removedCount === 1 ? '' : 's'}. ${data.warning}`
+          : `Removed ${data.removedCount} structure${data.removedCount === 1 ? '' : 's'}.`,
       )
       await loadData(false)
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'Failed to clear tracked structures')
+      setError(nextError instanceof Error ? nextError.message : 'Failed to clear structures')
     } finally {
       setPlacementActionBusy(null)
     }
@@ -1121,7 +1207,8 @@ export default function WorldsSection({
       const data = await res.json()
       if (!data.ok) throw new Error(data.error || 'Failed to locate placements')
       setPlacements(data.placements ?? [])
-      setStatus((data.placements ?? []).length > 0 ? `Found ${(data.placements ?? []).length} structure placement(s).` : 'No tracked structures found at that location.')
+      setStructureSummary(current => ({ ...current, total: typeof data.total === 'number' ? data.total : (data.placements ?? []).length }))
+      setStatus((data.placements ?? []).length > 0 ? `Found ${(data.placements ?? []).length} structure(s).` : 'No indexed structures found at that location.')
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Failed to find structures')
     }
@@ -1189,39 +1276,73 @@ export default function WorldsSection({
     }
   }
 
-  const handleClearLiveEntities = async (scope: 'world' | 'all') => {
-    const entries = scope === 'world' ? visibleLiveEntities : liveEntities
-    const scopeLabel = scope === 'world'
-      ? (liveEntityWorldFilter ? `${liveEntityWorldFilter}` : 'the selected world')
-      : 'all loaded worlds'
+  const handleClearLiveEntities = async (mode: 'listed' | 'world' | 'all' | 'radius', radius?: 10 | 25 | 50) => {
+    const entries = liveEntityWorldFilter ? visibleLiveEntities : liveEntities
+    const world = liveEntityWorldFilter.trim() || null
 
-    if (entries.length === 0) {
-      setError(scope === 'world' ? 'No listed entities match the current world filter.' : 'No listed live entities are available to remove.')
+    if (mode === 'listed' && entries.length === 0) {
+      setError('No listed live entities are available to remove.')
+      return
+    }
+    if (mode === 'world' && !world) {
+      setError('Choose a world filter before clearing a world of entities.')
+      return
+    }
+    if (mode === 'radius' && !selectedPlayer) {
+      setError('Pick an active player first.')
       return
     }
 
-    const limitedNotice = isLiveEntityListLimited || liveEntitySummary.warning
-      ? ' Only the entities currently listed in Mcraftr will be removed.'
+    const limitedNotice = mode === 'listed' && (isLiveEntityListLimited || liveEntitySummary.warning)
+      ? ' Only the currently listed entities will be removed.'
       : ''
+    const confirmLabel =
+      mode === 'listed'
+        ? `${entries.length} listed live entit${entries.length === 1 ? 'y' : 'ies'}`
+        : mode === 'world'
+          ? `every non-player entity in ${world}`
+          : mode === 'all'
+            ? 'every non-player entity in all loaded worlds'
+            : `every non-player entity within ${radius} blocks of ${selectedPlayer}`
 
-    if (typeof window !== 'undefined' && !window.confirm(`Remove ${entries.length} listed live entities from ${scopeLabel}?${limitedNotice}`)) {
+    if (typeof window !== 'undefined' && !window.confirm(`Remove ${confirmLabel}?${limitedNotice}`)) {
       return
     }
 
-    setLiveEntityActionBusy(scope)
+    const busyKey = mode === 'radius' ? `radius:${radius}` : mode
+    setLiveEntityActionBusy(busyKey)
     try {
-      const data = await postJson('/api/minecraft/entities/clear', {
-        world: scope === 'world' ? liveEntityWorldFilter || null : null,
-        uuids: entries.map(entry => entry.uuid),
-      })
+      let data: { removedCount: number; warning?: string | null }
+      if (mode === 'listed') {
+        data = await postJson('/api/minecraft/entities/clear', {
+          mode: 'listed',
+          world,
+          uuids: entries.map(entry => entry.uuid),
+        })
+      } else if (mode === 'radius') {
+        const playerTarget = await resolvePlayerTarget(selectedPlayer)
+        data = await postJson('/api/minecraft/entities/clear', {
+          mode: 'radius',
+          world: playerTarget.world,
+          x: playerTarget.location.x,
+          y: playerTarget.location.y,
+          z: playerTarget.location.z,
+          radius,
+        })
+      } else {
+        data = await postJson('/api/minecraft/entities/clear', {
+          mode,
+          world,
+        })
+      }
       setStatus(
         data.warning
-          ? `Removed ${data.removedCount} listed live entit${data.removedCount === 1 ? 'y' : 'ies'}. ${data.warning}`
-          : `Removed ${data.removedCount} listed live entit${data.removedCount === 1 ? 'y' : 'ies'}.`,
+          ? `Removed ${data.removedCount} entit${data.removedCount === 1 ? 'y' : 'ies'}. ${data.warning}`
+          : `Removed ${data.removedCount} entit${data.removedCount === 1 ? 'y' : 'ies'}.`,
       )
       await loadData(false)
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'Failed to clear listed live entities')
+      setError(nextError instanceof Error ? nextError.message : 'Failed to clear live entities')
     } finally {
       setLiveEntityActionBusy(null)
     }
@@ -2051,32 +2172,67 @@ export default function WorldsSection({
       )}
 
       {canStructureCatalog && (
-        <CollapsibleCard title="PLACED STRUCTURES" storageKey="worlds:placements" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
+        <CollapsibleCard title="LIVE STRUCTURES" storageKey="worlds:placements" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
           <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[11px] font-mono text-[var(--text-dim)]">
-            This section tracks structure placements Mcraftr can reliably identify. Native worldgen structure instance discovery is not yet available from the current bridge surface, so bulk actions here apply to tracked placements only.
+            This section shows indexed structures the server can currently discover, including worldgen instances and tracked placed structures. Listed actions only touch what Mcraftr is currently showing; world, all-world, and radius actions use the server index directly.
           </div>
+          {structureSummary.warning && (
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[11px] font-mono text-[var(--text-dim)]">
+              {structureSummary.warning}
+            </div>
+          )}
+          {structureSummary.indexing.some(entry => entry.phase !== 'ready') && (
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[11px] font-mono text-[var(--text-dim)]">
+              {structureSummary.indexing
+                .filter(entry => entry.phase !== 'ready')
+                .map(entry => `${entry.world}: ${entry.phase}${entry.total > 0 ? ` ${entry.processed}/${entry.total}` : ''}`)
+                .join(' · ')}
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-[12px] font-mono text-[var(--text-dim)]">
-              {placementWorldFilter ? `${visiblePlacements.length} tracked placement(s) shown in ${placementWorldFilter}` : `${placements.length} tracked placement(s) loaded`}
+              {placementWorldFilter ? `${visiblePlacements.length} structure(s) shown in ${placementWorldFilter}` : `${placements.length} structure(s) loaded`}
             </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => void handleClearTrackedStructures('world')}
-                disabled={!canStructureRemove || !placementWorldFilter || placementActionBusy !== null}
+                onClick={() => void handleClearStructures('listed')}
+                disabled={!canStructureRemove || visiblePlacements.length === 0 || placementActionBusy !== null}
                 className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] disabled:opacity-40 hover:border-[var(--accent-mid)]"
               >
-                {placementActionBusy === 'world' ? 'Clearing…' : 'Clear Tracked World'}
+                {placementActionBusy === 'listed' ? 'Clearing…' : 'Clear Listed'}
               </button>
               <button
                 type="button"
-                onClick={() => void handleClearTrackedStructures('all')}
+                onClick={() => void handleClearStructures('world')}
+                disabled={!canStructureRemove || !placementWorldFilter || placementActionBusy !== null}
+                className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] disabled:opacity-40 hover:border-[var(--accent-mid)]"
+              >
+                {placementActionBusy === 'world' ? 'Clearing…' : 'Clear World'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleClearStructures('all')}
                 disabled={!canStructureRemove || placementActionBusy !== null}
                 className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] disabled:opacity-40 hover:border-[var(--accent-mid)]"
               >
-                {placementActionBusy === 'all' ? 'Clearing…' : 'Clear All Tracked'}
+                {placementActionBusy === 'all' ? 'Clearing…' : 'Clear All Worlds'}
               </button>
+              {([10, 25, 50] as const).map(radius => (
+                <button
+                  key={radius}
+                  type="button"
+                  onClick={() => void handleClearStructures('radius', radius)}
+                  disabled={!canStructureRemove || !selectedPlayer || placementActionBusy !== null}
+                  className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] disabled:opacity-40 hover:border-[var(--accent-mid)]"
+                >
+                  {placementActionBusy === `radius:${radius}` ? 'Clearing…' : `Clear ${radius}`}
+                </button>
+              ))}
             </div>
+          </div>
+          <div className="text-[11px] font-mono text-[var(--text-dim)]">
+            Radius clears use the active player’s live location. {selectedPlayer ? <span>Current active player: <span className="text-[var(--accent)]">{selectedPlayer}</span>.</span> : 'Pick an active player to use the 10 / 25 / 50 block clears.'}
           </div>
           <div className="flex gap-2">
             {(['coords', 'player'] as const).map(mode => (
@@ -2123,7 +2279,10 @@ export default function WorldsSection({
                 className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4 text-left transition-all hover:border-[var(--accent-mid)]"
                 disabled={!canStructureRemove}
               >
-                <div className="text-[13px] font-mono text-[var(--text)]">{entry.structure_label}</div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[13px] font-mono text-[var(--text)]">{entry.structure_label}</div>
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-dim)]">{entry.source_kind}</div>
+                </div>
                 <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">
                   {entry.world} · {entry.origin_x}, {entry.origin_y}, {entry.origin_z}
                 </div>
@@ -2131,7 +2290,7 @@ export default function WorldsSection({
             ))}
             {visiblePlacements.length === 0 && (
               <div className="rounded-2xl border border-dashed border-[var(--border)] px-4 py-10 text-center text-[13px] font-mono text-[var(--text-dim)]">
-                No tracked structure placements yet.
+                No indexed structures match the current filter.
               </div>
             )}
           </div>
@@ -2328,7 +2487,7 @@ export default function WorldsSection({
       )}
 
       {canEntityCatalog && (
-        <CollapsibleCard title="PLACED ENTITIES" storageKey="worlds:entities-live" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
+        <CollapsibleCard title="LIVE ENTITIES" storageKey="worlds:entities-live" bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-[12px] font-mono text-[var(--text-dim)]">
               {isLiveEntityListLimited
@@ -2346,24 +2505,39 @@ export default function WorldsSection({
               </select>
               <button
                 type="button"
-                onClick={() => void handleClearLiveEntities('world')}
-                disabled={!canEntityLiveTools || !liveEntityWorldFilter || visibleLiveEntities.length === 0 || liveEntityActionBusy !== null}
+                onClick={() => void handleClearLiveEntities('listed')}
+                disabled={!canEntityLiveTools || visibleLiveEntities.length === 0 || liveEntityActionBusy !== null}
                 className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] disabled:opacity-40 hover:border-[var(--accent-mid)]"
               >
-                {liveEntityActionBusy === 'world'
-                  ? 'Removing…'
-                  : (isLiveEntityListLimited || liveEntitySummary.warning ? 'Clear Listed World' : 'Clear World')}
+                {liveEntityActionBusy === 'listed' ? 'Removing…' : 'Clear Listed'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleClearLiveEntities('world')}
+                disabled={!canEntityLiveTools || !liveEntityWorldFilter || liveEntityActionBusy !== null}
+                className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] disabled:opacity-40 hover:border-[var(--accent-mid)]"
+              >
+                {liveEntityActionBusy === 'world' ? 'Removing…' : 'Clear World'}
               </button>
               <button
                 type="button"
                 onClick={() => void handleClearLiveEntities('all')}
-                disabled={!canEntityLiveTools || liveEntities.length === 0 || liveEntityActionBusy !== null}
+                disabled={!canEntityLiveTools || liveEntityActionBusy !== null}
                 className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] disabled:opacity-40 hover:border-[var(--accent-mid)]"
               >
-                {liveEntityActionBusy === 'all'
-                  ? 'Removing…'
-                  : (isLiveEntityListLimited || liveEntitySummary.warning ? 'Clear Listed Worlds' : 'Clear All Worlds')}
+                {liveEntityActionBusy === 'all' ? 'Removing…' : 'Clear All Worlds'}
               </button>
+              {([10, 25, 50] as const).map(radius => (
+                <button
+                  key={radius}
+                  type="button"
+                  onClick={() => void handleClearLiveEntities('radius', radius)}
+                  disabled={!canEntityLiveTools || !selectedPlayer || liveEntityActionBusy !== null}
+                  className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] disabled:opacity-40 hover:border-[var(--accent-mid)]"
+                >
+                  {liveEntityActionBusy === `radius:${radius}` ? 'Removing…' : `Clear ${radius}`}
+                </button>
+              ))}
             </div>
           </div>
           {liveEntitySummary.warning && (
@@ -2371,6 +2545,9 @@ export default function WorldsSection({
               {liveEntitySummary.warning}
             </div>
           )}
+          <div className="text-[11px] font-mono text-[var(--text-dim)]">
+            Radius clears use the active player’s live location. {selectedPlayer ? <span>Current active player: <span className="text-[var(--accent)]">{selectedPlayer}</span>.</span> : 'Pick an active player to use the 10 / 25 / 50 block clears.'}
+          </div>
           <div className="space-y-3">
             {visibleLiveEntities.map(entry => (
               <CollapsibleCard

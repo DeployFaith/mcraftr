@@ -1,9 +1,17 @@
 import { NextRequest } from 'next/server'
 import { logAudit } from '@/lib/audit'
 import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags, rconForRequest } from '@/lib/rcon'
+import { requireServerCapability } from '@/lib/server-capability'
+import { runBridgeJson } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+type BridgeResponse = {
+  ok: boolean
+  world?: string | null
+  error?: string
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -31,7 +39,10 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
   }
 
-  const body = await req.json().catch(() => ({}))
+  const capability = await requireServerCapability(req, 'full')
+  if (!capability.ok) return capability.response
+
+  const body = await req.json().catch(() => ({})) as Record<string, unknown>
   const uuid = typeof body.uuid === 'string' ? body.uuid.trim() : ''
   const world = typeof body.world === 'string' && body.world.trim() ? body.world.trim() : null
   const label = typeof body.label === 'string' && body.label.trim() ? body.label.trim() : uuid
@@ -40,13 +51,19 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: 'A valid entity UUID is required' }, { status: 400 })
   }
 
-  const result = await rconForRequest(req, `kill ${uuidToSelector(uuid)}`)
-  if (!result.ok) {
-    return Response.json({ ok: false, error: result.error || 'Failed to remove entity' }, { status: 502 })
+  const bridge = await runBridgeJson<BridgeResponse>(req, `entities remove ${uuid}`)
+  if (!bridge.ok || bridge.data.ok === false) {
+    const result = await rconForRequest(req, `kill ${uuidToSelector(uuid)}`)
+    if (!result.ok) {
+      return Response.json(
+        { ok: false, error: bridge.ok ? bridge.data.error || result.error || 'Failed to remove entity' : bridge.error || result.error || 'Failed to remove entity' },
+        { status: 502 },
+      )
+    }
   }
 
   const serverId = await getSessionActiveServerId(req)
   logAudit(userId, 'entity_remove', label, world ? `${world} · ${uuid}` : uuid, serverId)
 
-  return Response.json({ ok: true, uuid })
+  return Response.json({ ok: true, uuid, world: bridge.ok ? bridge.data.world ?? world : world })
 }

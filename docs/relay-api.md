@@ -54,9 +54,17 @@ Mcraftr currently expects Relay-backed support for command families like:
 - `worlds settings <world>` and related world actions
 - `player locate <player>`
 - `entities list`
-- `entities live`
+- `entities live [world]`
+- `entities remove <uuid>`
+- `entities clear <world|*>`
+- `entities clear radius <world> <x> <y> <z> <radius>`
 - `entities spawn ...`
+- `structures list [world|*>`
+- `structures index status`
 - `structures place ...`
+- `structures remove <structureInstanceId>`
+- `structures clear <world|*>`
+- `structures clear radius <world> <x> <y> <z> <radius>`
 - `worldedit info`
 - `commands catalog`
 - `commands complete64 <base64url-line>`
@@ -159,6 +167,122 @@ Guidance:
 - keep `commands catalog` lightweight
 - load richer command detail on demand
 - let Mcraftr infer wizard support from names and aliases unless a stable provider-side `wizardId` is cheap to maintain
+
+## Entity Contract
+
+`entities live` is for the live entity viewer, targeted deletes, and safe listed-only cleanup.
+
+Recommended response shape:
+
+```json
+{
+  "ok": true,
+  "entities": [
+    {
+      "uuid": "00000000-0000-0000-0000-000000000000",
+      "id": "zombie",
+      "label": "Zombie",
+      "category": "hostile",
+      "world": "world",
+      "location": { "x": 12, "y": 64, "z": -4 }
+    }
+  ],
+  "limit": 200,
+  "totalEntities": 431,
+  "truncated": true
+}
+```
+
+Guidance:
+
+- cap large live payloads on the Relay side before serialization
+- always return `totalEntities`
+- set `truncated: true` when the viewer is only seeing a safe subset
+- avoid failing the whole command when the world is simply busy or crowded
+
+`entities clear <world|*>` is the dangerous scope-wide clear.
+
+`entities clear radius <world> <x> <y> <z> <radius>` is the dangerous radius clear centered on the active player's live location at click time.
+
+Recommended destructive response fields:
+
+- `matchedCount`
+- `removedCount`
+- `failedCount`
+- optional `warning`
+
+## Structure Contract
+
+Mcraftr treats structures in the viewer as a provider-backed index of discoverable structure instances.
+
+In v1, that means:
+
+- native or generated structure instances
+- provider-tracked placed structures
+
+It does not mean arbitrary player-built assemblies.
+
+Recommended `structures list` response shape:
+
+```json
+{
+  "ok": true,
+  "items": [
+    {
+      "id": "worldgen:world:village:10:60:10:20:70:20",
+      "kind": "worldgen",
+      "world": "world",
+      "structureId": "minecraft:village",
+      "structureLabel": "Village",
+      "sourceKind": "native-worldgen",
+      "originX": 10,
+      "originY": 60,
+      "originZ": 10,
+      "minX": 10,
+      "minY": 60,
+      "minZ": 10,
+      "maxX": 20,
+      "maxY": 70,
+      "maxZ": 20
+    }
+  ],
+  "total": 1,
+  "indexing": {
+    "worlds": [
+      { "world": "world", "phase": "ready", "processed": 0, "total": 0 }
+    ]
+  }
+}
+```
+
+Guidance:
+
+- structure ids must be stable enough to support individual delete actions
+- bounds should be complete enough for exact-point matching and radius intersection checks
+- radius clears should remove any structure whose indexed footprint intersects the radius, not just structures whose origin happens to be nearby
+- when indexing is still warming up, report that through `structures index status` and the `indexing` payload instead of silently pretending the world is complete
+
+`structures remove <structureInstanceId>` removes one indexed structure instance.
+
+`structures clear <world|*>` is the dangerous scope-wide clear.
+
+`structures clear radius <world> <x> <y> <z> <radius>` is the dangerous radius clear around the active player.
+
+## Capabilities
+
+Relay integrations should advertise supported capability flags in `stack status`.
+
+Current capability flags used by Mcraftr:
+
+- `entity_delete`
+- `entity_clear_scope`
+- `entity_clear_radius`
+- `structure_index`
+- `structure_delete`
+- `structure_clear_scope`
+- `structure_clear_radius`
+
+These flags let Mcraftr hide destructive controls when the provider has not implemented the matching command family.
 
 ## Response Expectations
 
