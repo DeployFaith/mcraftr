@@ -52,6 +52,10 @@ npm run build
 npm run pw:audit
 ```
 
+Before running Playwright, set a local `PLAYWRIGHT_BASE_URL` or `NEXTAUTH_URL`.
+
+Without one of those values, the current Playwright config falls back to the hosted DeployFaith URL instead of your local app.
+
 Useful targeted commands:
 
 ```bash

@@ -82,7 +82,7 @@ Mcraftr uses that to validate Beacon during server setup and to display stack he
 
 Even without Relay, Beacon can still make Mcraftr more useful by powering read-only discovery and metadata surfaces.
 
-That is important for the future product direction, even though Mcraftr still treats `Full Mcraftr Stack` as the complete recommended setup.
+That is important for the future product direction, even though Mcraftr currently treats `Full Mcraftr Stack` as the complete `RCON + Relay + Beacon` setup in the product UI.
 
 ## Future Direction
 

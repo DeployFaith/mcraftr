@@ -44,7 +44,7 @@ Use the admin email and password from the installer.
 
 ### 4. Add your Minecraft server
 
-In Mcraftr, choose `Quick Connect` and enter:
+In Mcraftr, the connect screen opens with `Full Mcraftr Stack` preselected. If you only want plain RCON, switch to `Quick Connect` and enter:
 
 - server address
 - RCON port
@@ -52,6 +52,8 @@ In Mcraftr, choose `Quick Connect` and enter:
 - optional Minecraft version override
 
 Your Minecraft server can be local, on your LAN, on a private VPN, or on a remote VPS.
+
+For manual installs, private or LAN RCON targets also require `MCRAFTR_ALLOW_PRIVATE_RCON_HOSTS=true` in your env.
 
 ## Option 2: Public Domain Install With Caddy
 

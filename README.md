@@ -26,8 +26,8 @@ When it finishes:
 
 1. open the URL it prints
 2. sign in with the admin account you just created
-3. go to `Quick Connect`
-4. add your Minecraft server
+3. go to the connect screen
+4. add your Minecraft server with either `Full Mcraftr Stack` or `Quick Connect`
 
 Your Minecraft server can be on the same machine, somewhere else on your LAN, behind a private VPN, or on a remote VPS as long as Mcraftr can reach its RCON endpoint.
 
@@ -73,9 +73,11 @@ It is especially good at:
 
 ## Quick Connect
 
-`Quick Connect` is the default path and works with plain RCON.
+`Quick Connect` is the simplest path and works with plain RCON.
 
 Use it if you want the fastest setup and already have a reachable RCON endpoint.
+
+In the current connect UI, `Full Mcraftr Stack` is preselected first, but you can switch to `Quick Connect` at any time.
 
 In `server.properties`:
 
@@ -201,6 +203,8 @@ Important runtime variables include:
 
 See `.env.example` for the full configuration surface.
 
+For manual self-hosting, private or LAN RCON targets are rejected unless `MCRAFTR_ALLOW_PRIVATE_RCON_HOSTS=true` is set.
+
 ## Tech Stack
 
 - Next.js 15
@@ -244,7 +248,7 @@ Hosted website and public demo policies:
 - `https://mcraftr.deployfaith.xyz/privacy`
 - `https://mcraftr.deployfaith.xyz/terms`
 
-Those pages apply to the DeployFaith-operated hosted site and public demo. Self-hosted operators remain responsible for their own deployment, data handling, and compliance obligations.
+Those pages are external DeployFaith-hosted site policies, not routes inside a self-hosted Mcraftr app. Self-hosted operators remain responsible for their own deployment, data handling, and compliance obligations.
 
 ## License
 

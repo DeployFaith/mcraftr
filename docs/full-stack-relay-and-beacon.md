@@ -7,7 +7,7 @@ This guide explains the three layers Mcraftr can use to talk to your Minecraft s
 - `Quick Connect` uses `RCON` only.
 - `Full Mcraftr Stack` uses `RCON + Relay + Beacon`.
 
-`Quick Connect` is the real baseline Mcraftr product. `Full Mcraftr Stack` is the richer, world-aware setup built on optional Relay and Beacon enhancements.
+`Quick Connect` is the real baseline Mcraftr product. `Full Mcraftr Stack` is the richer, world-aware setup built on `RCON + Relay + Beacon` together.
 
 ## RCON
 
@@ -68,7 +68,7 @@ For the current Mcraftr-facing Beacon behavior, see `docs/beacon.md`.
 That means:
 
 - `Quick Connect` is ideal when you want the core Mcraftr product over plain RCON.
-- `Full Mcraftr Stack` is ideal when you want worlds, structures, entities, maps, richer terminal help, and the integrated experience built on optional Relay and Beacon layers.
+- `Full Mcraftr Stack` is ideal when you want worlds, structures, entities, maps, richer terminal help, and the integrated experience built on Relay and Beacon together.
 
 ## What Happens Without Relay or Beacon
 
@@ -78,7 +78,7 @@ Mcraftr can still run without them.
 - without `Beacon`, Mcraftr still works and loses only file-backed world, structure, plugin, and metadata enhancements
 - without both, Mcraftr stays in `Quick Connect`, which remains the intended baseline mode
 
-The app should guide users toward the full-stack setup when they open a feature that depends on Relay, Beacon, or both.
+Those partial states can still be useful during integration work, but the product's `Full Mcraftr Stack` label assumes both Relay and Beacon are present. The app should guide users toward that complete setup when they open a feature that depends on Relay, Beacon, or both.
 
 ## Future Direction
 

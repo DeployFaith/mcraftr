@@ -56,10 +56,12 @@ Mcraftr does not ship a default Relay implementation.
 `Full Mcraftr Stack` means:
 
 - `RCON`
-- optional `Relay`
-- optional `Beacon`
+- `Relay`
+- `Beacon`
 
-In practice, Full Stack is the richer integrated experience, but Mcraftr core should still stand on its own without those optional layers.
+That is the richer integrated experience Mcraftr labels as Full Stack in the product UI.
+
+`Relay` and `Beacon` are still optional at the product level because Mcraftr core works over plain RCON, but once you choose `Full Mcraftr Stack`, both integrations are expected to be present.
 
 ## Product Boundary
 

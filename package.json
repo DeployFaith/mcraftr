@@ -7,7 +7,7 @@
     "setup:env": "node scripts/setup-env.mjs",
     "dev": "next dev --turbopack",
     "build": "next build",
-    "start": "node server.js",
+    "start": "next start",
     "lint": "eslint .",
     "beacon": "node beacon/server.mjs",
     "dokploy:deploy": "node scripts/dokploy-deploy.mjs",
