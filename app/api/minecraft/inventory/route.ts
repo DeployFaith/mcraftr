@@ -78,6 +78,21 @@ function getItemMaxStack(itemId: string): number {
   return MAX_STACK_BY_ID.get(itemId as `minecraft:${string}`) ?? 64
 }
 
+async function probeInventorySlots(req: NextRequest, player: string, fromSlot: number, toSlot: number) {
+  const liveProbe = await rconInventory(req, [
+    slotQuery(fromSlot, player, 'id'),
+    slotQuery(fromSlot, player, 'count'),
+    slotQuery(fromSlot, player, 'ench'),
+    slotQuery(toSlot, player, 'id'),
+    slotQuery(toSlot, player, 'count'),
+    slotQuery(toSlot, player, 'ench'),
+  ])
+  if (!liveProbe.ok) {
+    return { ok: false as const, response: Response.json({ ok: false, error: liveProbe.error || 'RCON error' }, { status: 502 }) }
+  }
+  return { ok: true as const, probe: liveProbe }
+}
+
 // ── RCON helper scoped to inventory (uses 'inventory' rate-limit bucket) ──────
 
 async function rconInventory(req: NextRequest, cmds: string[]): Promise<{ ok: boolean; results: string[]; error?: string }> {
@@ -207,17 +222,9 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, error: 'Invalid slot number' }, { status: 400 })
     }
 
-    const liveProbe = await rconInventory(req, [
-      slotQuery(Number(fromSlot), player, 'id'),
-      slotQuery(Number(fromSlot), player, 'count'),
-      slotQuery(Number(fromSlot), player, 'ench'),
-      slotQuery(Number(toSlot), player, 'id'),
-      slotQuery(Number(toSlot), player, 'count'),
-      slotQuery(Number(toSlot), player, 'ench'),
-    ])
-    if (!liveProbe.ok) {
-      return Response.json({ ok: false, error: liveProbe.error || 'RCON error' }, { status: 502 })
-    }
+    const probeResult = await probeInventorySlots(req, player, Number(fromSlot), Number(toSlot))
+    if (!probeResult.ok) return probeResult.response
+    const liveProbe = probeResult.probe
 
     const fromIdOut = liveProbe.results[0] ?? ''
     const fromCountOut = liveProbe.results[1] ?? ''
@@ -236,26 +243,37 @@ export async function POST(req: NextRequest) {
     }
 
     if ((toIdOut ?? '').includes('Found no elements')) {
-      const copyResult = await rconForRequest(req, `minecraft:item replace entity ${player} ${dest} from entity ${player} ${src}`)
-      if (!copyResult.ok) return Response.json({ ok: false, error: copyResult.error || 'RCON error' })
-
-      const postCopyProbe = await rconInventory(req, [
-        slotQuery(Number(fromSlot), player, 'id'),
-        slotQuery(Number(toSlot), player, 'id'),
-      ])
-      if (!postCopyProbe.ok) {
-        return Response.json({ ok: false, error: postCopyProbe.error || 'RCON error' }, { status: 502 })
+      const fromEnchants = parseEnchants(fromEnchantsOut)
+      if (fromEnchants) {
+        return Response.json({ ok: false, error: 'Moving enchanted or custom items to empty slots is not supported yet.' }, { status: 400 })
       }
 
-      const sourceStillOccupied = !(postCopyProbe.results[0] ?? '').includes('Found no elements')
-      const destinationNowOccupied = !(postCopyProbe.results[1] ?? '').includes('Found no elements')
+      const fromCount = parseCount(fromCountOut)
+      const writeDestResult = await rconForRequest(req, replaceItemCommand(player, dest, fromId, fromCount))
+      if (!writeDestResult.ok) return Response.json({ ok: false, error: writeDestResult.error || 'RCON error' }, { status: 502 })
 
-      if (sourceStillOccupied && destinationNowOccupied) {
-        const clearResult = await rconForRequest(req, `minecraft:item replace entity ${player} ${src} with air`)
-        if (!clearResult.ok) return Response.json({ ok: false, error: clearResult.error || 'RCON error' })
+      const verifyAfterWrite = await probeInventorySlots(req, player, Number(fromSlot), Number(toSlot))
+      if (!verifyAfterWrite.ok) return verifyAfterWrite.response
+      const destAfterId = verifyAfterWrite.probe.results[3] ?? ''
+      const destAfterCount = verifyAfterWrite.probe.results[4] ?? ''
+      const verifiedDestId = parseId(destAfterId)
+      const verifiedDestCount = parseCount(destAfterCount)
+      if (verifiedDestId !== fromId || verifiedDestCount !== fromCount) {
+        return Response.json({ ok: false, error: 'Move could not be verified after writing the destination slot.' }, { status: 409 })
       }
 
-      return Response.json({ ok: true })
+      const clearResult = await rconForRequest(req, `minecraft:item replace entity ${player} ${src} with air`)
+      if (!clearResult.ok) return Response.json({ ok: false, error: clearResult.error || 'RCON error' }, { status: 502 })
+
+      const verifyAfterClear = await probeInventorySlots(req, player, Number(fromSlot), Number(toSlot))
+      if (!verifyAfterClear.ok) return verifyAfterClear.response
+      const sourceCleared = (verifyAfterClear.probe.results[0] ?? '').includes('Found no elements')
+      const destinationStillPresent = parseId(verifyAfterClear.probe.results[3] ?? '') === fromId
+      if (!sourceCleared || !destinationStillPresent) {
+        return Response.json({ ok: false, error: 'Move could not be verified after clearing the source slot.' }, { status: 409 })
+      }
+
+      return Response.json({ ok: true, message: `Moved ${itemLabel(fromId)} to slot ${toSlot}` })
     }
 
     const toId = parseId(toIdOut)
@@ -265,13 +283,19 @@ export async function POST(req: NextRequest) {
 
     const fromEnchants = parseEnchants(fromEnchantsOut)
     const toEnchants = parseEnchants(toEnchantsOut)
-    if (fromId !== toId || fromEnchants || toEnchants) {
-      return Response.json({ ok: false, error: 'Live inventory combining only works for matching plain items right now.' }, { status: 400 })
+    if (fromId !== toId) {
+      return Response.json({ ok: false, error: 'Swapping different items is not supported yet.' }, { status: 400 })
+    }
+    if (fromEnchants || toEnchants) {
+      return Response.json({ ok: false, error: 'Only matching plain-item stack merges are supported right now.' }, { status: 400 })
     }
 
     const maxStack = getItemMaxStack(fromId)
     const fromCount = parseCount(fromCountOut)
     const toCount = parseCount(toCountOut)
+    if (toCount >= maxStack) {
+      return Response.json({ ok: false, error: 'Target stack is already full.' }, { status: 400 })
+    }
     const mergedCount = Math.min(maxStack, fromCount + toCount)
     const remainder = Math.max(0, (fromCount + toCount) - mergedCount)
 
@@ -283,7 +307,21 @@ export async function POST(req: NextRequest) {
       : await rconForRequest(req, `minecraft:item replace entity ${player} ${src} with air`)
     if (!sourceResult.ok) return Response.json({ ok: false, error: sourceResult.error || 'RCON error' })
 
-    return Response.json({ ok: true })
+    const verifyAfterMerge = await probeInventorySlots(req, player, Number(fromSlot), Number(toSlot))
+    if (!verifyAfterMerge.ok) return verifyAfterMerge.response
+    const finalDestId = parseId(verifyAfterMerge.probe.results[3] ?? '')
+    const finalDestCount = parseCount(verifyAfterMerge.probe.results[4] ?? '')
+    const finalSourceEmpty = (verifyAfterMerge.probe.results[0] ?? '').includes('Found no elements')
+    const finalSourceCount = parseCount(verifyAfterMerge.probe.results[1] ?? '')
+
+    if (finalDestId !== fromId || finalDestCount !== mergedCount) {
+      return Response.json({ ok: false, error: 'Merged stack could not be verified after update.' }, { status: 409 })
+    }
+    if ((remainder === 0 && !finalSourceEmpty) || (remainder > 0 && finalSourceCount !== remainder)) {
+      return Response.json({ ok: false, error: 'Source remainder could not be verified after update.' }, { status: 409 })
+    }
+
+    return Response.json({ ok: true, message: `Merged ${itemLabel(fromId)} into slot ${toSlot}` })
   } catch (e: unknown) {
     return Response.json({ ok: false, error: e instanceof Error ? e.message : 'Server error' }, { status: 500 })
   }

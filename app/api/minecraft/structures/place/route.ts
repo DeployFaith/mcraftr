@@ -4,6 +4,7 @@ import { logAudit } from '@/lib/audit'
 import { requireServerCapability } from '@/lib/server-capability'
 import { createStructurePlacement } from '@/lib/structure-placements'
 import { callSidecarForRequest, runBridgeJson } from '@/lib/server-bridge'
+import type { BridgeErrorCode } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -26,6 +27,22 @@ type PlayerLocateResponse = {
 type StructureMetadataResponse = {
   ok: boolean
   dimensions?: { width: number | null; height: number | null; length: number | null } | null
+}
+
+function relayStructureFailureMessage(code: BridgeErrorCode | undefined, fallbackError?: string) {
+  if (code === 'bridge_json_parse_failed') {
+    return 'Relay-backed structure placement failed because the Relay response could not be parsed.'
+  }
+  if (code === 'bridge_non_json_response') {
+    return 'Relay-backed structure placement failed because Relay did not return valid JSON.'
+  }
+  if (code === 'bridge_transport_failed') {
+    return 'Relay-backed structure placement failed because Relay could not be reached over RCON.'
+  }
+  if (code === 'bridge_command_rejected' || code === 'bridge_invalid_prefix') {
+    return 'Relay-backed structure placement failed because the server rejected the Relay command.'
+  }
+  return fallbackError || 'Relay-backed structure placement failed.'
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -188,7 +205,7 @@ export async function POST(req: NextRequest) {
           : `execute in ${world} run place template ${bridgeRef} ${x} ${y} ${z} ${rotationKeyword(rotation)} none 1.0 0`)
     const placed = await rconForRequest(req, vanillaCommand)
     if (!placed.ok) {
-      return Response.json({ ok: false, error: placed.error || 'Failed to place native structure' }, { status: 502 })
+      return Response.json({ ok: false, placed: false, tracked: false, provider: 'vanilla-rcon', placementKind, error: placed.error || 'Failed to place native structure' }, { status: 502 })
     }
 
     if (placementKind === 'native-template' && userId && serverId) {
@@ -227,7 +244,7 @@ export async function POST(req: NextRequest) {
           `${trackedPlacement.world} @ ${trackedPlacement.origin.x},${trackedPlacement.origin.y},${trackedPlacement.origin.z}`,
           serverId,
         )
-        return Response.json({ ok: true, placementId, world: trackedPlacement.world, origin: trackedPlacement.origin, bounds: trackedPlacement.bounds })
+        return Response.json({ ok: true, placed: true, tracked: true, provider: 'vanilla-rcon', placementKind, placementId, world: trackedPlacement.world, origin: trackedPlacement.origin, bounds: trackedPlacement.bounds })
       }
     }
 
@@ -235,10 +252,10 @@ export async function POST(req: NextRequest) {
       if (userId) {
         logAudit(userId, 'structure_place', structureLabel, `${world} @ ${x},${y},${z}`, serverId)
       }
-      return Response.json({ ok: true, world, origin: { x, y, z }, bounds: null })
+      return Response.json({ ok: true, placed: true, tracked: false, provider: 'vanilla-rcon', placementKind, warning: 'Structure placed successfully, but precise tracked bounds could not be resolved.', world, origin: { x, y, z }, bounds: null })
     }
 
-    return Response.json({ ok: true, world: null, origin: null, bounds: null })
+    return Response.json({ ok: true, placed: true, tracked: false, provider: 'vanilla-rcon', placementKind, warning: 'Structure placed successfully, but precise tracked bounds could not be resolved.', world: null, origin: null, bounds: null })
   }
 
   let command = `structures place ${bridgeRef} ${rotation} ${includeAir ? 'air' : 'noair'}`
@@ -250,7 +267,15 @@ export async function POST(req: NextRequest) {
 
   const bridge = await runBridgeJson<BridgeResponse>(req, command)
   if (!bridge.ok || bridge.data.ok === false) {
-    return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || 'Failed to place structure' : bridge.error }, { status: 502 })
+    return Response.json({
+      ok: false,
+      placed: false,
+      tracked: false,
+      provider: 'relay',
+      placementKind,
+      failureCode: bridge.ok ? 'relay_place_failed' : bridge.code,
+      error: bridge.ok ? bridge.data.error || 'Failed to place structure' : relayStructureFailureMessage(bridge.code, bridge.error),
+    }, { status: 502 })
   }
 
   if (userId && serverId) {
@@ -291,9 +316,9 @@ export async function POST(req: NextRequest) {
         `${trackedPlacement.world} @ ${trackedPlacement.origin.x},${trackedPlacement.origin.y},${trackedPlacement.origin.z}`,
         serverId,
       )
-      return Response.json({ ok: true, placementId, world: trackedPlacement.world, origin: trackedPlacement.origin, bounds: trackedPlacement.bounds })
-    }
-  }
+        return Response.json({ ok: true, placed: true, tracked: true, provider: 'relay', placementKind, placementId, world: trackedPlacement.world, origin: trackedPlacement.origin, bounds: trackedPlacement.bounds })
+     }
+   }
 
-  return Response.json({ ok: true, world: bridge.data.world ?? null, origin: bridge.data.origin ?? null, bounds: bridge.data.bounds ?? null })
+  return Response.json({ ok: true, placed: true, tracked: false, provider: 'relay', placementKind, warning: 'Structure placed successfully, but tracked bounds could not be resolved.', world: bridge.data.world ?? null, origin: bridge.data.origin ?? null, bounds: bridge.data.bounds ?? null })
 }

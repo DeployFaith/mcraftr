@@ -131,13 +131,13 @@ export async function GET(req: NextRequest) {
         const limitedEntities = fallback.entities.slice(0, MAX_LIVE_ENTITIES)
         const totalEntities = Math.max(fallback.totalEntities, fallback.entities.length)
         const responseTruncated = fallback.truncated || totalEntities > limitedEntities.length
-        return Response.json({
-          ok: true,
-          entities: limitedEntities,
-          totalEntities,
-          truncated: responseTruncated,
-          warning: fallback.partial
-            ? 'Some worlds returned too much Relay data, so the live entity picker is showing the worlds that responded successfully.'
+          return Response.json({
+            ok: true,
+            entities: limitedEntities,
+            totalEntities,
+            truncated: responseTruncated,
+            warning: fallback.partial
+            ? 'Some worlds returned too much Relay data, so the live entity picker is only showing worlds that responded successfully. Spawn actions may still work.'
             : (responseTruncated
                 ? `Showing the first ${limitedEntities.length} live entities out of ${totalEntities}.`
                 : null),

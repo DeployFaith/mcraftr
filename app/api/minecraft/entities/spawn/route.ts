@@ -4,6 +4,7 @@ import { logAudit } from '@/lib/audit'
 import { requireServerCapability } from '@/lib/server-capability'
 import { runBridgeJson } from '@/lib/server-bridge'
 import { buildPresetSnbt, normalizeEntityPresetInput } from '@/lib/entity-presets'
+import type { BridgeErrorCode } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -14,6 +15,41 @@ type BridgeResponse = {
   entity?: string
   count?: number
   error?: string
+}
+
+function shouldUseVanillaEntitySpawnFallback(code: BridgeErrorCode | undefined) {
+  return code === 'bridge_json_parse_failed'
+    || code === 'bridge_non_json_response'
+    || code === 'bridge_transport_failed'
+    || code === 'bridge_command_rejected'
+}
+
+async function runNativeEntitySpawnFallback(req: NextRequest, options: {
+  entityId: string
+  count: number
+  locationMode: 'coords' | 'player'
+  player: string
+  world: string
+  x: number
+  y: number
+  z: number
+}) {
+  const command = options.locationMode === 'player'
+    ? `execute as ${options.player} at ${options.player} run summon ${options.entityId} ~ ~ ~`
+    : `execute in ${options.world} run summon ${options.entityId} ${options.x} ${options.y} ${options.z}`
+
+  for (let i = 0; i < options.count; i += 1) {
+    const result = await rconForRequest(req, command)
+    if (!result.ok) {
+      return { ok: false as const, error: result.error || 'Failed to spawn entity via vanilla fallback' }
+    }
+  }
+
+  return {
+    ok: true as const,
+    provider: 'vanilla-rcon',
+    warning: 'Relay spawn fallback was used because Relay data could not be parsed reliably.',
+  }
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -84,12 +120,22 @@ export async function POST(req: NextRequest) {
 
   const bridge = await runBridgeJson<BridgeResponse>(req, command)
   if (!bridge.ok || bridge.data.ok === false) {
-    return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || 'Failed to spawn entity' : bridge.error }, { status: 502 })
+    if (!bridge.ok && shouldUseVanillaEntitySpawnFallback(bridge.code)) {
+      const fallback = await runNativeEntitySpawnFallback(req, { entityId, count, locationMode, player, world, x, y, z })
+      if (fallback.ok) {
+        if (userId) {
+          logAudit(userId, 'entity_spawn', entityId, `${locationMode === 'player' ? player : world} count=${count} provider=vanilla-rcon`.trim(), serverId)
+        }
+        return Response.json({ ok: true, entity: entityId, count, world: locationMode === 'coords' ? world : null, provider: fallback.provider, fallbackUsed: true, warning: fallback.warning })
+      }
+      return Response.json({ ok: false, error: `Relay spawn failed and vanilla fallback also failed: ${fallback.error}` }, { status: 502 })
+    }
+    return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || 'Failed to spawn entity' : bridge.error, failureCode: bridge.ok ? 'relay_place_failed' : bridge.code }, { status: 502 })
   }
 
   if (userId) {
-    logAudit(userId, 'entity_spawn', entityId, `${bridge.data.world ?? ''} count=${count}`.trim(), serverId)
+    logAudit(userId, 'entity_spawn', entityId, `${bridge.data.world ?? ''} count=${count} provider=relay`.trim(), serverId)
   }
 
-  return Response.json({ ok: true, entity: bridge.data.entity ?? entityId, count: bridge.data.count ?? count, world: bridge.data.world ?? null })
+  return Response.json({ ok: true, entity: bridge.data.entity ?? entityId, count: bridge.data.count ?? count, world: bridge.data.world ?? null, provider: 'relay', fallbackUsed: false })
 }
