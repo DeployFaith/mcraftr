@@ -308,6 +308,9 @@ function ActionChip({
   disabled = false,
   tone = 'var(--accent)',
   active = false,
+  lockedReason,
+  ctaLabel,
+  onCta,
 }: {
   icon: string
   label: string
@@ -316,23 +319,41 @@ function ActionChip({
   disabled?: boolean
   tone?: string
   active?: boolean
+  lockedReason?: string
+  ctaLabel?: string
+  onCta?: () => void
 }) {
+  const locked = !!lockedReason
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="group relative inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-mono shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(0,0,0,0.18)]"
-      style={active
-        ? { borderColor: tone, background: `linear-gradient(180deg, ${tone}24, ${tone}14)`, color: tone, boxShadow: `0 0 0 1px ${tone}22 inset` }
-        : { borderColor: 'var(--border)', background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))', color: 'var(--text)' }}
-    >
-      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-current/15 bg-black/10 px-1 text-[10px] leading-none">{icon}</span>
-      <span className="tracking-[0.12em]">{label}</span>
-      <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 w-44 -translate-x-1/2 rounded-2xl border border-white/10 bg-[#0b1018]/95 px-3 py-2 text-left text-[10px] leading-relaxed text-[var(--text-dim)] opacity-0 shadow-[0_20px_40px_rgba(0,0,0,0.35)] backdrop-blur-sm transition-all duration-150 group-hover:translate-y-0.5 group-hover:opacity-100 group-focus-visible:opacity-100">
-        {hint}
-      </span>
-    </button>
+    <div className="group relative inline-flex">
+      <button
+        type="button"
+        onClick={locked || disabled ? undefined : onClick}
+        disabled={disabled}
+        aria-disabled={locked || disabled}
+        className="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-mono shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(0,0,0,0.18)]"
+        style={locked
+          ? { borderColor: 'rgba(148,163,184,0.18)', background: 'linear-gradient(180deg, rgba(148,163,184,0.10), rgba(148,163,184,0.04))', color: 'rgba(148,163,184,0.88)' }
+          : active
+            ? { borderColor: tone, background: `linear-gradient(180deg, ${tone}24, ${tone}14)`, color: tone, boxShadow: `0 0 0 1px ${tone}22 inset` }
+            : { borderColor: 'var(--border)', background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))', color: 'var(--text)' }}
+      >
+        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-current/15 bg-black/10 px-1 text-[10px] leading-none">{locked ? 'L' : icon}</span>
+        <span className="tracking-[0.12em]">{label}</span>
+      </button>
+      <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 w-48 -translate-x-1/2 rounded-2xl border border-white/10 bg-[#0b1018]/95 px-3 py-2 text-left text-[10px] leading-relaxed text-[var(--text-dim)] opacity-0 shadow-[0_20px_40px_rgba(0,0,0,0.35)] backdrop-blur-sm transition-all duration-150 group-hover:pointer-events-auto group-hover:translate-y-0.5 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+        <div>{lockedReason ?? hint}</div>
+        {locked && onCta && ctaLabel && (
+          <button
+            type="button"
+            onClick={onCta}
+            className="mt-2 rounded-full border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-2.5 py-1 text-[10px] font-mono tracking-[0.14em] text-[var(--accent)]"
+          >
+            {ctaLabel}
+          </button>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -440,6 +461,14 @@ function PlayerPanel({
   const canInventory = features ? features.enable_inventory : true
   const canPlayerCommands = features ? features.enable_player_commands : true
   const canControlDeck = canPlayerCommands || canVitals || canLocation || canEffects
+  const openIntegrations = useCallback(() => {
+    window.location.assign('/minecraft?tab=settings')
+  }, [])
+  const healthLockedReason = 'Exact health control needs a supported player-control integration.'
+  const hungerLockedReason = 'Exact hunger control is unavailable on vanilla. Install the supported integration to unlock it.'
+  const restoreLockedReason = 'This recovery action depends on a supported player-control integration.'
+  const extinguishLockedReason = 'This action is locked until a supported player-control integration is installed.'
+  const inventoryUnavailableReason = 'This inventory utility is temporarily unavailable while command compatibility is being validated.'
 
   const loadFeatures = useCallback(async () => {
     try {

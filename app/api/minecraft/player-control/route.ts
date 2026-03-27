@@ -125,6 +125,14 @@ async function runCommands(req: NextRequest, commands: string[]) {
   return outputs
 }
 
+async function sendPlayerMessage(req: NextRequest, player: string, message: string, color: 'aqua' | 'green' | 'gold' | 'yellow' | 'red' = 'aqua') {
+  const payload = JSON.stringify({ text: `[Mcraftr] ${message}`, color })
+  const result = await rconForRequest(req, `tellraw ${player} ${payload}`)
+  if (!result.ok) {
+    throw new Error(result.error || 'Failed to send player message')
+  }
+}
+
 function roundCoord(value: number) {
   return Math.round(value * 100) / 100
 }
@@ -181,6 +189,7 @@ export async function POST(req: NextRequest) {
         return Response.json({ ok: false, error: 'Invalid gamemode' }, { status: 400 })
       }
       await runCommands(req, [`gamemode ${gamemode} ${player}`])
+      await sendPlayerMessage(req, player, `Gamemode changed to ${gamemode}.`, 'green')
       logAudit(userId, 'player_control', player, `gamemode:${gamemode}`, serverId)
       return Response.json({ ok: true, message: `${player} is now in ${gamemode}.` })
     }
@@ -197,7 +206,8 @@ export async function POST(req: NextRequest) {
       const x = Math.round(pos.x)
       const y = Math.round(pos.y)
       const z = Math.round(pos.z)
-      await runCommands(req, [`execute in ${DIMENSION_IDS[dimension]} run teleport ${player} ${x} ${y} ${z}`])
+      await runCommands(req, [`execute as ${player} in ${DIMENSION_IDS[dimension]} run teleport @s ${x} ${y} ${z}`])
+      await sendPlayerMessage(req, player, `Shifted from ${body.fromDimension ?? 'your current dimension'} to ${dimension} at ${x} ${y} ${z}.`, 'aqua')
       logAudit(userId, 'player_control', player, `dimension:${dimension}:${x},${y},${z}`, serverId)
       return Response.json({ ok: true, message: `${player} moved to ${dimension}.` })
     }
@@ -245,6 +255,7 @@ export async function POST(req: NextRequest) {
       }
       const points = Math.floor((xpBarCapacity(level) * progress) / 100)
       await runCommands(req, [`xp set ${player} ${level} levels`, `xp set ${player} ${points} points`])
+      await sendPlayerMessage(req, player, `Experience updated to level ${level} at ${progress} percent.`, 'green')
       logAudit(userId, 'player_control', player, `xp:${level}:${progress}%`, serverId)
       return Response.json({ ok: true, message: `${player} experience updated to Lv.${level} at ${progress}%.` })
     }
@@ -253,6 +264,7 @@ export async function POST(req: NextRequest) {
       const mode = body.mode === 'levels' ? 'levels' : 'points'
       const amount = Math.max(1, Math.floor(Number(body.amount)))
       await runCommands(req, [`xp add ${player} ${amount} ${mode}`])
+      await sendPlayerMessage(req, player, `You received ${amount} ${mode}.`, 'green')
       logAudit(userId, 'player_control', player, `xp-boost:${amount}:${mode}`, serverId)
       return Response.json({ ok: true, message: `Boosted ${player} by ${amount} ${mode}.` })
     }
@@ -264,7 +276,12 @@ export async function POST(req: NextRequest) {
       if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
         return Response.json({ ok: false, error: 'Coordinates are required' }, { status: 400 })
       }
+      const fromPos = body.fromPos as { x?: unknown; y?: unknown; z?: unknown } | null | undefined
       await runCommands(req, [`teleport ${player} ${roundCoord(x)} ${roundCoord(y)} ${roundCoord(z)}`])
+      const fromText = fromPos && isFiniteNumber(fromPos.x) && isFiniteNumber(fromPos.y) && isFiniteNumber(fromPos.z)
+        ? ` from ${roundCoord(fromPos.x)} ${roundCoord(fromPos.y)} ${roundCoord(fromPos.z)}`
+        : ''
+      await sendPlayerMessage(req, player, `Teleported${fromText} to ${roundCoord(x)} ${roundCoord(y)} ${roundCoord(z)}.`, 'aqua')
       logAudit(userId, 'player_control', player, `teleport-coords:${roundCoord(x)},${roundCoord(y)},${roundCoord(z)}`, serverId)
       return Response.json({ ok: true, message: `${player} moved to ${roundCoord(x)}, ${roundCoord(y)}, ${roundCoord(z)}.` })
     }
@@ -278,6 +295,7 @@ export async function POST(req: NextRequest) {
       const y = Math.round(spawn.y)
       const z = Math.round(spawn.z)
       await runCommands(req, [`teleport ${player} ${x} ${y} ${z}`])
+      await sendPlayerMessage(req, player, `Returned to bed or anchor spawn at ${x} ${y} ${z}.`, 'aqua')
       logAudit(userId, 'player_control', player, `teleport-spawn:${x},${y},${z}`, serverId)
       return Response.json({ ok: true, message: `${player} returned to their spawn anchor.` })
     }
@@ -291,6 +309,7 @@ export async function POST(req: NextRequest) {
       const y = Math.round(pos.y)
       const z = Math.round(pos.z)
       await runCommands(req, [`spawnpoint ${player} ${x} ${y} ${z}`])
+      await sendPlayerMessage(req, player, `Spawn point updated to ${x} ${y} ${z}.`, 'gold')
       logAudit(userId, 'player_control', player, `set-spawn:${x},${y},${z}`, serverId)
       return Response.json({ ok: true, message: `${player} spawn point updated to current position.` })
     }
@@ -304,6 +323,7 @@ export async function POST(req: NextRequest) {
       const y = Math.round(spawn.y)
       const z = Math.round(spawn.z)
       await runCommands(req, [`teleport ${player} ${x} ${y} ${z}`])
+      await sendPlayerMessage(req, player, `Teleported to world spawn at ${x} ${y} ${z}.`, 'aqua')
       logAudit(userId, 'player_control', player, `teleport-world-spawn:${x},${y},${z}`, serverId)
       return Response.json({ ok: true, message: `${player} returned to the world spawn.` })
     }
@@ -324,6 +344,7 @@ export async function POST(req: NextRequest) {
       const next = { x: pos.x, y: pos.y, z: pos.z }
       next[axis as 'x' | 'y' | 'z'] += delta
       await runCommands(req, [`teleport ${player} ${roundCoord(next.x)} ${roundCoord(next.y)} ${roundCoord(next.z)}`])
+      await sendPlayerMessage(req, player, `Moved ${delta > 0 ? '+' : ''}${delta} on ${axis.toUpperCase()}.`, 'aqua')
       logAudit(userId, 'player_control', player, `nudge-axis:${axis}:${delta}`, serverId)
       return Response.json({ ok: true, message: `${player} nudged ${delta > 0 ? '+' : ''}${delta} on ${axis.toUpperCase()}.` })
     }
@@ -352,6 +373,7 @@ export async function POST(req: NextRequest) {
         return Response.json({ ok: false, error: 'Invalid effect loadout' }, { status: 400 })
       }
       await runCommands(req, preset.commands(player))
+      await sendPlayerMessage(req, player, `${preset.label} applied.`, 'green')
       logAudit(userId, 'player_control', player, `effect-loadout:${loadout}`, serverId)
       return Response.json({ ok: true, message: `${preset.label} applied to ${player}.` })
     }
@@ -364,6 +386,7 @@ export async function POST(req: NextRequest) {
 
     if (action === 'clear_effects') {
       await runCommands(req, [`effect clear ${player}`])
+      await sendPlayerMessage(req, player, 'All active effects were cleared.', 'gold')
       logAudit(userId, 'player_control', player, 'clear-effects', serverId)
       return Response.json({ ok: true, message: `${player}'s active effects were cleared.` })
     }
@@ -407,6 +430,7 @@ export async function POST(req: NextRequest) {
         bonusPoints: preset.bonusPoints,
         intervalSeconds: preset.intervalSeconds,
       })
+      await sendPlayerMessage(req, player, `${preset.label} started for ${preset.durationHours} hour${preset.durationHours === 1 ? '' : 's'}.`, 'green')
       return Response.json({ ok: true, booster, message: `${preset.label} started for ${player}.` })
     }
 
@@ -419,6 +443,7 @@ export async function POST(req: NextRequest) {
       if (!cancelled) {
         return Response.json({ ok: false, error: 'Booster not found' }, { status: 404 })
       }
+      await sendPlayerMessage(req, player, 'Your timed XP booster was stopped.', 'gold')
       return Response.json({ ok: true, message: 'Booster cancelled.' })
     }
 
