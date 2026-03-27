@@ -238,8 +238,23 @@ export async function POST(req: NextRequest) {
     if ((toIdOut ?? '').includes('Found no elements')) {
       const copyResult = await rconForRequest(req, `minecraft:item replace entity ${player} ${dest} from entity ${player} ${src}`)
       if (!copyResult.ok) return Response.json({ ok: false, error: copyResult.error || 'RCON error' })
-      const clearResult = await rconForRequest(req, `minecraft:item replace entity ${player} ${src} with air`)
-      if (!clearResult.ok) return Response.json({ ok: false, error: clearResult.error || 'RCON error' })
+
+      const postCopyProbe = await rconInventory(req, [
+        slotQuery(Number(fromSlot), player, 'id'),
+        slotQuery(Number(toSlot), player, 'id'),
+      ])
+      if (!postCopyProbe.ok) {
+        return Response.json({ ok: false, error: postCopyProbe.error || 'RCON error' }, { status: 502 })
+      }
+
+      const sourceStillOccupied = !(postCopyProbe.results[0] ?? '').includes('Found no elements')
+      const destinationNowOccupied = !(postCopyProbe.results[1] ?? '').includes('Found no elements')
+
+      if (sourceStillOccupied && destinationNowOccupied) {
+        const clearResult = await rconForRequest(req, `minecraft:item replace entity ${player} ${src} with air`)
+        if (!clearResult.ok) return Response.json({ ok: false, error: clearResult.error || 'RCON error' })
+      }
+
       return Response.json({ ok: true })
     }
 
