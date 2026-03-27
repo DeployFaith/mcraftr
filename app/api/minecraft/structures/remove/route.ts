@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
+import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags, rconForRequest } from '@/lib/rcon'
 import { logAudit } from '@/lib/audit'
 import { requireServerCapability } from '@/lib/server-capability'
 import { getStructurePlacementById, markStructurePlacementRemoved } from '@/lib/structure-placements'
@@ -26,18 +26,21 @@ async function removeTrackedFallback(req: NextRequest, placementId: string, serv
   if (!placement || placement.removed_at) return null
 
   const isNative = placement.source_kind === 'native'
-  const command = isNative
-    ? `execute in ${placement.world} run fill ${placement.min_x} ${placement.min_y} ${placement.min_z} ${placement.max_x} ${placement.max_y} ${placement.max_z} minecraft:air replace`
-    : `structures remove ${placement.bridge_ref} ${placement.world} ${placement.origin_x} ${placement.origin_y} ${placement.origin_z} ${placement.rotation} ${placement.include_air ? 'air' : 'noair'}`
+  if (isNative) {
+    const result = await rconForRequest(
+      req,
+      `execute in ${placement.world} run fill ${placement.min_x} ${placement.min_y} ${placement.min_z} ${placement.max_x} ${placement.max_y} ${placement.max_z} minecraft:air replace`,
+    )
+    if (!result.ok) return null
+    return { placement, world: placement.world }
+  }
 
-  const bridge = await runBridgeJson<BridgeResponse>(req, command)
+  const bridge = await runBridgeJson<BridgeResponse>(req, `structures remove ${placement.bridge_ref} ${placement.world} ${placement.origin_x} ${placement.origin_y} ${placement.origin_z} ${placement.rotation} ${placement.include_air ? 'air' : 'noair'}`)
   if (!bridge.ok || bridge.data.ok === false) return null
   return { placement, world: bridge.data.world ?? placement.world }
 }
 
 async function verifyStructureRemoved(req: NextRequest, placementId: string, serverId: string, world: string | null, origin?: { x: number; y: number; z: number } | null) {
-  const tracked = getStructurePlacementById(placementId, serverId)
-  if (tracked && !tracked.removed_at) return false
   if (!world || !origin) return false
   const radius = 4
   const command = origin
@@ -68,10 +71,12 @@ async function removePlacementFromPayload(req: NextRequest, payload: {
   if (!payload.world || payload.originX === null || payload.originY === null || payload.originZ === null || payload.rotation === null) return null
   if (payload.sourceKind === 'native') {
     if (payload.minX === null || payload.minY === null || payload.minZ === null || payload.maxX === null || payload.maxY === null || payload.maxZ === null) return null
-    const command = `execute in ${payload.world} run fill ${payload.minX} ${payload.minY} ${payload.minZ} ${payload.maxX} ${payload.maxY} ${payload.maxZ} minecraft:air replace`
-    const bridge = await runBridgeJson<BridgeResponse>(req, command)
-    if (!bridge.ok || bridge.data.ok === false) return null
-    return { world: bridge.data.world ?? payload.world }
+    const result = await rconForRequest(
+      req,
+      `execute in ${payload.world} run fill ${payload.minX} ${payload.minY} ${payload.minZ} ${payload.maxX} ${payload.maxY} ${payload.maxZ} minecraft:air replace`,
+    )
+    if (!result.ok) return null
+    return { world: payload.world }
   }
   if (!payload.bridgeRef) return null
   const command = `structures remove ${payload.bridgeRef} ${payload.world} ${payload.originX} ${payload.originY} ${payload.originZ} ${payload.rotation} ${payload.includeAir ? 'air' : 'noair'}`

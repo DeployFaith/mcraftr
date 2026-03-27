@@ -32,6 +32,24 @@ function killRemovedEntity(stdout: string) {
   return match ? Number.parseInt(match[1] ?? '0', 10) > 0 : false
 }
 
+async function probeEntityPresenceByUuid(req: NextRequest, uuid: string) {
+  const selector = uuidToSelector(uuid)
+  const result = await rconForRequest(req, `execute if entity ${selector} run data get entity ${selector} UUID`)
+  if (!result.ok) {
+    return { ok: false as const, error: result.error || 'Failed to probe entity presence' }
+  }
+
+  const stdout = result.stdout.toLowerCase()
+  if (stdout.includes('test failed')) {
+    return { ok: true as const, exists: false }
+  }
+  if (stdout.includes('test passed') || stdout.includes('uuid')) {
+    return { ok: true as const, exists: true }
+  }
+
+  return { ok: false as const, error: 'Entity presence probe returned an unknown response' }
+}
+
 export async function POST(req: NextRequest) {
   const userId = await getSessionUserId(req)
   if (!userId) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
@@ -56,8 +74,21 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: 'A valid entity UUID is required' }, { status: 400 })
   }
 
+  const beforeProbe = await probeEntityPresenceByUuid(req, uuid)
+  if (!beforeProbe.ok) {
+    return Response.json({ ok: false, error: beforeProbe.error }, { status: 502 })
+  }
+  if (!beforeProbe.exists) {
+    return Response.json({ ok: true, uuid, world, provider: null, warning: 'Entity was already gone.' })
+  }
+
   const result = await rconForRequest(req, `kill ${uuidToSelector(uuid)}`)
-  const removedViaKill = result.ok && killRemovedEntity(result.stdout)
+  const afterKillProbe = await probeEntityPresenceByUuid(req, uuid)
+  if (!afterKillProbe.ok) {
+    return Response.json({ ok: false, error: afterKillProbe.error }, { status: 502 })
+  }
+
+  const removedViaKill = result.ok && killRemovedEntity(result.stdout) && !afterKillProbe.exists
   if (!removedViaKill) {
     const bridge = await runBridgeJson<BridgeResponse>(req, `entities remove ${uuid}`)
     if (!bridge.ok || bridge.data.ok === false) {
@@ -66,6 +97,15 @@ export async function POST(req: NextRequest) {
         { status: 502 },
       )
     }
+
+    const afterRelayProbe = await probeEntityPresenceByUuid(req, uuid)
+    if (!afterRelayProbe.ok) {
+      return Response.json({ ok: false, error: afterRelayProbe.error }, { status: 502 })
+    }
+    if (afterRelayProbe.exists) {
+      return Response.json({ ok: false, error: `Entity removal command completed, but ${label} is still present.` }, { status: 409 })
+    }
+
     const resolvedWorld = bridge.data.world ?? world
     const serverId = await getSessionActiveServerId(req)
     logAudit(userId, 'entity_remove', label, resolvedWorld ? `${resolvedWorld} · ${uuid}` : uuid, serverId)

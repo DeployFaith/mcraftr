@@ -1,17 +1,10 @@
 import { NextRequest } from 'next/server'
-import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
+import { checkFeatureAccess, getSessionActiveServerId, getSessionUserId, getUserFeatureFlags, rconForRequest } from '@/lib/rcon'
 import { logAudit } from '@/lib/audit'
 import { requireServerCapability } from '@/lib/server-capability'
-import { runBridgeJson } from '@/lib/server-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
-type BridgeResponse = {
-  ok: boolean
-  world?: string
-  error?: string
-}
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -29,7 +22,7 @@ export async function POST(req: NextRequest) {
   const capability = await requireServerCapability(req, 'full')
   if (!capability.ok) return capability.response
 
-  const { world, x, y, z, width, height, length, rotation } = await req.json()
+  const { world, x, y, z, width, height, length } = await req.json()
   if (
     typeof world !== 'string' ||
     !isFiniteNumber(x) ||
@@ -42,12 +35,12 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: 'World, coords, and dimensions are required' }, { status: 400 })
   }
 
-  const bridge = await runBridgeJson<BridgeResponse>(
+  const result = await rconForRequest(
     req,
-    `structures clear ${world.trim()} ${x} ${y} ${z} ${Math.max(1, Math.floor(width))} ${Math.max(1, Math.floor(height))} ${Math.max(1, Math.floor(length))} ${[0, 90, 180, 270].includes(Number(rotation)) ? Number(rotation) : 0}`,
+    `execute in ${world.trim()} run fill ${x} ${y} ${z} ${x + Math.max(1, Math.floor(width)) - 1} ${y + Math.max(1, Math.floor(height)) - 1} ${z + Math.max(1, Math.floor(length)) - 1} minecraft:air replace`,
   )
-  if (!bridge.ok || bridge.data.ok === false) {
-    return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || 'Failed to clear structure area' : bridge.error }, { status: 502 })
+  if (!result.ok) {
+    return Response.json({ ok: false, error: result.error || 'Failed to clear structure area' }, { status: 502 })
   }
 
   const userId = await getSessionUserId(req)
@@ -56,5 +49,5 @@ export async function POST(req: NextRequest) {
     logAudit(userId, 'structure_clear', world.trim(), `${x},${y},${z} size=${width}x${height}x${length}`, serverId)
   }
 
-  return Response.json({ ok: true, world: bridge.data.world ?? world.trim() })
+  return Response.json({ ok: true, world: world.trim() })
 }

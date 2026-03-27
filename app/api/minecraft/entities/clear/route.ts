@@ -37,24 +37,73 @@ function killRemovedEntity(stdout: string) {
   return match ? Number.parseInt(match[1] ?? '0', 10) > 0 : false
 }
 
+async function probeEntityPresenceByUuid(req: NextRequest, uuid: string) {
+  const selector = uuidToSelector(uuid)
+  const result = await rconForRequest(req, `execute if entity ${selector} run data get entity ${selector} UUID`)
+  if (!result.ok) {
+    return { ok: false as const, error: result.error || 'Failed to probe entity presence' }
+  }
+
+  const stdout = result.stdout.toLowerCase()
+  if (stdout.includes('test failed')) {
+    return { ok: true as const, exists: false }
+  }
+  if (stdout.includes('test passed') || stdout.includes('uuid')) {
+    return { ok: true as const, exists: true }
+  }
+
+  return { ok: false as const, error: 'Entity presence probe returned an unknown response' }
+}
+
 async function removeListedEntities(req: NextRequest, uuids: string[]) {
   let removedCount = 0
+  let failedCount = 0
   for (const uuid of uuids) {
+    const beforeProbe = await probeEntityPresenceByUuid(req, uuid)
+    if (!beforeProbe.ok) {
+      failedCount += 1
+      continue
+    }
+    if (!beforeProbe.exists) {
+      continue
+    }
+
     const killResult = await rconForRequest(req, `kill ${uuidToSelector(uuid)}`)
-    if (killResult.ok && killRemovedEntity(killResult.stdout)) {
+    const afterKillProbe = await probeEntityPresenceByUuid(req, uuid)
+    if (!afterKillProbe.ok) {
+      failedCount += 1
+      continue
+    }
+    if (killResult.ok && killRemovedEntity(killResult.stdout) && !afterKillProbe.exists) {
       removedCount += 1
       continue
     }
+
     const bridge = await runBridgeJson<{ ok: boolean; error?: string }>(req, `entities remove ${uuid}`)
-    if (bridge.ok && bridge.data.ok !== false) removedCount += 1
+    if (!bridge.ok || bridge.data.ok === false) {
+      failedCount += 1
+      continue
+    }
+
+    const afterRelayProbe = await probeEntityPresenceByUuid(req, uuid)
+    if (!afterRelayProbe.ok) {
+      failedCount += 1
+      continue
+    }
+    if (!afterRelayProbe.exists) {
+      removedCount += 1
+      continue
+    }
+
+    failedCount += 1
   }
 
   return {
     ok: removedCount > 0 || uuids.length === 0,
     matchedCount: uuids.length,
     removedCount,
-    failedCount: Math.max(0, uuids.length - removedCount),
-    warning: uuids.length > removedCount ? `${uuids.length - removedCount} listed entities could not be removed.` : null,
+    failedCount,
+    warning: failedCount > 0 ? `${failedCount} listed entit${failedCount === 1 ? 'y' : 'ies'} could not be removed.` : null,
   }
 }
 
