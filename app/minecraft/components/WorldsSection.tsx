@@ -429,6 +429,29 @@ function structureCardPalette(_entry: StructureCatalogEntry): CatalogCardPalette
   return accentCardPalette()
 }
 
+function structurePlacementStatus(entry: StructureCatalogEntry) {
+  const placementKind = entry.placementKind ?? 'schematic'
+  if (placementKind === 'native-template') {
+    return {
+      label: 'Verified',
+      hint: 'Mcraftr can usually verify and track this structure placement type.',
+      style: { borderColor: '#166534', background: 'rgba(34,197,94,0.12)', color: '#86efac' },
+    }
+  }
+  if (placementKind === 'native-worldgen') {
+    return {
+      label: 'Experimental',
+      hint: 'This worldgen structure type may accept the command but not produce a precisely verifiable visible placement.',
+      style: { borderColor: '#92400e', background: 'rgba(245,158,11,0.12)', color: '#fcd34d' },
+    }
+  }
+  return {
+    label: 'Relay-backed',
+    hint: 'This structure depends on Relay placement data for full verification and tracking.',
+    style: { borderColor: '#1d4ed8', background: 'rgba(59,130,246,0.12)', color: '#93c5fd' },
+  }
+}
+
 function entityCardPalette(entry: EntityCatalogEntry): CatalogCardPalette {
   return accentCardPalette()
 }
@@ -1198,10 +1221,12 @@ export default function WorldsSection({
       const data = await postJson('/api/minecraft/structures/place', payload)
       const targetWorld = playerTarget ? playerTarget.world : structureWorld
       if (targetWorld) setPlacementWorldFilter(targetWorld)
+      const providerLabel = data.provider ? ` via ${data.provider}` : ''
+      const kindLabel = data.placementKind ? ` (${data.placementKind})` : ''
       setStatus(
         data.verified === false
-          ? `${selectedStructure.label} placement command completed${data.world ? ` in ${data.world}` : targetWorld ? ` in ${targetWorld}` : ''}, but Mcraftr could not verify the final placement.${data.warning ? ` ${data.warning}` : ''}`
-          : `Placed ${selectedStructure.label}${data.world ? ` in ${data.world}` : targetWorld ? ` in ${targetWorld}` : ''}.${data.warning ? ` ${data.warning}` : ''}`,
+          ? `${selectedStructure.label} placement command completed${providerLabel}${kindLabel}${data.world ? ` in ${data.world}` : targetWorld ? ` in ${targetWorld}` : ''}, but Mcraftr could not verify the final placement.${data.warning ? ` ${data.warning}` : ''}`
+          : `Placed ${selectedStructure.label}${providerLabel}${kindLabel}${data.world ? ` in ${data.world}` : targetWorld ? ` in ${targetWorld}` : ''}.${data.warning ? ` ${data.warning}` : ''}`,
       )
       setSelectedStructure(null)
       await loadData(false)
@@ -1638,6 +1663,7 @@ export default function WorldsSection({
 
   const renderStructureCatalogCard = (entry: StructureCatalogEntry) => {
     const palette = structureCardPalette(entry)
+    const placementStatus = structurePlacementStatus(entry)
     const metaStats = [
       ['Category', entry.category],
       ['Format', entry.format ?? entry.placementKind ?? 'native'],
@@ -1662,6 +1688,7 @@ export default function WorldsSection({
           <div className="flex flex-wrap justify-end gap-2 text-[10px] font-mono tracking-widest">
             <span className="rounded-full border px-2 py-1" style={{ borderColor: palette.frame, background: palette.badge, color: palette.badgeText }}>{entry.sourceKind}</span>
             <span className="rounded-full border px-2 py-1" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{entry.placementKind}</span>
+            <span title={placementStatus.hint} className="rounded-full border px-2 py-1" style={placementStatus.style}>{placementStatus.label}</span>
           </div>
         </div>
 
@@ -1684,6 +1711,10 @@ export default function WorldsSection({
             {entry.summary}
           </div>
         )}
+
+        <div className="rounded-[22px] border px-4 py-3 text-[11px] font-mono" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>
+          <span className="text-[var(--text)]">Placement status:</span> {placementStatus.hint}
+        </div>
 
         <div className="flex flex-wrap gap-2">
           <button
