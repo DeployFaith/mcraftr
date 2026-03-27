@@ -1,8 +1,13 @@
 import { RateLimiterRedis, RateLimiterMemory, RateLimiterAbstract } from 'rate-limiter-flexible'
 import { NextRequest } from 'next/server'
 
-function isRateLimitingEnabled() {
+function isPublicDemo() {
   return process.env.MCRAFTR_PUBLIC_DEMO === 'true'
+}
+
+function isRateLimitingEnabled() {
+  // Default to enabled for safety. Self-hosters can opt out explicitly.
+  return process.env.MCRAFTR_DISABLE_RATE_LIMITING !== 'true'
 }
 
 // ── Redis client (lazy, singleton) ────────────────────────────────────────────
@@ -28,28 +33,44 @@ async function getRedisClient() {
 
 type LimiterKey = 'register' | 'login' | 'account' | 'rcon' | 'inventory' | 'broadcast'
 
-const LIMITS: Record<LimiterKey, { points: number; duration: number }> = {
-  register:  { points: 5,   duration: 15 * 60 }, // 5 attempts per 15 min
-  login:     { points: 10,  duration: 15 * 60 }, // 10 attempts per 15 min
-  account:   { points: 5,   duration: 15 * 60 }, // 5 attempts per 15 min
-  rcon:      { points: 300, duration: 60 },        // 300 RCON commands per 60s per user (admin panel use)
-  inventory: { points: 500, duration: 60 },       // per-slot inventory fetches (up to ~120 calls/fetch)
-  broadcast: { points: 10,  duration: 60 },       // 10 broadcasts per 60s
+const PUBLIC_DEMO_LIMITS: Record<LimiterKey, { points: number; duration: number }> = {
+  register: { points: 5, duration: 15 * 60 }, // 5 attempts per 15 min
+  login: { points: 10, duration: 15 * 60 }, // 10 attempts per 15 min
+  account: { points: 5, duration: 15 * 60 }, // 5 attempts per 15 min
+  rcon: { points: 300, duration: 60 }, // 300 RCON commands per 60s per user (admin panel use)
+  inventory: { points: 500, duration: 60 }, // per-slot inventory fetches (up to ~120 calls/fetch)
+  broadcast: { points: 10, duration: 60 }, // 10 broadcasts per 60s
 }
 
-const _limiters = new Map<LimiterKey, RateLimiterAbstract>()
+const SELF_HOST_LIMITS: Record<LimiterKey, { points: number; duration: number }> = {
+  register: { points: 20, duration: 15 * 60 }, // gentle default for self-hosting
+  login: { points: 30, duration: 15 * 60 },
+  account: { points: 20, duration: 15 * 60 },
+  rcon: { points: 1200, duration: 60 },
+  inventory: { points: 1500, duration: 60 },
+  broadcast: { points: 30, duration: 60 },
+}
+
+function getLimits() {
+  return isPublicDemo() ? PUBLIC_DEMO_LIMITS : SELF_HOST_LIMITS
+}
+
+const _limiters = new Map<string, RateLimiterAbstract>()
 
 async function getLimiter(key: LimiterKey): Promise<RateLimiterAbstract> {
-  if (_limiters.has(key)) return _limiters.get(key)!
+  const limits = getLimits()
+  const profile = isPublicDemo() ? 'demo' : 'selfhost'
+  const cacheKey = `${profile}:${key}`
+  if (_limiters.has(cacheKey)) return _limiters.get(cacheKey)!
 
-  const opts = LIMITS[key]
+  const opts = limits[key]
   const redis = await getRedisClient()
 
   const limiter = redis
-    ? new RateLimiterRedis({ storeClient: redis, keyPrefix: `mcraftr:rl:${key}`, ...opts })
-    : new RateLimiterMemory({ keyPrefix: `mcraftr:rl:${key}`, ...opts })
+    ? new RateLimiterRedis({ storeClient: redis, keyPrefix: `mcraftr:rl:${cacheKey}`, ...opts })
+    : new RateLimiterMemory({ keyPrefix: `mcraftr:rl:${cacheKey}`, ...opts })
 
-  _limiters.set(key, limiter)
+  _limiters.set(cacheKey, limiter)
   return limiter
 }
 
@@ -74,6 +95,7 @@ export async function checkRateLimit(
     return { limited: false }
   }
 
+  const limits = getLimits()
   const limiter = await getLimiter(key)
   // Use the rightmost entry in X-Forwarded-For — the last hop added by a
   // trusted proxy. The leftmost entry is client-controlled and trivially
@@ -101,7 +123,7 @@ export async function checkRateLimit(
           status: 429,
           headers: {
             'Retry-After': String(retryAfter),
-            'X-RateLimit-Limit': String(LIMITS[key].points),
+            'X-RateLimit-Limit': String(limits[key].points),
             'X-RateLimit-Remaining': '0',
           },
         }
