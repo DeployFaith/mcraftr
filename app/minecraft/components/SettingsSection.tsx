@@ -8,6 +8,7 @@ import CapabilityLockCard from './CapabilityLockCard'
 import ColorPickerModal from './ColorPickerModal'
 import IntegrationCard from './IntegrationCard'
 import IntegrationRecommendationModal from './IntegrationRecommendationModal'
+import { useIntegrationManager } from './useIntegrationManager'
 import McraftrSwitch from './McraftrSwitch'
 import { sanitizeBridgePrefix, sanitizeBridgeProviderLabel } from '@/lib/public-branding'
 import { BUILTIN_MUSIC, BUILTIN_SOUNDS, DEFAULT_MUSIC_SETTINGS, DEFAULT_SOUND_SETTINGS, cleanupUnusedUploadedMedia, describeSource, loadMusicSettings, loadSoundSettings, playMediaSource, registerUploadedMediaIds, saveMusicSettings, saveSoundSettings, type MediaSource, type SoundEffectKey, type SoundSettings, type MusicSettings } from '@/app/components/soundfx'
@@ -116,74 +117,6 @@ type PluginStackData = {
   }
 }
 
-type IntegrationStatus = {
-  id: string
-  label: string
-  description: string
-  owner: 'mcraftr' | 'third-party'
-  kind: 'plugin' | 'service'
-  installed: boolean
-  installState: 'ready' | 'missing' | 'unsupported' | 'unknown' | 'outdated' | 'drifted' | 'user-managed'
-  detectedVersion: string | null
-  pinnedVersion: string
-  restartRequired: boolean
-  featureSummaries: string[]
-  supportedMinecraftVersions: string[]
-  notes: string[]
-  reasons: string[]
-  source?: {
-    downloadUrl?: string | null
-    filename?: string | null
-    pluginPath?: string | null
-    backupPath?: string | null
-    managed?: boolean
-  }
-}
-
-type IntegrationPreference = {
-  userId: string
-  serverId: string
-  preferenceKey: 'structure_editor_provider'
-  integrationId: string
-  reason: string | null
-  createdAt: number
-  updatedAt: number
-}
-
-type IntegrationRecommendation = {
-  recommendedId: string | null
-  confidence: 'high' | 'medium' | 'low'
-  summary: string
-  reasons: string[]
-  alternatives: Array<{
-    id: string
-    acceptable: boolean
-    reason: string
-  }>
-  restartRequired: boolean
-  pinnedVersion: string | null
-}
-
-type IntegrationsData = {
-  ok: boolean
-  error?: string
-  server?: {
-    id: string
-    label: string | null
-    minecraftVersion: string | null
-    bridgeEnabled: boolean
-    sidecarEnabled: boolean
-  }
-  integrations?: IntegrationStatus[]
-  preferences?: {
-    all: IntegrationPreference[]
-    structureEditorProvider: IntegrationPreference | null
-    shouldPromptForStructureEditor: boolean
-  }
-  recommendations?: {
-    structureEditor: IntegrationRecommendation
-  }
-}
 
 const THEME_PACK_DOCS_URL = '/theme-packs'
 
@@ -271,12 +204,8 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
   const [servers, setServers] = useState<SavedServerSummary[]>([])
   const [activeServerId, setActiveServerId] = useState<string | null>(null)
   const [pluginStack, setPluginStack] = useState<PluginStackData | null>(null)
-  const [integrationsData, setIntegrationsData] = useState<IntegrationsData | null>(null)
-  const [integrationsLoading, setIntegrationsLoading] = useState(true)
   const [integrationPreferenceSaving, setIntegrationPreferenceSaving] = useState(false)
   const [integrationRecommendationOpen, setIntegrationRecommendationOpen] = useState(false)
-  const [integrationActionBusy, setIntegrationActionBusy] = useState<string | null>(null)
-  const [integrationActionStatus, setIntegrationActionStatus] = useState<{ ok: boolean; msg: string } | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
   const { theme, setTheme, accent, setAccent, customAccent, setCustomAccent, themePack, setThemePack, font, setFont, fontSize, setFontSize } = useTheme()
   const [customAccentInput, setCustomAccentInput] = useState(customAccent)
@@ -449,14 +378,18 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
       .catch(() => setPluginStack({ ok: false, error: 'Failed to load stack status', bridge: {}, sidecar: {} }))
   }, [])
 
-  useEffect(() => {
-    setIntegrationsLoading(true)
-    fetch('/api/minecraft/integrations', { cache: 'no-store' })
-      .then(r => r.json())
-      .then(d => setIntegrationsData(d))
-      .catch(() => setIntegrationsData({ ok: false, error: 'Failed to load integration status' }))
-      .finally(() => setIntegrationsLoading(false))
-  }, [])
+  const {
+    data: integrationsData,
+    loading: integrationsLoading,
+    busyKey: integrationActionBusy,
+    status: integrationActionStatus,
+    runAction: executeIntegrationAction,
+    savePreference: persistStructureEditorPreference,
+    clearPreference: clearStructureEditorPreference,
+    integrations,
+    structureProviderPreference: structureEditorPreference,
+    structureProviderRecommendation: structureEditorRecommendation,
+  } = useIntegrationManager()
 
   const disconnectServer = async () => {
     if (!confirm('Remove the current active server from this account?')) return
@@ -479,38 +412,11 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
 
   const activeServer = servers.find(server => server.id === activeServerId) ?? null
 
-  const integrations = integrationsData?.integrations ?? []
-  const structureEditorPreference = integrationsData?.preferences?.structureEditorProvider ?? null
-  const structureEditorRecommendation = integrationsData?.recommendations?.structureEditor ?? null
-
-  const refreshIntegrations = async () => {
-    setIntegrationsLoading(true)
-    try {
-      const res = await fetch('/api/minecraft/integrations', { cache: 'no-store' })
-      const data = await res.json()
-      setIntegrationsData(data)
-    } catch {
-      setIntegrationsData({ ok: false, error: 'Failed to load integration status' })
-    } finally {
-      setIntegrationsLoading(false)
-    }
-  }
-
   const saveStructureEditorPreference = async (integrationId: string, reason: string) => {
     setIntegrationPreferenceSaving(true)
     try {
-      const res = await fetch('/api/minecraft/integrations/preference', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          preferenceKey: 'structure_editor_provider',
-          integrationId,
-          reason,
-        }),
-      })
-      const data = await res.json()
-      if (!data.ok) throw new Error(data.error || 'Failed to save preference')
-      await refreshIntegrations()
+      const data = await persistStructureEditorPreference(integrationId, reason)
+      if (!data) throw new Error('Failed to save preference')
       setIntegrationRecommendationOpen(false)
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Failed to save provider preference')
@@ -520,23 +426,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
   }
 
   const runIntegrationAction = async (action: 'install' | 'remove' | 'repair', integrationId: string) => {
-    setIntegrationActionBusy(`${action}:${integrationId}`)
-    setIntegrationActionStatus(null)
-    try {
-      const res = await fetch(`/api/minecraft/integrations/${action}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ integrationId }),
-      })
-      const data = await res.json()
-      if (!data.ok) throw new Error(data.error || `Failed to ${action} integration`)
-      setIntegrationActionStatus({ ok: true, msg: data.message || `${integrationId} ${action} complete.` })
-      await refreshIntegrations()
-    } catch (error) {
-      setIntegrationActionStatus({ ok: false, msg: error instanceof Error ? error.message : `Failed to ${action} integration.` })
-    } finally {
-      setIntegrationActionBusy(null)
-    }
+    await executeIntegrationAction(action, integrationId)
   }
 
   // ── Change password ─────────────────────────────────────────────────────────
@@ -1563,14 +1453,8 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
                     onClick={async () => {
                       setIntegrationPreferenceSaving(true)
                       try {
-                        const res = await fetch('/api/minecraft/integrations/preference', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ preferenceKey: 'structure_editor_provider', clear: true }),
-                        })
-                        const data = await res.json()
-                        if (!data.ok) throw new Error(data.error || 'Failed to clear preference')
-                        await refreshIntegrations()
+                        const data = await clearStructureEditorPreference()
+                        if (!data) throw new Error('Failed to clear preference')
                       } catch (error) {
                         alert(error instanceof Error ? error.message : 'Failed to clear provider preference')
                       } finally {

@@ -10,7 +10,9 @@ import ConfirmModal, { type ConfirmModalProps } from './ConfirmModal'
 import CatalogArtwork, { isCatalogArtworkEnabled } from './CatalogArtwork'
 import EntityPresetEditorModal from './EntityPresetEditorModal'
 import CapabilityLockCard from './CapabilityLockCard'
+import IntegrationDependencyPrompt from './IntegrationDependencyPrompt'
 import IntegrationRecommendationModal from './IntegrationRecommendationModal'
+import { useIntegrationManager } from './useIntegrationManager'
 import { playSound } from '@/app/components/soundfx'
 import type { CatalogArtPayload } from '@/lib/catalog-art/types'
 import type { FeatureKey } from '@/lib/features'
@@ -20,50 +22,6 @@ import { FALLBACK_ENTITY_CATALOG } from '@/lib/entity-catalog'
 
 type FeatureFlags = Record<FeatureKey, boolean>
 
-type IntegrationStatus = {
-  id: string
-  label: string
-  installState: 'ready' | 'missing' | 'unsupported' | 'unknown' | 'outdated' | 'drifted' | 'user-managed'
-  detectedVersion: string | null
-  pinnedVersion: string
-  restartRequired: boolean
-  reasons: string[]
-  source?: {
-    managed?: boolean
-  }
-}
-
-type IntegrationPreference = {
-  integrationId: string
-  reason: string | null
-}
-
-type IntegrationRecommendation = {
-  recommendedId: string | null
-  confidence: 'high' | 'medium' | 'low'
-  summary: string
-  reasons: string[]
-  alternatives: Array<{
-    id: string
-    acceptable: boolean
-    reason: string
-  }>
-  restartRequired: boolean
-  pinnedVersion: string | null
-}
-
-type IntegrationsData = {
-  ok: boolean
-  error?: string
-  integrations?: IntegrationStatus[]
-  preferences?: {
-    structureEditorProvider: IntegrationPreference | null
-    shouldPromptForStructureEditor: boolean
-  }
-  recommendations?: {
-    structureEditor: IntegrationRecommendation
-  }
-}
 
 type WorldEntry = {
   name: string
@@ -571,12 +529,21 @@ export default function WorldsSection({
   const [liveEntityActionBusy, setLiveEntityActionBusy] = useState<string | null>(null)
   const [placementActionBusy, setPlacementActionBusy] = useState<string | null>(null)
   const [confirmModal, setConfirmModal] = useState<Omit<ConfirmModalProps, 'onCancel'> | null>(null)
-  const [integrationsData, setIntegrationsData] = useState<IntegrationsData | null>(null)
-  const [integrationsBusy, setIntegrationsBusy] = useState<string | null>(null)
-  const [integrationsStatus, setIntegrationsStatus] = useState<{ ok: boolean; msg: string } | null>(null)
   const [integrationRecommendationOpen, setIntegrationRecommendationOpen] = useState(false)
 
   const [placementWorldFilter, setPlacementWorldFilter] = useState('')
+
+  const {
+    data: integrationsData,
+    busyKey: integrationsBusy,
+    status: integrationsStatus,
+    refresh: loadIntegrations,
+    runAction: executeIntegrationAction,
+    savePreference: persistStructureEditorPreference,
+    structureProviderStatuses,
+    structureProviderPreference,
+    structureProviderRecommendation,
+  } = useIntegrationManager({ autoLoad: false })
   const [placementMode, setPlacementMode] = useState<LocationMode>('coords')
   const [placementX, setPlacementX] = useState('')
   const [placementY, setPlacementY] = useState('')
@@ -617,13 +584,6 @@ export default function WorldsSection({
     })
   }, [])
   const activeWorldEntry = worldsData?.worlds.find(world => world.name === activeWorld) ?? worldsData?.worlds[0] ?? null
-  const structureProviderStatuses = useMemo(
-    () => (integrationsData?.integrations ?? []).filter(integration => integration.id === 'worldedit' || integration.id === 'fawe'),
-    [integrationsData],
-  )
-  const structureProviderPreference = integrationsData?.preferences?.structureEditorProvider ?? null
-  const structureProviderRecommendation = integrationsData?.recommendations?.structureEditor ?? null
-  const structureProviderActiveCount = structureProviderStatuses.filter(integration => ['ready', 'outdated', 'drifted', 'user-managed'].includes(integration.installState)).length
 
   const loadFeatures = useCallback(async () => {
     try {
@@ -632,16 +592,6 @@ export default function WorldsSection({
       if (data.ok && data.features) setFeatures(data.features)
     } catch {
       setFeatures(null)
-    }
-  }, [])
-
-  const loadIntegrations = useCallback(async () => {
-    try {
-      const res = await fetch('/api/minecraft/integrations', { cache: 'no-store' })
-      const data = await res.json()
-      setIntegrationsData(data)
-    } catch {
-      setIntegrationsData({ ok: false, error: 'Failed to load integration status' })
     }
   }, [])
 
@@ -790,53 +740,12 @@ export default function WorldsSection({
     setLoading(false)
   }, [canEntityCatalog, canEntityLiveTools, canSpawnTools, canStructureCatalog, canWorldInventory, stackMode])
 
-  const runIntegrationAction = useCallback(async (action: 'install' | 'remove' | 'repair', integrationId: string) => {
-    setIntegrationsBusy(`${action}:${integrationId}`)
-    setIntegrationsStatus(null)
-    try {
-      const res = await fetch(`/api/minecraft/integrations/${action}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ integrationId }),
-      })
-      const data = await res.json()
-      if (!data.ok) throw new Error(data.error || `Failed to ${action} integration`)
-      setIntegrationsStatus({ ok: true, msg: data.message || `${integrationId} ${action} complete.` })
-      await loadIntegrations()
-    } catch (nextError) {
-      setIntegrationsStatus({ ok: false, msg: nextError instanceof Error ? nextError.message : `Failed to ${action} integration.` })
-    } finally {
-      setIntegrationsBusy(null)
-    }
-  }, [loadIntegrations])
-
-  const saveStructureEditorPreference = useCallback(async (integrationId: string, reason: string) => {
-    setIntegrationsBusy(`preference:${integrationId}`)
-    setIntegrationsStatus(null)
-    try {
-      const res = await fetch('/api/minecraft/integrations/preference', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ preferenceKey: 'structure_editor_provider', integrationId, reason }),
-      })
-      const data = await res.json()
-      if (!data.ok) throw new Error(data.error || 'Failed to save structure editor preference')
-      setIntegrationsStatus({ ok: true, msg: `Structure editor provider set to ${integrationId}.` })
-      setIntegrationRecommendationOpen(false)
-      await loadIntegrations()
-    } catch (nextError) {
-      setIntegrationsStatus({ ok: false, msg: nextError instanceof Error ? nextError.message : 'Failed to save structure editor preference.' })
-    } finally {
-      setIntegrationsBusy(null)
-    }
-  }, [loadIntegrations])
-
   const requestStructureProviderInstall = useCallback((integrationId: string) => {
     const selected = structureProviderStatuses.find(entry => entry.id === integrationId)
     const conflicting = structureProviderStatuses.filter(entry => entry.id !== integrationId && ['ready', 'outdated', 'drifted', 'user-managed'].includes(entry.installState))
     if (!selected) return
     if (conflicting.length === 0) {
-      void runIntegrationAction('install', integrationId)
+      void executeIntegrationAction('install', integrationId)
       return
     }
 
@@ -846,10 +755,10 @@ export default function WorldsSection({
       confirmLabel: `Install ${selected.label}`,
       onConfirm: () => {
         setConfirmModal(null)
-        void runIntegrationAction('install', integrationId)
+        void executeIntegrationAction('install', integrationId)
       },
     })
-  }, [runIntegrationAction, structureProviderStatuses])
+  }, [executeIntegrationAction, structureProviderStatuses])
 
   const runWorldCommand = useCallback(async (kind: 'time' | 'weather', value: string) => {
     if (!activeWorld) {
@@ -2207,117 +2116,22 @@ export default function WorldsSection({
 
       {canStructureCatalog && (
         <CollapsibleCard title="STRUCTURE CATALOG" storageKey="worlds:structures" defaultOpen={false} bodyClassName="p-5 space-y-4" groupKey={WORLDS_COLLAPSIBLE_GROUP}>
-          <div className="rounded-[24px] border border-[var(--accent-mid)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--accent)_10%,transparent),rgba(8,12,18,0.55))] p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="space-y-2">
-                <div className="text-[10px] font-mono tracking-[0.28em] text-[var(--accent)]">ADVANCED BUILD PROVIDERS</div>
-                <div className="text-[15px] font-mono text-[var(--text)]">Pick the editor integration for deeper structure workflows</div>
-                <div className="max-w-3xl text-[12px] font-mono leading-relaxed text-[var(--text-dim)]">
-                  Beacon powers the catalog itself, but WorldEdit and FAWE unlock the stronger build-side workflow Mcraftr is designing around. Install one here, or let Mcraftr recommend the safest fit.
-                </div>
-              </div>
-              {structureProviderPreference && (
-                <div className="rounded-full border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-1 text-[10px] font-mono tracking-[0.18em] text-[var(--accent)]">
-                  SELECTED: {structureProviderPreference.integrationId.toUpperCase()}
-                </div>
-              )}
-            </div>
-
-            {integrationsStatus && (
-              <div className={`mt-3 rounded-2xl border px-3 py-3 text-[11px] font-mono ${integrationsStatus.ok ? 'border-emerald-900/60 bg-emerald-950/20 text-emerald-300' : 'border-red-900/60 bg-red-950/20 text-red-300'}`}>
-                {integrationsStatus.msg}
-              </div>
-            )}
-
-            {integrationsData?.ok === false && integrationsData.error && (
-              <div className="mt-3 rounded-2xl border border-red-900/60 bg-red-950/20 px-3 py-3 text-[11px] font-mono text-red-300">
-                {integrationsData.error}
-              </div>
-            )}
-
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
-              {structureProviderStatuses.map(integration => {
-                const isInstalled = ['ready', 'outdated', 'drifted', 'user-managed'].includes(integration.installState)
-                const canInstall = ['missing', 'unknown', 'outdated'].includes(integration.installState)
-                const canRepair = ['ready', 'outdated', 'drifted'].includes(integration.installState)
-                const isBusy = integrationsBusy === `install:${integration.id}` || integrationsBusy === `repair:${integration.id}` || integrationsBusy === `remove:${integration.id}` || integrationsBusy === `preference:${integration.id}`
-
-                return (
-                  <div key={integration.id} className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-[14px] font-mono text-[var(--text)]">{integration.label}</div>
-                        <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">
-                          {integration.detectedVersion ? `Detected ${integration.detectedVersion}` : 'Not currently detected'} • Curated pin {integration.pinnedVersion}
-                        </div>
-                      </div>
-                      <div className="rounded-full border px-2 py-1 text-[10px] font-mono tracking-[0.16em]" style={{ borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
-                        {integration.installState.toUpperCase()}
-                      </div>
-                    </div>
-                    <div className="mt-3 text-[11px] font-mono leading-relaxed text-[var(--text-dim)]">
-                      {integration.reasons[0] || 'Mcraftr can use this provider for advanced structure workflows.'}
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {canInstall && (
-                        <button
-                          type="button"
-                          disabled={!!integrationsBusy}
-                          onClick={() => requestStructureProviderInstall(integration.id)}
-                          className="rounded-xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 text-[11px] font-mono tracking-[0.18em] text-[var(--accent)] disabled:opacity-40"
-                        >
-                          {isBusy ? 'WORKING...' : `INSTALL ${integration.label.toUpperCase()}`}
-                        </button>
-                      )}
-                      {canRepair && (
-                        <button
-                          type="button"
-                          disabled={!!integrationsBusy}
-                          onClick={() => void runIntegrationAction('repair', integration.id)}
-                          className="rounded-xl border border-[var(--border)] px-3 py-2 text-[11px] font-mono tracking-[0.18em] text-[var(--text)] disabled:opacity-40"
-                        >
-                          {isBusy ? 'WORKING...' : 'REPAIR'}
-                        </button>
-                      )}
-                      {isInstalled && (
-                        <button
-                          type="button"
-                          disabled={!!integrationsBusy}
-                          onClick={() => void saveStructureEditorPreference(integration.id, `Worlds section selected ${integration.id} as the structure editor provider.`)}
-                          className="rounded-xl border border-[var(--border)] px-3 py-2 text-[11px] font-mono tracking-[0.18em] text-[var(--text-dim)] disabled:opacity-40"
-                        >
-                          {structureProviderPreference?.integrationId === integration.id ? 'SELECTED' : 'USE HERE'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {(integrationsData?.preferences?.shouldPromptForStructureEditor || structureProviderActiveCount === 0) && (
-                <button
-                  type="button"
-                  disabled={!!integrationsBusy}
-                  onClick={() => setIntegrationRecommendationOpen(true)}
-                  className="rounded-xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 text-[11px] font-mono tracking-[0.18em] text-[var(--accent)] disabled:opacity-40"
-                >
-                  LET MCRAFTR CHOOSE
-                </button>
-              )}
-              {structureProviderPreference && (
-                <button
-                  type="button"
-                  disabled={!!integrationsBusy}
-                  onClick={() => setIntegrationRecommendationOpen(true)}
-                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-[11px] font-mono tracking-[0.18em] text-[var(--text-dim)] disabled:opacity-40"
-                >
-                  REVIEW RECOMMENDATION
-                </button>
-              )}
-            </div>
-          </div>
+          <IntegrationDependencyPrompt
+            eyebrow="ADVANCED BUILD PROVIDERS"
+            title="Pick the editor integration for deeper structure workflows"
+            description="Beacon powers the catalog itself, but WorldEdit and FAWE unlock the stronger build-side workflow Mcraftr is designing around. Install one here, or let Mcraftr recommend the safest fit."
+            selectedIntegrationId={structureProviderPreference?.integrationId ?? null}
+            statuses={structureProviderStatuses}
+            busyKey={integrationsBusy}
+            statusMessage={integrationsStatus}
+            errorMessage={integrationsData?.ok === false ? integrationsData.error ?? null : null}
+            onInstall={requestStructureProviderInstall}
+            onRepair={(integrationId) => void executeIntegrationAction('repair', integrationId)}
+            onSelect={(integrationId) => {
+              void persistStructureEditorPreference(integrationId, `Worlds section selected ${integrationId} as the structure editor provider.`)
+            }}
+            onRecommend={() => setIntegrationRecommendationOpen(true)}
+          />
 
           <input
             ref={structureUploadRef}
@@ -2997,7 +2811,9 @@ export default function WorldsSection({
         onChoose={(integrationId) => {
           const selected = structureProviderStatuses.find(entry => entry.id === integrationId)
           if (selected && ['ready', 'outdated', 'drifted', 'user-managed'].includes(selected.installState)) {
-            void saveStructureEditorPreference(integrationId, `Worlds recommendation flow selected ${integrationId} as the structure editor provider.`)
+            void persistStructureEditorPreference(integrationId, `Worlds recommendation flow selected ${integrationId} as the structure editor provider.`).then(result => {
+              if (result) setIntegrationRecommendationOpen(false)
+            })
             return
           }
           requestStructureProviderInstall(integrationId)
