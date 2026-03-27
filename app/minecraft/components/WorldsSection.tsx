@@ -6,9 +6,11 @@ import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
 import McraftrSwitch from './McraftrSwitch'
 import PlayerPicker from './PlayerPicker'
 import SpawnInspectModal, { type EntityCatalogEntry, type LocationMode, type StructureCatalogEntry } from './SpawnInspectModal'
+import ConfirmModal, { type ConfirmModalProps } from './ConfirmModal'
 import CatalogArtwork, { isCatalogArtworkEnabled } from './CatalogArtwork'
 import EntityPresetEditorModal from './EntityPresetEditorModal'
 import CapabilityLockCard from './CapabilityLockCard'
+import IntegrationRecommendationModal from './IntegrationRecommendationModal'
 import { playSound } from '@/app/components/soundfx'
 import type { CatalogArtPayload } from '@/lib/catalog-art/types'
 import type { FeatureKey } from '@/lib/features'
@@ -17,6 +19,51 @@ import type { ServerStackMode } from '@/lib/server-stack'
 import { FALLBACK_ENTITY_CATALOG } from '@/lib/entity-catalog'
 
 type FeatureFlags = Record<FeatureKey, boolean>
+
+type IntegrationStatus = {
+  id: string
+  label: string
+  installState: 'ready' | 'missing' | 'unsupported' | 'unknown' | 'outdated' | 'drifted' | 'user-managed'
+  detectedVersion: string | null
+  pinnedVersion: string
+  restartRequired: boolean
+  reasons: string[]
+  source?: {
+    managed?: boolean
+  }
+}
+
+type IntegrationPreference = {
+  integrationId: string
+  reason: string | null
+}
+
+type IntegrationRecommendation = {
+  recommendedId: string | null
+  confidence: 'high' | 'medium' | 'low'
+  summary: string
+  reasons: string[]
+  alternatives: Array<{
+    id: string
+    acceptable: boolean
+    reason: string
+  }>
+  restartRequired: boolean
+  pinnedVersion: string | null
+}
+
+type IntegrationsData = {
+  ok: boolean
+  error?: string
+  integrations?: IntegrationStatus[]
+  preferences?: {
+    structureEditorProvider: IntegrationPreference | null
+    shouldPromptForStructureEditor: boolean
+  }
+  recommendations?: {
+    structureEditor: IntegrationRecommendation
+  }
+}
 
 type WorldEntry = {
   name: string
@@ -523,6 +570,11 @@ export default function WorldsSection({
   const [worldCommandBusy, setWorldCommandBusy] = useState<string | null>(null)
   const [liveEntityActionBusy, setLiveEntityActionBusy] = useState<string | null>(null)
   const [placementActionBusy, setPlacementActionBusy] = useState<string | null>(null)
+  const [confirmModal, setConfirmModal] = useState<Omit<ConfirmModalProps, 'onCancel'> | null>(null)
+  const [integrationsData, setIntegrationsData] = useState<IntegrationsData | null>(null)
+  const [integrationsBusy, setIntegrationsBusy] = useState<string | null>(null)
+  const [integrationsStatus, setIntegrationsStatus] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [integrationRecommendationOpen, setIntegrationRecommendationOpen] = useState(false)
 
   const [placementWorldFilter, setPlacementWorldFilter] = useState('')
   const [placementMode, setPlacementMode] = useState<LocationMode>('coords')
@@ -546,7 +598,32 @@ export default function WorldsSection({
   const canEntityPresets = canEntityCatalog && (features?.enable_entity_presets ?? true)
   const canRandomizedPlacement = features?.enable_randomized_placement ?? true
   const canPlacementValidation = features?.enable_placement_validation ?? true
+
+  const openRemovalConfirm = useCallback((
+    title: string,
+    body: string,
+    confirmLabel: string,
+    action: () => Promise<void> | void,
+  ) => {
+    setConfirmModal({
+      title,
+      body,
+      confirmLabel,
+      destructive: true,
+      onConfirm: () => {
+        setConfirmModal(null)
+        void action()
+      },
+    })
+  }, [])
   const activeWorldEntry = worldsData?.worlds.find(world => world.name === activeWorld) ?? worldsData?.worlds[0] ?? null
+  const structureProviderStatuses = useMemo(
+    () => (integrationsData?.integrations ?? []).filter(integration => integration.id === 'worldedit' || integration.id === 'fawe'),
+    [integrationsData],
+  )
+  const structureProviderPreference = integrationsData?.preferences?.structureEditorProvider ?? null
+  const structureProviderRecommendation = integrationsData?.recommendations?.structureEditor ?? null
+  const structureProviderActiveCount = structureProviderStatuses.filter(integration => ['ready', 'outdated', 'drifted', 'user-managed'].includes(integration.installState)).length
 
   const loadFeatures = useCallback(async () => {
     try {
@@ -555,6 +632,16 @@ export default function WorldsSection({
       if (data.ok && data.features) setFeatures(data.features)
     } catch {
       setFeatures(null)
+    }
+  }, [])
+
+  const loadIntegrations = useCallback(async () => {
+    try {
+      const res = await fetch('/api/minecraft/integrations', { cache: 'no-store' })
+      const data = await res.json()
+      setIntegrationsData(data)
+    } catch {
+      setIntegrationsData({ ok: false, error: 'Failed to load integration status' })
     }
   }, [])
 
@@ -703,6 +790,47 @@ export default function WorldsSection({
     setLoading(false)
   }, [canEntityCatalog, canEntityLiveTools, canSpawnTools, canStructureCatalog, canWorldInventory, stackMode])
 
+  const runIntegrationAction = useCallback(async (action: 'install' | 'remove' | 'repair', integrationId: string) => {
+    setIntegrationsBusy(`${action}:${integrationId}`)
+    setIntegrationsStatus(null)
+    try {
+      const res = await fetch(`/api/minecraft/integrations/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ integrationId }),
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || `Failed to ${action} integration`)
+      setIntegrationsStatus({ ok: true, msg: data.message || `${integrationId} ${action} complete.` })
+      await loadIntegrations()
+    } catch (nextError) {
+      setIntegrationsStatus({ ok: false, msg: nextError instanceof Error ? nextError.message : `Failed to ${action} integration.` })
+    } finally {
+      setIntegrationsBusy(null)
+    }
+  }, [loadIntegrations])
+
+  const saveStructureEditorPreference = useCallback(async (integrationId: string, reason: string) => {
+    setIntegrationsBusy(`preference:${integrationId}`)
+    setIntegrationsStatus(null)
+    try {
+      const res = await fetch('/api/minecraft/integrations/preference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preferenceKey: 'structure_editor_provider', integrationId, reason }),
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || 'Failed to save structure editor preference')
+      setIntegrationsStatus({ ok: true, msg: `Structure editor provider set to ${integrationId}.` })
+      setIntegrationRecommendationOpen(false)
+      await loadIntegrations()
+    } catch (nextError) {
+      setIntegrationsStatus({ ok: false, msg: nextError instanceof Error ? nextError.message : 'Failed to save structure editor preference.' })
+    } finally {
+      setIntegrationsBusy(null)
+    }
+  }, [loadIntegrations])
+
   const runWorldCommand = useCallback(async (kind: 'time' | 'weather', value: string) => {
     if (!activeWorld) {
       setError('Choose an active world first.')
@@ -736,6 +864,11 @@ export default function WorldsSection({
   useEffect(() => {
     void loadFeatures()
   }, [loadFeatures])
+
+  useEffect(() => {
+    if (stackMode !== 'full') return
+    void loadIntegrations()
+  }, [loadIntegrations, stackMode])
 
   useEffect(() => {
     if (stackMode !== 'full') {
@@ -1129,47 +1262,50 @@ export default function WorldsSection({
           : mode === 'all'
             ? 'every indexed structure in all worlds'
             : `every indexed structure within ${radius} blocks of ${selectedPlayer}`
-    if (typeof window !== 'undefined' && !window.confirm(`Remove ${confirmLabel}?`)) {
-      return
-    }
-
-    const busyKey = mode === 'radius' ? `radius:${radius}` : mode
-    setPlacementActionBusy(busyKey)
-    try {
-      let data: { removedCount: number; warning?: string | null }
-      if (mode === 'listed') {
-        data = await postJson('/api/minecraft/structures/placements/clear', {
-          mode: 'listed',
-          world,
-          structureIds: listedEntries.map(entry => entry.id),
-        })
-      } else if (mode === 'radius') {
-        const playerTarget = await resolvePlayerTarget(selectedPlayer)
-        data = await postJson('/api/minecraft/structures/placements/clear', {
-          mode: 'radius',
-          world: playerTarget.world,
-          x: playerTarget.location.x,
-          y: playerTarget.location.y,
-          z: playerTarget.location.z,
-          radius,
-        })
-      } else {
-        data = await postJson('/api/minecraft/structures/placements/clear', {
-          mode,
-          world,
-        })
-      }
-      setStatus(
-        data.warning
-          ? `Removed ${data.removedCount} structure${data.removedCount === 1 ? '' : 's'}. ${data.warning}`
-          : `Removed ${data.removedCount} structure${data.removedCount === 1 ? '' : 's'}.`,
-      )
-      await loadData(false)
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'Failed to clear structures')
-    } finally {
-      setPlacementActionBusy(null)
-    }
+    openRemovalConfirm(
+      'Remove Structures?',
+      `This will remove ${confirmLabel}. This cannot be undone.`,
+      mode === 'listed' ? 'Remove Listed' : mode === 'radius' ? `Clear ${radius}` : 'Remove Structures',
+      async () => {
+        const busyKey = mode === 'radius' ? `radius:${radius}` : mode
+        setPlacementActionBusy(busyKey)
+        try {
+          let data: { removedCount: number; warning?: string | null }
+          if (mode === 'listed') {
+            data = await postJson('/api/minecraft/structures/placements/clear', {
+              mode: 'listed',
+              world,
+              structureIds: listedEntries.map(entry => entry.id),
+            })
+          } else if (mode === 'radius') {
+            const playerTarget = await resolvePlayerTarget(selectedPlayer)
+            data = await postJson('/api/minecraft/structures/placements/clear', {
+              mode: 'radius',
+              world: playerTarget.world,
+              x: playerTarget.location.x,
+              y: playerTarget.location.y,
+              z: playerTarget.location.z,
+              radius,
+            })
+          } else {
+            data = await postJson('/api/minecraft/structures/placements/clear', {
+              mode,
+              world,
+            })
+          }
+          setStatus(
+            data.warning
+              ? `Removed ${data.removedCount} structure${data.removedCount === 1 ? '' : 's'}. ${data.warning}`
+              : `Removed ${data.removedCount} structure${data.removedCount === 1 ? '' : 's'}.`,
+          )
+          await loadData(false)
+        } catch (nextError) {
+          setError(nextError instanceof Error ? nextError.message : 'Failed to clear structures')
+        } finally {
+          setPlacementActionBusy(null)
+        }
+      },
+    )
   }
 
   const handleFindPlacements = async () => {
@@ -1257,23 +1393,27 @@ export default function WorldsSection({
   }
 
   const handleRemoveLiveEntity = async (entry: LiveEntityEntry) => {
-    if (typeof window !== 'undefined' && !window.confirm(`Remove ${entry.label} from ${entry.world}?`)) {
-      return
-    }
-    setLiveEntityActionBusy(entry.uuid)
-    try {
-      await postJson('/api/minecraft/entities/remove', {
-        uuid: entry.uuid,
-        label: entry.label,
-        world: entry.world,
-      })
-      setStatus(`Removed ${entry.label} from ${entry.world}.`)
-      await loadData(false)
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'Failed to remove live entity')
-    } finally {
-      setLiveEntityActionBusy(null)
-    }
+    openRemovalConfirm(
+      'Delete Live Entity?',
+      `${entry.label} will be removed from ${entry.world}.`,
+      'Delete Entity',
+      async () => {
+        setLiveEntityActionBusy(entry.uuid)
+        try {
+          await postJson('/api/minecraft/entities/remove', {
+            uuid: entry.uuid,
+            label: entry.label,
+            world: entry.world,
+          })
+          setStatus(`Removed ${entry.label} from ${entry.world}.`)
+          await loadData(false)
+        } catch (nextError) {
+          setError(nextError instanceof Error ? nextError.message : 'Failed to remove live entity')
+        } finally {
+          setLiveEntityActionBusy(null)
+        }
+      },
+    )
   }
 
   const handleClearLiveEntities = async (mode: 'listed' | 'world' | 'all' | 'radius', radius?: 10 | 25 | 50) => {
@@ -1305,47 +1445,50 @@ export default function WorldsSection({
             ? 'every non-player entity in all loaded worlds'
             : `every non-player entity within ${radius} blocks of ${selectedPlayer}`
 
-    if (typeof window !== 'undefined' && !window.confirm(`Remove ${confirmLabel}?${limitedNotice}`)) {
-      return
-    }
-
-    const busyKey = mode === 'radius' ? `radius:${radius}` : mode
-    setLiveEntityActionBusy(busyKey)
-    try {
-      let data: { removedCount: number; warning?: string | null }
-      if (mode === 'listed') {
-        data = await postJson('/api/minecraft/entities/clear', {
-          mode: 'listed',
-          world,
-          uuids: entries.map(entry => entry.uuid),
-        })
-      } else if (mode === 'radius') {
-        const playerTarget = await resolvePlayerTarget(selectedPlayer)
-        data = await postJson('/api/minecraft/entities/clear', {
-          mode: 'radius',
-          world: playerTarget.world,
-          x: playerTarget.location.x,
-          y: playerTarget.location.y,
-          z: playerTarget.location.z,
-          radius,
-        })
-      } else {
-        data = await postJson('/api/minecraft/entities/clear', {
-          mode,
-          world,
-        })
-      }
-      setStatus(
-        data.warning
-          ? `Removed ${data.removedCount} entit${data.removedCount === 1 ? 'y' : 'ies'}. ${data.warning}`
-          : `Removed ${data.removedCount} entit${data.removedCount === 1 ? 'y' : 'ies'}.`,
-      )
-      await loadData(false)
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'Failed to clear live entities')
-    } finally {
-      setLiveEntityActionBusy(null)
-    }
+    openRemovalConfirm(
+      'Remove Live Entities?',
+      `This will remove ${confirmLabel}.${limitedNotice} This cannot be undone.`,
+      mode === 'listed' ? 'Remove Listed' : mode === 'radius' ? `Clear ${radius}` : 'Remove Entities',
+      async () => {
+        const busyKey = mode === 'radius' ? `radius:${radius}` : mode
+        setLiveEntityActionBusy(busyKey)
+        try {
+          let data: { removedCount: number; warning?: string | null }
+          if (mode === 'listed') {
+            data = await postJson('/api/minecraft/entities/clear', {
+              mode: 'listed',
+              world,
+              uuids: entries.map(entry => entry.uuid),
+            })
+          } else if (mode === 'radius') {
+            const playerTarget = await resolvePlayerTarget(selectedPlayer)
+            data = await postJson('/api/minecraft/entities/clear', {
+              mode: 'radius',
+              world: playerTarget.world,
+              x: playerTarget.location.x,
+              y: playerTarget.location.y,
+              z: playerTarget.location.z,
+              radius,
+            })
+          } else {
+            data = await postJson('/api/minecraft/entities/clear', {
+              mode,
+              world,
+            })
+          }
+          setStatus(
+            data.warning
+              ? `Removed ${data.removedCount} entit${data.removedCount === 1 ? 'y' : 'ies'}. ${data.warning}`
+              : `Removed ${data.removedCount} entit${data.removedCount === 1 ? 'y' : 'ies'}.`,
+          )
+          await loadData(false)
+        } catch (nextError) {
+          setError(nextError instanceof Error ? nextError.message : 'Failed to clear live entities')
+        } finally {
+          setLiveEntityActionBusy(null)
+        }
+      },
+    )
   }
 
   const handleStructureUpload = async (file: File | null) => {
@@ -2712,6 +2855,13 @@ export default function WorldsSection({
             setEditingPreset(null)
           }}
           onSave={payload => void handleSavePreset(payload)}
+        />
+      )}
+
+      {confirmModal && (
+        <ConfirmModal
+          {...confirmModal}
+          onCancel={() => setConfirmModal(null)}
         />
       )}
     </div>
