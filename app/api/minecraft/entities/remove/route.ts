@@ -13,12 +13,6 @@ type BridgeResponse = {
   error?: string
 }
 
-type LiveEntityResponse = {
-  ok: boolean
-  entities?: Array<{ uuid: string }>
-  error?: string
-}
-
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function uuidToSelector(uuid: string) {
@@ -33,12 +27,9 @@ function uuidToSelector(uuid: string) {
   return `@e[nbt={UUID:[I;${ints.join(',')}]}]`
 }
 
-async function verifyEntityRemoved(req: NextRequest, uuid: string, world: string | null) {
-  if (!world) return true
-  const bridge = await runBridgeJson<LiveEntityResponse>(req, `entities live ${world}`)
-  if (!bridge.ok || bridge.data.ok === false) return false
-  const entities = Array.isArray(bridge.data.entities) ? bridge.data.entities : []
-  return !entities.some(entity => entity.uuid === uuid)
+function killRemovedEntity(stdout: string) {
+  const match = stdout.match(/killed\s+(\d+)\s+entities?/i)
+  return match ? Number.parseInt(match[1] ?? '0', 10) > 0 : false
 }
 
 export async function POST(req: NextRequest) {
@@ -66,7 +57,7 @@ export async function POST(req: NextRequest) {
   }
 
   const result = await rconForRequest(req, `kill ${uuidToSelector(uuid)}`)
-  const removedViaKill = result.ok && await verifyEntityRemoved(req, uuid, world)
+  const removedViaKill = result.ok && killRemovedEntity(result.stdout)
   if (!removedViaKill) {
     const bridge = await runBridgeJson<BridgeResponse>(req, `entities remove ${uuid}`)
     if (!bridge.ok || bridge.data.ok === false) {
@@ -76,10 +67,6 @@ export async function POST(req: NextRequest) {
       )
     }
     const resolvedWorld = bridge.data.world ?? world
-    const verified = await verifyEntityRemoved(req, uuid, resolvedWorld)
-    if (!verified) {
-      return Response.json({ ok: false, error: `Entity removal command completed, but ${label} is still present in ${resolvedWorld ?? 'the target world'}.` }, { status: 409 })
-    }
     const serverId = await getSessionActiveServerId(req)
     logAudit(userId, 'entity_remove', label, resolvedWorld ? `${resolvedWorld} · ${uuid}` : uuid, serverId)
     return Response.json({ ok: true, uuid, world: bridge.data.world ?? world, provider: 'relay' })

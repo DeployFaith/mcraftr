@@ -32,16 +32,21 @@ function uuidToSelector(uuid: string) {
   return `@e[nbt={UUID:[I;${ints.join(',')}]}]`
 }
 
+function killRemovedEntity(stdout: string) {
+  const match = stdout.match(/killed\s+(\d+)\s+entities?/i)
+  return match ? Number.parseInt(match[1] ?? '0', 10) > 0 : false
+}
+
 async function removeListedEntities(req: NextRequest, uuids: string[]) {
   let removedCount = 0
   for (const uuid of uuids) {
-    const bridge = await runBridgeJson<{ ok: boolean; error?: string }>(req, `entities remove ${uuid}`)
-    if (bridge.ok && bridge.data.ok !== false) {
+    const killResult = await rconForRequest(req, `kill ${uuidToSelector(uuid)}`)
+    if (killResult.ok && killRemovedEntity(killResult.stdout)) {
       removedCount += 1
       continue
     }
-    const result = await rconForRequest(req, `kill ${uuidToSelector(uuid)}`)
-    if (result.ok) removedCount += 1
+    const bridge = await runBridgeJson<{ ok: boolean; error?: string }>(req, `entities remove ${uuid}`)
+    if (bridge.ok && bridge.data.ok !== false) removedCount += 1
   }
 
   return {

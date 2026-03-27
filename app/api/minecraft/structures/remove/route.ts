@@ -27,26 +27,24 @@ async function removeTrackedFallback(req: NextRequest, placementId: string, serv
 
   const isNative = placement.source_kind === 'native'
   const command = isNative
-    ? `structures clear ${placement.world} ${placement.origin_x} ${placement.origin_y} ${placement.origin_z} ${placement.max_x - placement.min_x + 1} ${placement.max_y - placement.min_y + 1} ${placement.max_z - placement.min_z + 1} ${placement.rotation}`
+    ? `execute in ${placement.world} run fill ${placement.min_x} ${placement.min_y} ${placement.min_z} ${placement.max_x} ${placement.max_y} ${placement.max_z} minecraft:air replace`
     : `structures remove ${placement.bridge_ref} ${placement.world} ${placement.origin_x} ${placement.origin_y} ${placement.origin_z} ${placement.rotation} ${placement.include_air ? 'air' : 'noair'}`
 
   const bridge = await runBridgeJson<BridgeResponse>(req, command)
   if (!bridge.ok || bridge.data.ok === false) return null
-
-  markStructurePlacementRemoved(placement.id, serverId)
   return { placement, world: bridge.data.world ?? placement.world }
 }
 
 async function verifyStructureRemoved(req: NextRequest, placementId: string, serverId: string, world: string | null, origin?: { x: number; y: number; z: number } | null) {
   const tracked = getStructurePlacementById(placementId, serverId)
   if (tracked && !tracked.removed_at) return false
-  if (!world) return true
+  if (!world || !origin) return false
   const radius = 4
   const command = origin
     ? `structures list ${world} radius ${origin.x} ${origin.y} ${origin.z} ${radius}`
     : `structures list ${world}`
   const bridge = await runBridgeJson<RelayStructuresResponse>(req, command)
-  if (!bridge.ok || bridge.data.ok === false) return true
+  if (!bridge.ok || bridge.data.ok === false) return false
   const items = Array.isArray(bridge.data.items) ? bridge.data.items : []
   return !items.some(item => item.id === placementId)
 }
@@ -70,7 +68,7 @@ async function removePlacementFromPayload(req: NextRequest, payload: {
   if (!payload.world || payload.originX === null || payload.originY === null || payload.originZ === null || payload.rotation === null) return null
   if (payload.sourceKind === 'native') {
     if (payload.minX === null || payload.minY === null || payload.minZ === null || payload.maxX === null || payload.maxY === null || payload.maxZ === null) return null
-    const command = `structures clear ${payload.world} ${payload.originX} ${payload.originY} ${payload.originZ} ${payload.maxX - payload.minX + 1} ${payload.maxY - payload.minY + 1} ${payload.maxZ - payload.minZ + 1} ${payload.rotation}`
+    const command = `execute in ${payload.world} run fill ${payload.minX} ${payload.minY} ${payload.minZ} ${payload.maxX} ${payload.maxY} ${payload.maxZ} minecraft:air replace`
     const bridge = await runBridgeJson<BridgeResponse>(req, command)
     if (!bridge.ok || bridge.data.ok === false) return null
     return { world: bridge.data.world ?? payload.world }
@@ -113,7 +111,6 @@ export async function POST(req: NextRequest) {
 
   if (bridge.ok && bridge.data.ok !== false) {
     resolvedWorld = bridge.data.world ?? (typeof world === 'string' ? world : null)
-    markStructurePlacementRemoved(placementId, serverId)
     const verified = await verifyStructureRemoved(req, placementId, serverId, resolvedWorld, origin)
     if (!verified) {
       const trackedFallback = await removeTrackedFallback(req, placementId, serverId)
@@ -138,6 +135,7 @@ export async function POST(req: NextRequest) {
       }
       resolvedWorld = payloadFallback.world
     }
+    markStructurePlacementRemoved(placementId, serverId)
   } else {
     const fallback = await removeTrackedFallback(req, placementId, serverId)
     const payloadFallback = fallback ?? await removePlacementFromPayload(req, {
