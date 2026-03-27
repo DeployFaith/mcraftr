@@ -45,6 +45,14 @@ type StructureResponse = {
       templates?: number
       worldgen?: number
     }
+    nativeScan?: {
+      cacheDir?: string
+      cacheDirExists?: boolean
+      latestJar?: string | null
+      bundledJarPath?: string | null
+      warnings?: string[]
+      error?: string | null
+    }
   }
   capabilities?: string[]
 }

@@ -10,7 +10,7 @@ function sanitizeVersion(raw: string) {
 }
 
 function sanitizeEntityId(raw: string) {
-  return /^[a-z0-9_./-]+$/.test(raw) ? raw : null
+  return /^[a-z0-9_:./-]+$/.test(raw) ? raw : null
 }
 
 function labelFromEntityId(entityId: string) {

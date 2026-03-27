@@ -71,6 +71,14 @@ type StructureScanData = {
     templates?: number
     worldgen?: number
   }
+  nativeScan?: {
+    cacheDir?: string
+    cacheDirExists?: boolean
+    latestJar?: string | null
+    bundledJarPath?: string | null
+    warnings?: string[]
+    error?: string | null
+  }
 }
 
 type EntityScanRoot = {
@@ -305,6 +313,21 @@ function normalizeStructureScan(raw: unknown): StructureScanData | null {
           worldgen: typeof (row.nativeCounts as Record<string, unknown>).worldgen === 'number' ? (row.nativeCounts as Record<string, number>).worldgen : 0,
         }
       : undefined,
+    nativeScan: (() => {
+      if (!row.nativeScan || typeof row.nativeScan !== 'object') return undefined
+      const nativeScan = row.nativeScan as Record<string, unknown>
+      const warnings = Array.isArray(nativeScan.warnings)
+        ? nativeScan.warnings.filter((value): value is string => typeof value === 'string')
+        : undefined
+      return {
+        cacheDir: typeof nativeScan.cacheDir === 'string' ? nativeScan.cacheDir : undefined,
+        cacheDirExists: typeof nativeScan.cacheDirExists === 'boolean' ? nativeScan.cacheDirExists : undefined,
+        latestJar: typeof nativeScan.latestJar === 'string' ? nativeScan.latestJar : null,
+        bundledJarPath: typeof nativeScan.bundledJarPath === 'string' ? nativeScan.bundledJarPath : null,
+        warnings,
+        error: typeof nativeScan.error === 'string' ? nativeScan.error : null,
+      }
+    })(),
   }
 }
 
@@ -2281,6 +2304,15 @@ export default function WorldsSection({
             className="hidden"
             onChange={event => void handleStructureUpload(event.target.files?.[0] ?? null)}
           />
+          {structureScan?.nativeScan?.error && (
+            <div className="rounded-2xl border border-amber-900/60 bg-amber-950/20 px-4 py-3 text-[12px] font-mono text-amber-200">
+              <div className="text-[11px] tracking-[0.18em] text-amber-300">NATIVE STRUCTURE SCAN DEGRADED</div>
+              <div className="mt-2">Beacon could not load native structure templates on this server.</div>
+              {structureScan.nativeScan.warnings?.[0] && (
+                <div className="mt-2 text-[11px] text-amber-100/80">{structureScan.nativeScan.warnings[0]}</div>
+              )}
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-[12px] font-mono text-[var(--text-dim)]">
               {structures.length} structure entries · {structureScan?.nativeCounts?.templates ?? 0} native templates · {structureScan?.nativeCounts?.worldgen ?? 0} native worldgen
@@ -2392,7 +2424,9 @@ export default function WorldsSection({
               {structureLoadError
                 ? structureLoadError
                 : structures.length === 0
-                  ? 'No structures found. Check the beacon schematics path or upload a schematic first.'
+                  ? structureScan?.nativeScan?.error
+                    ? 'Beacon could not load native structure templates on this server. Uploaded schematics may still appear once Beacon roots are configured correctly.'
+                    : 'No structures found. Check the beacon schematics path or upload a schematic first.'
                   : structureSearch.trim()
                     ? `No structures match "${structureSearch.trim()}" for the current source filter.`
                     : 'No structures are available in the current source filter.'}

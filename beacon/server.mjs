@@ -825,78 +825,141 @@ function ensureBundledServerJar() {
   return { key, jarPath }
 }
 
+function diagnoseNativeStructureCatalog() {
+  const diagnostics = {
+    cacheDir: path.join(WORLDS_DIR, 'cache'),
+    cacheDirExists: isDirectory(path.join(WORLDS_DIR, 'cache')),
+    latestJar: null,
+    bundledJarPath: null,
+    warnings: [],
+    error: null,
+  }
+
+  try {
+    const latest = findLatestMojangJar()
+    if (!latest) {
+      diagnostics.error = 'no_mojang_cache_jar'
+      diagnostics.warnings.push('No mojang_*.jar was found under the server cache directory.')
+      return diagnostics
+    }
+    diagnostics.latestJar = displayPath(latest.fullPath)
+
+    const bundled = ensureBundledServerJar()
+    if (!bundled) {
+      diagnostics.error = 'no_bundled_server_jar'
+      diagnostics.warnings.push('Beacon could not prepare a bundled server jar for native structure scanning.')
+      return diagnostics
+    }
+    diagnostics.bundledJarPath = displayPath(bundled.jarPath)
+
+    try {
+      execFileSync('unzip', ['-l', bundled.jarPath], {
+        encoding: 'utf8',
+        maxBuffer: 16 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+    } catch {
+      diagnostics.error = 'unzip_unavailable_or_failed'
+      diagnostics.warnings.push('Beacon could not inspect the bundled server jar with unzip.')
+      return diagnostics
+    }
+
+    return diagnostics
+  } catch (error) {
+    diagnostics.error = 'native_structure_scan_failed'
+    diagnostics.warnings.push(error instanceof Error ? error.message : 'Unknown native structure scan error')
+    return diagnostics
+  }
+}
+
 function buildNativeStructureCatalog() {
-  const bundled = ensureBundledServerJar()
-  if (!bundled) {
-    return { templates: [], worldgen: [], jarPath: '' }
+  try {
+    const bundled = ensureBundledServerJar()
+    if (!bundled) {
+      return { templates: [], worldgen: [], jarPath: '', diagnostics: diagnoseNativeStructureCatalog() }
+    }
+    if (nativeStructureCache.key === bundled.key && nativeStructureCache.jarPath === bundled.jarPath) {
+      return { ...nativeStructureCache, diagnostics: diagnoseNativeStructureCatalog() }
+    }
+    const entries = listZipEntries(bundled.jarPath)
+    const worldgen = entries
+      .filter(entry => entry.startsWith('data/minecraft/worldgen/structure/') && entry.endsWith('.json'))
+      .map(entry => {
+        const resourceKey = entry
+          .replace(/^data\/minecraft\/worldgen\/structure\//, '')
+          .replace(/\.json$/i, '')
+        return {
+          id: `native-worldgen:${resourceKey}`,
+          label: labelize(resourceKey.split('/').at(-1) || resourceKey),
+          category: structureCategory(resourceKey, 'native-worldgen'),
+          sourceKind: 'native',
+          placementKind: 'native-worldgen',
+          bridgeRef: resourceKey,
+          resourceKey,
+          relativePath: null,
+          format: 'native',
+          sizeBytes: null,
+          updatedAt: null,
+          imageUrl: getStructureArtUrl({ placementKind: 'native-worldgen', resourceKey, label: labelize(resourceKey.split('/').at(-1) || resourceKey), format: 'native' }),
+          artUrl: getStructureArtUrl({ placementKind: 'native-worldgen', resourceKey, label: labelize(resourceKey.split('/').at(-1) || resourceKey), format: 'native' }),
+          iconId: resourceKey,
+          summary: `Vanilla worldgen structure ${titleizePath(resourceKey)}.`,
+          dimensions: null,
+          removable: false,
+          editable: false,
+        }
+      })
+      .sort((a, b) => a.label.localeCompare(b.label))
+    const templates = entries
+      .filter(entry => entry.startsWith('data/minecraft/structure/') && entry.endsWith('.nbt'))
+      .map(entry => {
+        const resourceKey = entry
+          .replace(/^data\/minecraft\/structure\//, '')
+          .replace(/\.nbt$/i, '')
+        return {
+          id: `native-template:${resourceKey}`,
+          label: labelize(resourceKey.split('/').at(-1) || resourceKey),
+          category: structureCategory(resourceKey, 'native-template'),
+          sourceKind: 'native',
+          placementKind: 'native-template',
+          bridgeRef: resourceKey,
+          resourceKey,
+          relativePath: null,
+          format: 'native',
+          sizeBytes: null,
+          updatedAt: null,
+          imageUrl: getStructureArtUrl({ placementKind: 'native-template', resourceKey, label: labelize(resourceKey.split('/').at(-1) || resourceKey), format: 'native' }),
+          artUrl: getStructureArtUrl({ placementKind: 'native-template', resourceKey, label: labelize(resourceKey.split('/').at(-1) || resourceKey), format: 'native' }),
+          iconId: resourceKey,
+          summary: `Vanilla template ${titleizePath(resourceKey)}.`,
+          dimensions: null,
+          removable: true,
+          editable: false,
+        }
+      })
+      .sort((a, b) => a.label.localeCompare(b.label))
+    nativeStructureCache = {
+      key: bundled.key,
+      jarPath: bundled.jarPath,
+      templates,
+      worldgen,
+    }
+    return { ...nativeStructureCache, diagnostics: diagnoseNativeStructureCatalog() }
+  } catch (error) {
+    return {
+      templates: [],
+      worldgen: [],
+      jarPath: '',
+      diagnostics: {
+        cacheDir: path.join(WORLDS_DIR, 'cache'),
+        cacheDirExists: isDirectory(path.join(WORLDS_DIR, 'cache')),
+        latestJar: null,
+        bundledJarPath: null,
+        warnings: [error instanceof Error ? error.message : 'Unknown native structure scan error'],
+        error: 'native_structure_scan_failed',
+      },
+    }
   }
-  if (nativeStructureCache.key === bundled.key && nativeStructureCache.jarPath === bundled.jarPath) {
-    return nativeStructureCache
-  }
-  const entries = listZipEntries(bundled.jarPath)
-  const worldgen = entries
-    .filter(entry => entry.startsWith('data/minecraft/worldgen/structure/') && entry.endsWith('.json'))
-    .map(entry => {
-      const resourceKey = entry
-        .replace(/^data\/minecraft\/worldgen\/structure\//, '')
-        .replace(/\.json$/i, '')
-      return {
-        id: `native-worldgen:${resourceKey}`,
-        label: labelize(resourceKey.split('/').at(-1) || resourceKey),
-        category: structureCategory(resourceKey, 'native-worldgen'),
-        sourceKind: 'native',
-        placementKind: 'native-worldgen',
-        bridgeRef: resourceKey,
-        resourceKey,
-        relativePath: null,
-        format: 'native',
-        sizeBytes: null,
-        updatedAt: null,
-        imageUrl: getStructureArtUrl({ placementKind: 'native-worldgen', resourceKey, label: labelize(resourceKey.split('/').at(-1) || resourceKey), format: 'native' }),
-        artUrl: getStructureArtUrl({ placementKind: 'native-worldgen', resourceKey, label: labelize(resourceKey.split('/').at(-1) || resourceKey), format: 'native' }),
-        iconId: resourceKey,
-        summary: `Vanilla worldgen structure ${titleizePath(resourceKey)}.`,
-        dimensions: null,
-        removable: false,
-        editable: false,
-      }
-    })
-    .sort((a, b) => a.label.localeCompare(b.label))
-  const templates = entries
-    .filter(entry => entry.startsWith('data/minecraft/structure/') && entry.endsWith('.nbt'))
-    .map(entry => {
-      const resourceKey = entry
-        .replace(/^data\/minecraft\/structure\//, '')
-        .replace(/\.nbt$/i, '')
-      return {
-        id: `native-template:${resourceKey}`,
-        label: labelize(resourceKey.split('/').at(-1) || resourceKey),
-        category: structureCategory(resourceKey, 'native-template'),
-        sourceKind: 'native',
-        placementKind: 'native-template',
-        bridgeRef: resourceKey,
-        resourceKey,
-        relativePath: null,
-        format: 'native',
-        sizeBytes: null,
-        updatedAt: null,
-        imageUrl: getStructureArtUrl({ placementKind: 'native-template', resourceKey, label: labelize(resourceKey.split('/').at(-1) || resourceKey), format: 'native' }),
-        artUrl: getStructureArtUrl({ placementKind: 'native-template', resourceKey, label: labelize(resourceKey.split('/').at(-1) || resourceKey), format: 'native' }),
-        iconId: resourceKey,
-        summary: `Vanilla template ${titleizePath(resourceKey)}.`,
-        dimensions: null,
-        removable: true,
-        editable: false,
-      }
-    })
-    .sort((a, b) => a.label.localeCompare(b.label))
-  nativeStructureCache = {
-    key: bundled.key,
-    jarPath: bundled.jarPath,
-    templates,
-    worldgen,
-  }
-  return nativeStructureCache
 }
 
 function stripBlockState(value) {
@@ -1230,6 +1293,7 @@ function scanStructures(req) {
       templates: native.templates.length,
       worldgen: native.worldgen.length,
     },
+    nativeScan: native.diagnostics,
   }
 }
 
