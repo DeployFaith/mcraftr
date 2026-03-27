@@ -106,13 +106,52 @@ function extractJson(raw: string): string | null {
       return line
     }
   }
-  const objectStart = trimmed.indexOf('{')
-  if (objectStart >= 0) {
-    return trimmed.slice(objectStart)
+
+  const starts = [trimmed.indexOf('{'), trimmed.indexOf('[')].filter(index => index >= 0)
+  if (starts.length === 0) return null
+
+  const jsonStart = Math.min(...starts)
+  const opener = trimmed[jsonStart]
+  const closer = opener === '{' ? '}' : ']'
+  let depth = 0
+  let inString = false
+  let escaped = false
+
+  for (let index = jsonStart; index < trimmed.length; index += 1) {
+    const char = trimmed[index]
+    if (inString) {
+      if (escaped) {
+        escaped = false
+        continue
+      }
+      if (char === '\\') {
+        escaped = true
+        continue
+      }
+      if (char === '"') {
+        inString = false
+      }
+      continue
+    }
+
+    if (char === '"') {
+      inString = true
+      continue
+    }
+    if (char === opener) {
+      depth += 1
+      continue
+    }
+    if (char === closer) {
+      depth -= 1
+      if (depth === 0) {
+        return trimmed.slice(jsonStart, index + 1)
+      }
+    }
   }
-  const arrayStart = trimmed.indexOf('[')
-  if (arrayStart >= 0) {
-    return trimmed.slice(arrayStart)
+
+  if (jsonStart >= 0) {
+    return trimmed.slice(jsonStart)
   }
   return null
 }
