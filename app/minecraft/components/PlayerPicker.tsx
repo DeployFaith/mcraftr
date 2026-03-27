@@ -15,11 +15,10 @@ type Props = {
 export default function PlayerPicker({ online, selected, onSelect, placeholder = 'Or type player name…' }: Props) {
   const [directory, setDirectory] = useState<DirectoryPlayer[]>([])
   const [filter, setFilter]       = useState<Filter>('30d')
-  const [loading, setLoading]     = useState(false)
+  const [loading, setLoading]     = useState(true)
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
     fetch(`/api/admin/players?filter=${filter}`)
       .then(r => r.json())
       .then(d => { if (!cancelled && d.ok) setDirectory(d.players ?? []) })
@@ -68,7 +67,7 @@ export default function PlayerPicker({ online, selected, onSelect, placeholder =
             {(['7d', '30d', 'all'] as Filter[]).map(f => (
               <button
                 key={f}
-                onClick={() => setFilter(f)}
+                onClick={() => { setLoading(true); setFilter(f) }}
                 className={`text-[8px] font-mono px-1.5 py-0.5 rounded border transition-all ${
                   filter === f
                     ? 'border-[var(--accent-mid)] text-[var(--accent)]'

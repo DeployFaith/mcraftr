@@ -396,14 +396,14 @@ function InlineMenu({
 // ── Online time ticker ────────────────────────────────────────────────────────
 
 function OnlineTimer({ joinedAtMs }: { joinedAtMs: number | null }) {
-  const [display, setDisplay] = useState(joinedAtMs ? formatOnlineTime(joinedAtMs) : '—')
+  const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    if (!joinedAtMs) { setDisplay('—'); return }
-    setDisplay(formatOnlineTime(joinedAtMs))
-    const t = setInterval(() => setDisplay(formatOnlineTime(joinedAtMs)), 1000)
+    if (!joinedAtMs) return
+    const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [joinedAtMs])
-  return <>{display}</>
+  void now
+  return <>{joinedAtMs ? formatOnlineTime(joinedAtMs) : '—'}</>
 }
 
 // ── Player detail panel ───────────────────────────────────────────────────────
@@ -461,15 +461,6 @@ function PlayerPanel({
   const canInventory = features ? features.enable_inventory : true
   const canPlayerCommands = features ? features.enable_player_commands : true
   const canControlDeck = canPlayerCommands || canVitals || canLocation || canEffects
-  const openIntegrations = useCallback(() => {
-    window.location.assign('/minecraft?tab=settings')
-  }, [])
-  const healthLockedReason = 'Exact health control needs a supported player-control integration.'
-  const hungerLockedReason = 'Exact hunger control is unavailable on vanilla. Install the supported integration to unlock it.'
-  const restoreLockedReason = 'This recovery action depends on a supported player-control integration.'
-  const extinguishLockedReason = 'This action is locked until a supported player-control integration is installed.'
-  const inventoryUnavailableReason = 'This inventory utility is temporarily unavailable while command compatibility is being validated.'
-
   const loadFeatures = useCallback(async () => {
     try {
       const r = await fetch('/api/account/preferences')

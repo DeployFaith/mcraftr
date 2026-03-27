@@ -9,6 +9,7 @@ export default function BrandLockup({ size = 'header', className = '' }: Props) 
 
   return (
     <div className={`flex items-center gap-1 ${className}`.trim()}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- tiny local SVG mark; next/image adds no meaningful value here */}
       <img src="/m.svg" alt="Mcraftr mark" className={`${markSize} object-contain shrink-0`} />
       <span className={`font-mono font-bold leading-none uppercase ${textSize}`} style={{ color: 'var(--accent)' }}>
         CRAFTR

@@ -56,9 +56,9 @@ function ConnectForm() {
   const [port, setPort] = useState('25575')
   const [password, setPassword] = useState('')
   const [stackMode, setStackMode] = useState<ServerStackMode>('full')
-  const [bridgeEnabled, setBridgeEnabled] = useState(true)
+  const [, setBridgeEnabled] = useState(true)
   const [bridgeCommandPrefix, setBridgeCommandPrefix] = useState('mcraftr')
-  const [sidecarEnabled, setSidecarEnabled] = useState(true)
+  const [, setSidecarEnabled] = useState(true)
   const [sidecarUrl, setSidecarUrl] = useState('http://mcraftr-beacon:9419/')
   const [sidecarToken, setSidecarToken] = useState('')
   const [sidecarStructureRoots, setSidecarStructureRoots] = useState('')
@@ -499,7 +499,7 @@ function ConnectForm() {
                     <div>
                       <div className="text-[11px] font-mono tracking-widest" style={{ color: 'var(--text-dim)' }}>MCRAFTR RELAY</div>
                       <div className="text-[12px] font-mono mt-1" style={{ color: 'var(--text-dim)' }}>
-                        Mcraftr's live integration layer for world operations, plugin stack data, typed server actions, and the deeper workflow. Your server needs a Relay API integration that exposes a relay prefix over RCON.
+                        Mcraftr&apos;s live integration layer for world operations, plugin stack data, typed server actions, and the deeper workflow. Your server needs a Relay API integration that exposes a relay prefix over RCON.
                       </div>
                     </div>
                     <div className="rounded border px-2 py-1 text-[10px] font-mono tracking-widest" style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}>
@@ -520,7 +520,7 @@ function ConnectForm() {
                       style={{ background: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '16px' }}
                     />
                     <div className="mt-1 text-[10px] font-mono" style={{ color: 'var(--text-dim)' }}>
-                      Enter the relay prefix exposed by your server's Relay API integration. Change this only if your plugin or mod uses a custom prefix.
+                      Enter the relay prefix exposed by your server&apos;s Relay API integration. Change this only if your plugin or mod uses a custom prefix.
                     </div>
                   </div>
                 </div>

@@ -176,7 +176,7 @@ export default function ColorPickerModal({
     })
   }
 
-  const useEyeDropper = async () => {
+  const openEyeDropper = async () => {
     if (!window.isSecureContext) {
       setEyeDropperStatus('Eyedropper needs HTTPS or another secure browser context.')
       return
@@ -347,7 +347,7 @@ export default function ColorPickerModal({
                 <div className="rounded-[22px] border p-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg) 68%, transparent)' }}>
                   <button
                     type="button"
-                    onClick={() => void useEyeDropper()}
+                    onClick={() => void openEyeDropper()}
                     disabled={eyeDropperBusy}
                     className="flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3 font-mono text-[11px] tracking-[0.16em] transition-all disabled:opacity-50"
                     style={{

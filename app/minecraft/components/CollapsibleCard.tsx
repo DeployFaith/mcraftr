@@ -30,20 +30,19 @@ export default function CollapsibleCard({
   onOpenChange,
   groupKey,
 }: Props) {
-  const [internalOpen, setInternalOpen] = useState(defaultOpen)
+  const [internalOpen, setInternalOpen] = useState(() => {
+    if (typeof window === 'undefined') return defaultOpen
+    try {
+      const stored = window.localStorage.getItem(`mcraftr:section:${storageKey}`)
+      if (stored === 'open') return true
+      if (stored === 'closed') return false
+    } catch {}
+    return defaultOpen
+  })
   const [groupOverride, setGroupOverride] = useState<boolean | null>(null)
   const stateKey = `mcraftr:section:${storageKey}`
   const isControlled = open !== undefined
   const isOpen = groupOverride ?? (isControlled ? open : internalOpen)
-
-  useEffect(() => {
-    if (isControlled) return
-    try {
-      const stored = window.localStorage.getItem(stateKey)
-      if (stored === 'open') setInternalOpen(true)
-      if (stored === 'closed') setInternalOpen(false)
-    } catch {}
-  }, [isControlled, stateKey])
 
   useEffect(() => {
     try {

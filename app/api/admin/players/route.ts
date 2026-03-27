@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getUserById, getUserFeatures } from '@/lib/users'
+import { getUserFeatures } from '@/lib/users'
 import { getDb } from '@/lib/db'
 import { getAdminAccess, requireAdminReadable } from '@/lib/admin-access'
 

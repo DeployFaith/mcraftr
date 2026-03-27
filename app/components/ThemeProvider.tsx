@@ -147,32 +147,23 @@ function applyTheme(theme: Theme, accentId: AccentChoice, customAccent: string, 
 }
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme,  setThemeState]  = useState<Theme>('dark')
-  const [accent, setAccentState] = useState<AccentChoice>('cyan')
-  const [customAccent, setCustomAccentState] = useState(DEFAULT_CUSTOM_ACCENT)
-  const [themePack, setThemePackState] = useState<ThemePack | null>(null)
-  const [font, setFontState] = useState<FontId>('operator')
-  const [fontSize, setFontSizeState] = useState<FontSizeId>('md')
-
-  // Read from localStorage on mount and apply
-  useEffect(() => {
-    const storedTheme  = (localStorage.getItem('mcraftr-theme')  as Theme    | null) ?? 'dark'
+  const [theme, setThemeState] = useState<Theme>(() => (typeof window === 'undefined' ? 'dark' : ((localStorage.getItem('mcraftr-theme') as Theme | null) ?? 'dark')))
+  const [accent, setAccentState] = useState<AccentChoice>(() => {
+    if (typeof window === 'undefined') return 'cyan'
     const rawAccent = localStorage.getItem('mcraftr-accent')
-    const storedAccent = (rawAccent === 'custom' || ACCENTS.some(a => a.id === rawAccent))
-      ? (rawAccent as AccentChoice)
-      : 'cyan'
-    const storedCustomAccent = normalizeHexColor(localStorage.getItem('mcraftr-custom-accent'))
-    const storedThemePack = normalizeThemePack(JSON.parse(localStorage.getItem('mcraftr-theme-pack') || 'null'))
-    const storedFont = (localStorage.getItem('mcraftr-font') as FontId | null) ?? 'operator'
-    const storedFontSize = (localStorage.getItem('mcraftr-font-size') as FontSizeId | null) ?? 'md'
-    setThemeState(storedTheme)
-    setAccentState(storedAccent)
-    setCustomAccentState(storedCustomAccent)
-    setThemePackState(storedThemePack)
-    setFontState(storedFont)
-    setFontSizeState(storedFontSize)
-    applyTheme(storedTheme, storedAccent, storedCustomAccent, storedThemePack, storedFont, storedFontSize)
-  }, [])
+    return (rawAccent === 'custom' || ACCENTS.some(a => a.id === rawAccent)) ? (rawAccent as AccentChoice) : 'cyan'
+  })
+  const [customAccent, setCustomAccentState] = useState(() => (typeof window === 'undefined' ? DEFAULT_CUSTOM_ACCENT : normalizeHexColor(localStorage.getItem('mcraftr-custom-accent'))))
+  const [themePack, setThemePackState] = useState<ThemePack | null>(() => {
+    if (typeof window === 'undefined') return null
+    return normalizeThemePack(JSON.parse(localStorage.getItem('mcraftr-theme-pack') || 'null'))
+  })
+  const [font, setFontState] = useState<FontId>(() => (typeof window === 'undefined' ? 'operator' : ((localStorage.getItem('mcraftr-font') as FontId | null) ?? 'operator')))
+  const [fontSize, setFontSizeState] = useState<FontSizeId>(() => (typeof window === 'undefined' ? 'md' : ((localStorage.getItem('mcraftr-font-size') as FontSizeId | null) ?? 'md')))
+
+  useEffect(() => {
+    applyTheme(theme, accent, customAccent, themePack, font, fontSize)
+  }, [theme, accent, customAccent, themePack, font, fontSize])
 
   const setTheme = (t: Theme) => {
     setThemeState(t)

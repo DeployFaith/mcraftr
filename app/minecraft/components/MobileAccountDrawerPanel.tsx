@@ -222,6 +222,7 @@ export default function MobileAccountDrawerPanel({ onNavigate }: { onNavigate?: 
         <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg2) 74%, transparent)' }}>
           <div className="flex items-center gap-3">
             {avatarSrc ? (
+              /* eslint-disable-next-line @next/next/no-img-element -- tiny avatar source can be builtin SVG, upload, or data URL */
               <img
                 src={avatarSrc}
                 alt="Profile picture"

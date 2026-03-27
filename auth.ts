@@ -1,4 +1,13 @@
-import NextAuth from 'next-auth'
+import NextAuth, { type Session } from 'next-auth'
+import type { JWT } from 'next-auth/jwt'
+
+type McraftrJWT = JWT & {
+  id?: string
+  hasServer?: boolean
+  role?: 'admin' | 'user'
+  activeServerId?: string | null
+  activeServerLabel?: string | null
+}
 
 // NOTE: This file is imported by middleware.ts which runs in the Edge Runtime.
 // It must NOT import anything that uses Node.js built-ins (fs, path, crypto, etc.).
@@ -39,7 +48,7 @@ export const authConfig = {
   },
   providers: [],  // No providers needed for Edge session checking
   callbacks: {
-    async session({ session, token }: { session: any; token: any }) {
+    async session({ session, token }: { session: Session; token: McraftrJWT }) {
       if (token?.id && session.user) {
         session.user.id = token.id as string
       }
@@ -49,7 +58,7 @@ export const authConfig = {
       session.activeServerLabel = token.activeServerLabel ?? null
       return session
     },
-    authorized({ auth }: { auth: any }) {
+    authorized({ auth }: { auth: Session | null }) {
       return !!auth?.user
     },
   },

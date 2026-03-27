@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, type InputHTMLAttributes } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import { useTheme, ACCENTS, FONTS, FONT_SIZES, type ThemePack } from '@/app/components/ThemeProvider'
 import { FEATURE_DEFS, FEATURE_CATEGORIES, type FeatureKey, type FeatureCategory } from '@/lib/features'
@@ -199,7 +199,12 @@ function resolveAvatarSrc(avatar: AccountAvatar | null) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function SettingsSection({ role: _role }: { role?: string }) {
+type DirectoryInputProps = InputHTMLAttributes<HTMLInputElement> & {
+  webkitdirectory?: string
+  directory?: string
+}
+
+export default function SettingsSection() {
   const { data: session, update: updateSession } = useSession()
   const [servers, setServers] = useState<SavedServerSummary[]>([])
   const [activeServerId, setActiveServerId] = useState<string | null>(null)
@@ -1135,7 +1140,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
               </label>
               <label className="rounded-xl border px-3 py-2 text-[11px] font-mono tracking-widest cursor-pointer" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text)' }}>
                 Upload Folder
-                <input type="file" accept="audio/*" multiple className="hidden" {...({ webkitdirectory: 'true', directory: '' } as any)} onChange={async e => { await uploadMusicFiles(e.target.files); e.currentTarget.value = '' }} />
+                <input type="file" accept="audio/*" multiple className="hidden" {...({ webkitdirectory: 'true', directory: '' } satisfies DirectoryInputProps)} onChange={async e => { await uploadMusicFiles(e.target.files); e.currentTarget.value = '' }} />
               </label>
               <button type="button" onClick={() => updateMusic({ ...musicSettings, tracks: DEFAULT_MUSIC_SETTINGS.tracks })} className="rounded-xl border px-3 py-2 text-[11px] font-mono tracking-widest" style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}>
                 Reset Built-ins
@@ -1178,7 +1183,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
           </div>
         </div>
         <div className="text-[11px] font-mono text-[var(--text-dim)] opacity-60 mb-2">
-          Turn off features you don't need. Admins can also restrict features for other users.
+          Turn off features you don&apos;t need. Admins can also restrict features for other users.
         </div>
         {featuresLoading ? (
           <div className="text-[13px] font-mono text-[var(--text-dim)] animate-pulse">Loading...</div>
@@ -1543,6 +1548,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
             <div className="space-y-3">
               <div className="text-[13px] font-mono tracking-widest text-[var(--text-dim)]">PROFILE PICTURE</div>
               {avatarSrc ? (
+                /* eslint-disable-next-line @next/next/no-img-element -- profile picture can be upload/data URL or builtin asset */
                 <img
                   src={avatarSrc}
                   alt="Current profile picture"
@@ -1576,6 +1582,7 @@ export default function SettingsSection({ role: _role }: { role?: string }) {
                           ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)' }
                           : { borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg2) 75%, transparent)' }}
                       >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- tiny local SVG avatar picker thumbnails do not benefit from next/image */}
                         <img src={`/profile-avatars/${option.id}.svg`} alt={option.label} className="mx-auto h-12 w-12 rounded-xl object-cover" />
                         <div className="mt-2 text-center text-[10px] font-mono tracking-widest" style={{ color: selected ? 'var(--accent)' : 'var(--text-dim)' }}>
                           {option.label}

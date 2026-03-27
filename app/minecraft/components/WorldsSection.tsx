@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CloudLightning, CloudSun, Moon, Sun } from 'lucide-react'
+import { CloudLightning, CloudSun } from 'lucide-react'
 import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
 import McraftrSwitch from './McraftrSwitch'
 import PlayerPicker from './PlayerPicker'
@@ -173,13 +173,6 @@ const WORLD_TOGGLE_SETTINGS = [
   ['autoload', 'Autoload'],
 ] as const
 const WORLD_DIFFICULTIES = ['peaceful', 'easy', 'normal', 'hard'] as const
-const WORLD_COMMANDS = [
-  { id: 'day', Icon: Sun, label: 'Day' },
-  { id: 'night', Icon: Moon, label: 'Night' },
-  { id: 'clear_weather', Icon: CloudSun, label: 'Clear Sky' },
-  { id: 'storm', Icon: CloudLightning, label: 'Storm' },
-] as const
-
 function titleCase(value: string): string {
   return value
     .split(/[_\-/\s]+/)
@@ -427,7 +420,8 @@ function accentCardPalette(): CatalogCardPalette {
   }
 }
 
-function structureCardPalette(_entry: StructureCatalogEntry): CatalogCardPalette {
+function structureCardPalette(entry: StructureCatalogEntry): CatalogCardPalette {
+  void entry
   return accentCardPalette()
 }
 
@@ -455,6 +449,7 @@ function structurePlacementStatus(entry: StructureCatalogEntry) {
 }
 
 function entityCardPalette(entry: EntityCatalogEntry): CatalogCardPalette {
+  void entry
   return accentCardPalette()
 }
 
@@ -2473,7 +2468,7 @@ export default function WorldsSection({
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3">
               <div className="text-[12px] font-mono text-[var(--text-dim)]">
-                {selectedPlayer ? <>Use <span className="text-[var(--accent)]">{selectedPlayer}</span>'s live world and position.</> : 'Pick an active player first.'}
+                {selectedPlayer ? <>Use <span className="text-[var(--accent)]">{selectedPlayer}</span>&apos;s live world and position.</> : 'Pick an active player first.'}
               </div>
               <button onClick={() => void handleFindPlacements()} disabled={!selectedPlayer} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[12px] font-mono text-[var(--text-dim)] disabled:opacity-40 hover:border-[var(--accent-mid)]">
                 Find At Player

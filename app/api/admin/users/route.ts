@@ -1,15 +1,10 @@
 import { NextRequest } from 'next/server'
-import { getUserById, getUserFeatures, listUsers, createUserByAdmin } from '@/lib/users'
+import { getUserFeatures, listUsers, createUserByAdmin } from '@/lib/users'
 import { logAudit } from '@/lib/audit'
 import { getAdminAccess, requireAdminReadable } from '@/lib/admin-access'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
-async function requireAdmin(req: NextRequest): Promise<string | null> {
-  const access = await getAdminAccess(req)
-  return access?.isAdmin ? access.userId : null
-}
 
 export async function GET(req: NextRequest) {
   const auth = requireAdminReadable(await getAdminAccess(req))

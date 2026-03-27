@@ -26,7 +26,6 @@ function item(id: string, label: string, maxStack = 64): CatalogItem {
 
 // Shorthand helpers
 const s1  = (id: string, label: string) => item(id, label, 1)
-const s16 = (id: string, label: string) => item(id, label, 16)
 
 export const CATALOG: CatalogCategory[] = [
   {

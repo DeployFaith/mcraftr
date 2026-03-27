@@ -147,22 +147,6 @@ function getItemMaxQty(item: CatalogItem) {
   return item.maxStack === 1 ? MAX_STACK_BATCHES : MAX_STACK_BATCHES * Math.max(1, item.maxStack)
 }
 
-function clampItemQty(item: CatalogItem, qty: number) {
-  return Math.max(1, Math.min(getItemMaxQty(item), Math.floor(qty) || 1))
-}
-
-function splitItemQty(item: CatalogItem, qty: number) {
-  const maxStack = Math.max(1, item.maxStack)
-  if (maxStack === 1) {
-    return { stacks: 0, extra: clampItemQty(item, qty) }
-  }
-  const safe = Math.max(1, clampItemQty(item, qty))
-  return {
-    stacks: Math.floor(safe / maxStack),
-    extra: safe % maxStack,
-  }
-}
-
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function PlayerChip({ name, selected, variant = 'default', bothSelected = false, onClick }: {
@@ -198,6 +182,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function itemCardPalette(item: CatalogItem, categoryLabel: string) {
+  void item
+  void categoryLabel
   return {
     frame: 'var(--accent-mid)',
     frameSoft: 'color-mix(in srgb, var(--accent) 12%, transparent)',
@@ -205,139 +191,6 @@ function itemCardPalette(item: CatalogItem, categoryLabel: string) {
     badge: 'color-mix(in srgb, var(--accent) 16%, transparent)',
     badgeText: 'var(--accent)',
   }
-}
-
-function Stepper({
-  label,
-  value,
-  min,
-  max,
-  step,
-  onChange,
-}: {
-  label: string
-  value: number
-  min: number
-  max: number
-  step: number
-  onChange: (value: number) => void
-}) {
-  return (
-    <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-2 space-y-1">
-      <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">{label}</div>
-      <div className="grid grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] gap-1 items-center">
-        <button
-          onClick={() => onChange(Math.max(min, value - step))}
-          className="h-9 rounded-lg border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] transition-all"
-        >
-          -
-        </button>
-        <input
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={e => onChange(Math.max(min, Math.min(max, Number(e.target.value) || min)))}
-          className="w-full text-center bg-[var(--bg)] border border-[var(--border)] rounded-lg px-2 py-2 text-[15px] font-mono text-[var(--text)] focus:outline-none focus:border-[var(--accent-mid)]"
-          style={{ fontSize: '16px' }}
-        />
-        <button
-          onClick={() => onChange(Math.min(max, value + step))}
-          className="h-9 rounded-lg border border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)] transition-all"
-        >
-          +
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function QuantityPicker({
-  item,
-  qty,
-  onChange,
-  compact = false,
-}: {
-  item: CatalogItem
-  qty: number
-  onChange: (qty: number) => void
-  compact?: boolean
-}) {
-  const maxQty = getItemMaxQty(item)
-  const safeQty = clampItemQty(item, qty)
-  const { stacks, extra } = splitItemQty(item, safeQty)
-  const isStackable = item.maxStack > 1
-  const quickValues = isStackable
-    ? [1, item.maxStack, item.maxStack * 2, maxQty]
-    : [1, 8, 16, maxQty]
-  const quickLabels = isStackable
-    ? ['1', '1 stack', '2 stacks', 'Max']
-    : ['1', '8', '16', 'Max']
-
-  return (
-    <div className={`space-y-2 ${compact ? '' : 'rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3'}`}>
-      <div className={`flex flex-wrap gap-1.5 ${compact ? '' : 'mb-1'}`}>
-        {quickValues.map((value, index) => (
-          <button
-            key={`${item.id}:${value}`}
-            onClick={() => onChange(clampItemQty(item, value))}
-            className={`px-2 py-1 rounded-md border text-[12px] font-mono transition-all ${
-              safeQty === clampItemQty(item, value)
-                ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]'
-                : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--accent-mid)]'
-            }`}
-          >
-            {quickLabels[index]}
-          </button>
-        ))}
-      </div>
-
-      {isStackable ? (
-        <div className={`grid gap-2 ${compact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-3'}`}>
-          <Stepper
-            label="STACKS"
-            value={stacks}
-            min={0}
-            max={MAX_STACK_BATCHES}
-            step={1}
-            onChange={nextStacks => onChange(Math.max(1, Math.min(maxQty, (nextStacks * item.maxStack) + extra)))}
-          />
-          <Stepper
-            label="EXTRA"
-            value={extra}
-            min={0}
-            max={item.maxStack - 1}
-            step={1}
-            onChange={nextExtra => onChange(Math.max(1, Math.min(maxQty, (stacks * item.maxStack) + nextExtra)))}
-          />
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-2 flex flex-col justify-center">
-            <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">TOTAL</div>
-            <div className="text-[18px] font-mono text-[var(--text)]">{safeQty}</div>
-            <div className="text-[11px] font-mono text-[var(--text-dim)]">
-              {stacks > 0 ? `${stacks} stack${stacks === 1 ? '' : 's'}` : '0 stacks'}{extra > 0 ? ` + ${extra}` : ''}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className={`grid gap-2 ${compact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-[minmax(0,1fr)_10rem]'}`}>
-          <Stepper
-            label="COUNT"
-            value={safeQty}
-            min={1}
-            max={maxQty}
-            step={1}
-            onChange={next => onChange(clampItemQty(item, next))}
-          />
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-2 flex flex-col justify-center">
-            <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">LIMIT</div>
-            <div className="text-[18px] font-mono text-[var(--text)]">{maxQty}</div>
-            <div className="text-[11px] font-mono text-[var(--text-dim)]">single items</div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────

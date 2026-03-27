@@ -4,7 +4,7 @@ import { getActiveServer, getUserById } from '@/lib/users'
 import { getAuditLog } from '@/lib/audit'
 import { getDb } from '@/lib/db'
 import { ensureScheduleRunnerStarted } from '@/lib/schedules'
-import { callSidecarForRequest, runBridgeCommand, runBridgeJson } from '@/lib/server-bridge'
+import { callSidecarForRequest, runBridgeJson } from '@/lib/server-bridge'
 import { getServerStackDescription, getServerStackLabel } from '@/lib/server-stack'
 
 type DashboardWorldSettingsResponse = {
@@ -82,11 +82,6 @@ function parseDifficulty(raw: string): string | null {
 function parseWhitelistCount(raw: string): number {
   const m = raw.match(/There are (\d+) whitelisted players/i)
   return m ? parseInt(m[1], 10) : 0
-}
-
-function parseRuleValue(raw: string): string | null {
-  const m = raw.match(/(?:\bis\s+|set to:\s*)(true|false)\b/i)
-  return m ? m[1].toLowerCase() : null
 }
 
 export async function GET(req: NextRequest) {

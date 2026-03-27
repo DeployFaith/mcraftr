@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { CatalogArtPayload } from '@/lib/catalog-art/types'
 
 type Props = {
@@ -156,33 +156,33 @@ export default function CatalogArtwork({
     [category, art?.class, art?.strategy].filter(Boolean).join(' · ') || category,
     sourceKind,
   )
-  const primaryUrl = art?.url ?? imageUrl ?? null
-  const [src, setSrc] = useState(primaryUrl || fallback)
-  const [loaded, setLoaded] = useState(false)
+  return <ArtworkImage key={`${art?.url ?? imageUrl ?? fallback}:${fallback}`} src={art?.url ?? imageUrl ?? null} fallback={fallback} label={label} className={className} artClass={art?.class ?? kind} artStrategy={art?.strategy ?? 'fallback-card'} />
+}
 
-  useEffect(() => {
-    setSrc(primaryUrl || fallback)
-    setLoaded(false)
-  }, [primaryUrl, fallback])
+function ArtworkImage({ src, fallback, label, className, artClass, artStrategy }: { src: string | null; fallback: string; label: string; className: string; artClass: string; artStrategy: string }) {
+  const [loaded, setLoaded] = useState(false)
+  const [useFallback, setUseFallback] = useState(false)
+  const resolvedSrc = useFallback ? fallback : (src || fallback)
 
   return (
     <div
       className={`relative overflow-hidden ${className}`}
-      data-art-class={art?.class ?? kind}
-      data-art-strategy={art?.strategy ?? 'fallback-card'}
+      data-art-class={artClass}
+      data-art-strategy={artStrategy}
     >
       {!loaded && (
         <div className="absolute inset-0 animate-pulse bg-[linear-gradient(120deg,rgba(255,255,255,0.04),rgba(255,255,255,0.12),rgba(255,255,255,0.04))]" />
       )}
+      {/* eslint-disable-next-line @next/next/no-img-element -- dynamic fallback/data URL artwork is not a good fit for next/image */}
       <img
-        src={src}
+        src={resolvedSrc}
         alt={`${label} preview`}
         className={`h-full w-full object-contain transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         loading="lazy"
         onLoad={() => setLoaded(true)}
         onError={() => {
-          if (src !== fallback) {
-            setSrc(fallback)
+          if (!useFallback && src) {
+            setUseFallback(true)
             setLoaded(false)
             return
           }

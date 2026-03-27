@@ -6,11 +6,6 @@ import { getAdminAccess } from '@/lib/admin-access'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-async function requireAdmin(req: NextRequest): Promise<string | null> {
-  const access = await getAdminAccess(req)
-  return access?.isAdmin ? access.userId : null
-}
-
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const access = await getAdminAccess(req)
   if (!access || !access.isAdmin) return Response.json({ ok: false, error: 'Forbidden' }, { status: 403 })

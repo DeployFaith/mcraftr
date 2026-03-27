@@ -301,7 +301,6 @@ export default function AdminSection({ players, readOnly = false }: Props) {
 
   const [wlPlayers,  setWlPlayers]  = useState<string[] | null>(null)
   const [wlLoading,  setWlLoading]  = useState(false)
-  const [wlInput,    setWlInput]    = useState('')
   const [wlBusy,     setWlBusy]     = useState<string | null>(null)
   const [wlTarget,   setWlTarget]   = useState('')
 
@@ -327,7 +326,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
       const d = await r.json()
       addToast(d.ok ? 'ok' : 'error', d.ok ? d.message : (d.error || 'Whitelist action failed'))
       if (d.ok) {
-        if (action === 'add') { setWlPlayers(prev => prev ? [...prev, player].sort() : [player]); setWlInput(''); setWlTarget('') }
+        if (action === 'add') { setWlPlayers(prev => prev ? [...prev, player].sort() : [player]); setWlTarget('') }
         else setWlPlayers(prev => prev ? prev.filter(p => p !== player) : null)
       }
     } catch (e) {
@@ -802,7 +801,7 @@ export default function AdminSection({ players, readOnly = false }: Props) {
                 <SectionLabel>CURRENT ENTRIES ({wlPlayers.length})</SectionLabel>
               </div>
               {wlPlayers.length === 0 ? (
-                <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">Whitelist is empty — no one's on the list</div>
+                <div className="text-[13px] font-mono text-[var(--text-dim)] opacity-60">Whitelist is empty — no one&apos;s on the list</div>
               ) : (
                 <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
                   {wlPlayers.map(p => (

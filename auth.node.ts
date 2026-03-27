@@ -1,4 +1,5 @@
 import NextAuth from 'next-auth'
+import type { JWT } from 'next-auth/jwt'
 import Credentials from 'next-auth/providers/credentials'
 import { getUserByEmail, getUserById, validatePassword } from '@/lib/users'
 import { authConfig } from '@/auth'
@@ -19,7 +20,7 @@ export const { handlers, auth: nodeAuth, signIn, signOut } = NextAuth({
         username: { label: 'Email', type: 'text' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials, request) {
+      async authorize(credentials) {
         if (!credentials?.username || !credentials?.password) return null
         const user = getUserByEmail(credentials.username as string)
         if (!user) return null
@@ -30,7 +31,7 @@ export const { handlers, auth: nodeAuth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
-    async jwt({ token, user, trigger }: { token: any; user: any; trigger?: string }) {
+    async jwt({ token, user }: { token: JWT; user?: { id?: string } | null }) {
       // On initial sign-in, persist the user id into the token.
       if (user?.id) {
         token.id = user.id

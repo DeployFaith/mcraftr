@@ -62,11 +62,6 @@ const updateKey = (content, key, value) => {
   return `${content.trimEnd()}\n${key}=${value}\n`
 }
 
-const removeKeys = (content, keys) => {
-  const lines = content.split('\n')
-  return lines.filter((line) => !keys.some((key) => line.startsWith(`${key}=`) || line.startsWith(`# ${key}=`))).join('\n')
-}
-
 const main = async () => {
   try {
     if (existsSync(envPath)) {

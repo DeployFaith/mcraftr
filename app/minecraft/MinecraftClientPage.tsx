@@ -63,41 +63,45 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
   const [minecraftVersion, setMinecraftVersion] = useState<MinecraftVersionState | null>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
-  const loadFeatures = useCallback(async () => {
-    try {
-      const r = await fetch('/api/account/preferences')
-      const d = await r.json()
-      if (d.ok && d.features) setFeatures(d.features)
-    } catch {
-      setFeatures(null)
-    }
-  }, [])
-
   useEffect(() => {
-    loadFeatures()
-    const onFeatures = () => { void loadFeatures() }
-    window.addEventListener('mcraftr:features-updated', onFeatures)
-    return () => window.removeEventListener('mcraftr:features-updated', onFeatures)
-  }, [loadFeatures])
-
-  const loadActiveServer = useCallback(async () => {
-    try {
-      const response = await fetch('/api/servers/active', { cache: 'no-store' })
-      const payload = await response.json()
-      if (payload.ok && payload.activeServer?.stackMode) {
-        setStackMode(payload.activeServer.stackMode as ServerStackMode)
-        setBridgeEnabled(payload.activeServer.bridgeEnabled === true)
-        setSidecarEnabled(payload.activeServer.sidecarEnabled === true)
-        setMinecraftVersion(payload.activeServer.minecraftVersion ?? null)
+    let cancelled = false
+    const syncFeatures = async () => {
+      try {
+        const r = await fetch('/api/account/preferences')
+        const d = await r.json()
+        if (!cancelled) setFeatures(d.ok && d.features ? d.features : null)
+      } catch {
+        if (!cancelled) setFeatures(null)
       }
-    } catch {
-      // keep previous mode until the server switch settles
+    }
+    void syncFeatures()
+    const onFeatures = () => { void syncFeatures() }
+    window.addEventListener('mcraftr:features-updated', onFeatures)
+    return () => {
+      cancelled = true
+      window.removeEventListener('mcraftr:features-updated', onFeatures)
     }
   }, [])
 
   useEffect(() => {
-    void loadActiveServer()
-  }, [loadActiveServer, session?.activeServerId])
+    let cancelled = false
+    const syncActiveServer = async () => {
+      try {
+        const response = await fetch('/api/servers/active', { cache: 'no-store' })
+        const payload = await response.json()
+        if (!cancelled && payload.ok && payload.activeServer?.stackMode) {
+          setStackMode(payload.activeServer.stackMode as ServerStackMode)
+          setBridgeEnabled(payload.activeServer.bridgeEnabled === true)
+          setSidecarEnabled(payload.activeServer.sidecarEnabled === true)
+          setMinecraftVersion(payload.activeServer.minecraftVersion ?? null)
+        }
+      } catch {
+        // keep previous mode until the server switch settles
+      }
+    }
+    void syncActiveServer()
+    return () => { cancelled = true }
+  }, [session?.activeServerId])
 
   useEffect(() => {
     const syncFromUrl = () => {
@@ -170,10 +174,6 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
   const visibleTab = tabs.find(t => t.id === activeTab) ? activeTab : 'dashboard'
   const stackFlags = useMemo(() => ({ bridgeEnabled, sidecarEnabled }), [bridgeEnabled, sidecarEnabled])
 
-  useEffect(() => {
-    setVisitedTabs(prev => (prev.includes(visibleTab) ? prev : [...prev, visibleTab]))
-  }, [visibleTab])
-
   const shouldRenderTab = useCallback(
       (id: TabId) => visibleTab === id || visitedTabs.includes(id),
       [visibleTab, visitedTabs])
@@ -205,14 +205,6 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
   }, [role, stackMode, visibleTab, handleTabChange])
 
   // Keyboard shortcut hints - map visible tabs to their shortcuts
-  const tabShortcuts = useMemo(() => {
-    const map: Record<string, string> = {}
-    tabs.forEach((tab, idx) => {
-      if (tab.shortcut) map[tab.id] = tab.shortcut
-    })
-    return map
-  }, [tabs])
-
   return (
     <div className="flex flex-col min-h-[calc(100vh-48px)]">
       <nav className="hidden md:flex sticky top-14 z-30 border-b border-[var(--border)] backdrop-blur-md" style={{ background: 'rgba(10,10,15,0.88)' }}>
@@ -393,7 +385,7 @@ export default function MinecraftClientPage({ initialTab, initialRole, initialSt
         )}
         {shouldRenderTab('settings') && (
           <div className={visibleTab === 'settings' ? 'block' : 'hidden'} aria-hidden={visibleTab !== 'settings'}>
-            <SettingsSection role={role} />
+          <SettingsSection />
           </div>
         )}
       </div>

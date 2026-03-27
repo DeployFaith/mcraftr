@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { createUserServer, deleteUserServer, getUserById, updateUserServer } from '@/lib/users'
+import { createUserServer, deleteUserServer, getUserById } from '@/lib/users'
 import { DEFAULT_MINECRAFT_VERSION, normalizeMinecraftVersion } from '@/lib/minecraft-version'
 import { testRconConnection, getSessionUserId } from '@/lib/rcon'
 import { testBeaconConnection, testBridgeConnection } from '@/lib/server-bridge'
