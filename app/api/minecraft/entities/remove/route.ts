@@ -51,19 +51,23 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: 'A valid entity UUID is required' }, { status: 400 })
   }
 
-  const bridge = await runBridgeJson<BridgeResponse>(req, `entities remove ${uuid}`)
-  if (!bridge.ok || bridge.data.ok === false) {
-    const result = await rconForRequest(req, `kill ${uuidToSelector(uuid)}`)
-    if (!result.ok) {
+  const result = await rconForRequest(req, `kill ${uuidToSelector(uuid)}`)
+  if (!result.ok) {
+    const bridge = await runBridgeJson<BridgeResponse>(req, `entities remove ${uuid}`)
+    if (!bridge.ok || bridge.data.ok === false) {
       return Response.json(
         { ok: false, error: bridge.ok ? bridge.data.error || result.error || 'Failed to remove entity' : bridge.error || result.error || 'Failed to remove entity' },
         { status: 502 },
       )
     }
+    const serverId = await getSessionActiveServerId(req)
+    const resolvedWorld = bridge.data.world ?? world
+    logAudit(userId, 'entity_remove', label, resolvedWorld ? `${resolvedWorld} · ${uuid}` : uuid, serverId)
+    return Response.json({ ok: true, uuid, world: bridge.data.world ?? world, provider: 'relay' })
   }
 
   const serverId = await getSessionActiveServerId(req)
   logAudit(userId, 'entity_remove', label, world ? `${world} · ${uuid}` : uuid, serverId)
 
-  return Response.json({ ok: true, uuid, world: bridge.ok ? bridge.data.world ?? world : world })
+  return Response.json({ ok: true, uuid, world, provider: 'vanilla-rcon' })
 }

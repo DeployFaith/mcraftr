@@ -45,6 +45,7 @@ function normalizePlacement(item: RelayStructureItem) {
     structure_label: item.structureLabel,
     source_kind: typeof item.sourceKind === 'string' ? item.sourceKind : 'tracked',
     bridge_ref: typeof item.bridgeRef === 'string' ? item.bridgeRef : '',
+    placement_kind: typeof item.sourceKind === 'string' && item.sourceKind === 'native' ? 'native-template' : null,
     origin_x: typeof item.originX === 'number' ? item.originX : 0,
     origin_y: typeof item.originY === 'number' ? item.originY : 0,
     origin_z: typeof item.originZ === 'number' ? item.originZ : 0,

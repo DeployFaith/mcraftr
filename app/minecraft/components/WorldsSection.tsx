@@ -91,6 +91,8 @@ type PlacementEntry = {
   structure_id: string
   structure_label: string
   source_kind: string
+   bridge_ref?: string
+   placement_kind?: string | null
   origin_x: number
   origin_y: number
   origin_z: number
@@ -1245,6 +1247,19 @@ export default function WorldsSection({
         placementId: placementToRemove.id,
         structureLabel: placementToRemove.structure_label,
         world: placementToRemove.world,
+        sourceKind: placementToRemove.source_kind,
+        bridgeRef: placementToRemove.bridge_ref ?? '',
+        originX: placementToRemove.origin_x,
+        originY: placementToRemove.origin_y,
+        originZ: placementToRemove.origin_z,
+        minX: placementToRemove.min_x,
+        minY: placementToRemove.min_y,
+        minZ: placementToRemove.min_z,
+        maxX: placementToRemove.max_x,
+        maxY: placementToRemove.max_y,
+        maxZ: placementToRemove.max_z,
+        rotation: placementToRemove.rotation,
+        includeAir: placementToRemove.include_air === 1,
       })
       setStatus(`Removed ${placementToRemove.structure_label}.`)
       setPlacementToRemove(null)
@@ -2475,7 +2490,17 @@ export default function WorldsSection({
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-[13px] font-mono text-[var(--text)]">{entry.structure_label}</div>
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-dim)]">{entry.source_kind}</div>
+                  <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-[var(--text-dim)]">
+                    <span>{entry.source_kind}</span>
+                    <span
+                      className="rounded-full border px-2 py-1 normal-case"
+                      style={entry.source_kind === 'native'
+                        ? { borderColor: '#92400e', background: 'rgba(245,158,11,0.12)', color: '#fcd34d' }
+                        : { borderColor: '#166534', background: 'rgba(34,197,94,0.12)', color: '#86efac' }}
+                    >
+                      {entry.source_kind === 'native' ? 'Experimental removal' : 'Tracked removal'}
+                    </span>
+                  </div>
                 </div>
                 <div className="mt-1 text-[11px] font-mono text-[var(--text-dim)]">
                   {entry.world} · {entry.origin_x}, {entry.origin_y}, {entry.origin_z}

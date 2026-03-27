@@ -31,6 +31,37 @@ async function removeTrackedFallback(req: NextRequest, placementId: string, serv
   return { placement, world: bridge.data.world ?? placement.world }
 }
 
+async function removePlacementFromPayload(req: NextRequest, payload: {
+  sourceKind: string | null
+  bridgeRef: string | null
+  world: string | null
+  originX: number | null
+  originY: number | null
+  originZ: number | null
+  minX: number | null
+  minY: number | null
+  minZ: number | null
+  maxX: number | null
+  maxY: number | null
+  maxZ: number | null
+  rotation: number | null
+  includeAir: boolean
+}) {
+  if (!payload.world || payload.originX === null || payload.originY === null || payload.originZ === null || payload.rotation === null) return null
+  if (payload.sourceKind === 'native') {
+    if (payload.minX === null || payload.minY === null || payload.minZ === null || payload.maxX === null || payload.maxY === null || payload.maxZ === null) return null
+    const command = `structures clear ${payload.world} ${payload.originX} ${payload.originY} ${payload.originZ} ${payload.maxX - payload.minX + 1} ${payload.maxY - payload.minY + 1} ${payload.maxZ - payload.minZ + 1} ${payload.rotation}`
+    const bridge = await runBridgeJson<BridgeResponse>(req, command)
+    if (!bridge.ok || bridge.data.ok === false) return null
+    return { world: bridge.data.world ?? payload.world }
+  }
+  if (!payload.bridgeRef) return null
+  const command = `structures remove ${payload.bridgeRef} ${payload.world} ${payload.originX} ${payload.originY} ${payload.originZ} ${payload.rotation} ${payload.includeAir ? 'air' : 'noair'}`
+  const bridge = await runBridgeJson<BridgeResponse>(req, command)
+  if (!bridge.ok || bridge.data.ok === false) return null
+  return { world: bridge.data.world ?? payload.world }
+}
+
 export async function POST(req: NextRequest) {
   const features = await getUserFeatureFlags(req)
   if (!checkFeatureAccess(features, 'enable_structure_catalog')) {
@@ -48,7 +79,8 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: 'No active server selected' }, { status: 400 })
   }
 
-  const { placementId, structureLabel, world } = await req.json().catch(() => ({})) as Record<string, unknown>
+  const body = await req.json().catch(() => ({})) as Record<string, unknown>
+  const { placementId, structureLabel, world } = body
   if (!placementId || typeof placementId !== 'string') {
     return Response.json({ ok: false, error: 'Placement id is required' }, { status: 400 })
   }
@@ -60,13 +92,29 @@ export async function POST(req: NextRequest) {
     resolvedWorld = bridge.data.world ?? (typeof world === 'string' ? world : null)
   } else {
     const fallback = await removeTrackedFallback(req, placementId, serverId)
-    if (!fallback) {
+    const payloadFallback = fallback ?? await removePlacementFromPayload(req, {
+      sourceKind: typeof body.sourceKind === 'string' ? body.sourceKind : null,
+      bridgeRef: typeof body.bridgeRef === 'string' && body.bridgeRef.trim() ? body.bridgeRef.trim() : null,
+      world: typeof world === 'string' ? world.trim() : null,
+      originX: typeof body.originX === 'number' ? body.originX : null,
+      originY: typeof body.originY === 'number' ? body.originY : null,
+      originZ: typeof body.originZ === 'number' ? body.originZ : null,
+      minX: typeof body.minX === 'number' ? body.minX : null,
+      minY: typeof body.minY === 'number' ? body.minY : null,
+      minZ: typeof body.minZ === 'number' ? body.minZ : null,
+      maxX: typeof body.maxX === 'number' ? body.maxX : null,
+      maxY: typeof body.maxY === 'number' ? body.maxY : null,
+      maxZ: typeof body.maxZ === 'number' ? body.maxZ : null,
+      rotation: typeof body.rotation === 'number' ? body.rotation : null,
+      includeAir: body.includeAir === true || body.includeAir === 1,
+    })
+    if (!payloadFallback) {
       return Response.json(
-        { ok: false, error: bridge.ok ? bridge.data.error || 'Failed to remove structure' : bridge.error },
+        { ok: false, error: bridge.ok ? bridge.data.error || 'Failed to remove structure. This placement may not have been tracked precisely enough for automated removal.' : bridge.error || 'Failed to remove structure. This placement may not have been tracked precisely enough for automated removal.' },
         { status: 502 },
       )
     }
-    resolvedWorld = fallback.world
+    resolvedWorld = payloadFallback.world
   }
 
   const userId = await getSessionUserId(req)
