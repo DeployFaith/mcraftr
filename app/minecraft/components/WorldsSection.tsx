@@ -148,6 +148,7 @@ type LiveEntityEntry = {
 type LiveEntityLoadSummary = {
   totalEntities: number
   warning: string | null
+  scopeLabel: string
 }
 
 const WORLDS_COLLAPSIBLE_GROUP = 'worlds-tab'
@@ -468,7 +469,11 @@ export default function WorldsSection({
   const [structureSummary, setStructureSummary] = useState<StructureLoadSummary>({ total: 0, warning: null, indexing: [] })
   const [worldDetails, setWorldDetails] = useState<Record<string, WorldSettingsEntry>>({})
   const [liveEntities, setLiveEntities] = useState<LiveEntityEntry[]>([])
-  const [liveEntitySummary, setLiveEntitySummary] = useState<LiveEntityLoadSummary>({ totalEntities: 0, warning: null })
+  const [liveEntitySummary, setLiveEntitySummary] = useState<LiveEntityLoadSummary>({
+    totalEntities: 0,
+    warning: null,
+    scopeLabel: 'across loaded worlds',
+  })
   const [playerWorlds, setPlayerWorlds] = useState<Record<string, string | null>>({})
   const [structureScan, setStructureScan] = useState<StructureScanData | null>(null)
   const [entityScan, setEntityScan] = useState<EntityScanData | null>(null)
@@ -612,6 +617,37 @@ export default function WorldsSection({
     setCollapseAllActive(current => !current)
   }, [collapseAllActive])
 
+  const resolveLiveEntityQuery = useCallback(async () => {
+    const filteredWorld = liveEntityWorldFilter.trim()
+    if (filteredWorld) {
+      return {
+        query: `?world=${encodeURIComponent(filteredWorld)}`,
+        scopeLabel: `in ${filteredWorld}`,
+      }
+    }
+
+    if (selectedPlayer) {
+      try {
+        const response = await fetch(`/api/minecraft/player-location?player=${encodeURIComponent(selectedPlayer)}`, { cache: 'no-store' })
+        const data = await response.json()
+        if (data.ok && typeof data.world === 'string' && data.world.trim()) {
+          const world = data.world.trim()
+          return {
+            query: `?world=${encodeURIComponent(world)}`,
+            scopeLabel: `in ${world} near ${selectedPlayer}`,
+          }
+        }
+      } catch {
+        // Fall through to the broader all-world query.
+      }
+    }
+
+    return {
+      query: '',
+      scopeLabel: 'across loaded worlds',
+    }
+  }, [liveEntityWorldFilter, selectedPlayer])
+
   const loadData = useCallback(async (showSpinner = false) => {
     if (stackMode !== 'full') {
       setLoading(false)
@@ -678,8 +714,9 @@ export default function WorldsSection({
     }
 
     if (canEntityCatalog) {
+      const liveEntityQuery = await resolveLiveEntityQuery()
       try {
-        const res = await fetch('/api/minecraft/entities/live', { cache: 'no-store' })
+        const res = await fetch(`/api/minecraft/entities/live${liveEntityQuery.query}`, { cache: 'no-store' })
         const data = await res.json()
         if (data.ok) {
           const entities = Array.isArray(data.entities) ? data.entities : []
@@ -688,14 +725,23 @@ export default function WorldsSection({
           setLiveEntitySummary({
             totalEntities,
             warning: typeof data.warning === 'string' && data.warning.trim() ? data.warning.trim() : null,
+            scopeLabel: liveEntityQuery.scopeLabel,
           })
         } else {
           setLiveEntities([])
-          setLiveEntitySummary({ totalEntities: 0, warning: data.error || null })
+          setLiveEntitySummary({
+            totalEntities: 0,
+            warning: data.error || null,
+            scopeLabel: liveEntityQuery.scopeLabel,
+          })
         }
       } catch {
         setLiveEntities([])
-        setLiveEntitySummary({ totalEntities: 0, warning: null })
+        setLiveEntitySummary({
+          totalEntities: 0,
+          warning: null,
+          scopeLabel: liveEntityQuery.scopeLabel,
+        })
       }
     }
 
@@ -738,7 +784,7 @@ export default function WorldsSection({
 
     setError(nextErrors[0] ?? null)
     setLoading(false)
-  }, [canEntityCatalog, canEntityLiveTools, canSpawnTools, canStructureCatalog, canWorldInventory, stackMode])
+  }, [canEntityCatalog, canEntityLiveTools, canSpawnTools, canStructureCatalog, canWorldInventory, resolveLiveEntityQuery, stackMode])
 
   const requestStructureProviderInstall = useCallback((integrationId: string) => {
     const selected = structureProviderStatuses.find(entry => entry.id === integrationId)
@@ -1313,6 +1359,9 @@ export default function WorldsSection({
       }
       const data = await postJson('/api/minecraft/entities/spawn', payload)
       setStatus(`Spawned ${data.count} ${selectedEntity.label}${data.world ? ` in ${data.world}` : ''}.`)
+      if (typeof data.world === 'string' && data.world.trim()) {
+        setLiveEntityWorldFilter(data.world.trim())
+      }
       setSelectedEntity(null)
       await loadData(false)
     } catch (nextError) {
@@ -2581,8 +2630,8 @@ export default function WorldsSection({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-[12px] font-mono text-[var(--text-dim)]">
               {isLiveEntityListLimited
-                ? `${liveEntities.length} of ${liveEntitySummary.totalEntities} live entities loaded across loaded worlds`
-                : `${liveEntities.length} live entities detected across loaded worlds`}
+                ? `${liveEntities.length} of ${liveEntitySummary.totalEntities} live entities loaded ${liveEntitySummary.scopeLabel}`
+                : `${liveEntities.length} live entities detected ${liveEntitySummary.scopeLabel}`}
             </div>
             <div className="flex flex-wrap gap-2">
               <select
@@ -2676,7 +2725,7 @@ export default function WorldsSection({
             ))}
             {visibleLiveEntities.length === 0 && (
               <div className="rounded-2xl border border-dashed border-[var(--border)] px-4 py-10 text-center text-[13px] font-mono text-[var(--text-dim)]">
-                No live entities match the current world filter.
+                No live entities were found {liveEntitySummary.scopeLabel}.
               </div>
             )}
           </div>
