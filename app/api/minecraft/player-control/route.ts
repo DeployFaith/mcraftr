@@ -39,6 +39,36 @@ const XP_BOOSTER_PRESETS = {
   '5h': { label: 'Overdrive Shift', durationHours: 5, bonusPoints: 110, intervalSeconds: 300 },
 } as const
 
+const EFFECT_LOADOUTS = {
+  clear: {
+    label: 'Clear Effects',
+    commands: (player: string) => [`effect clear ${player}`],
+  },
+  traversal: {
+    label: 'Traversal Boost',
+    commands: (player: string) => [
+      `effect give ${player} minecraft:speed 300 1 true`,
+      `effect give ${player} minecraft:jump_boost 300 1 true`,
+    ],
+  },
+  builder: {
+    label: 'Builder Focus',
+    commands: (player: string) => [
+      `effect give ${player} minecraft:night_vision 600 0 true`,
+      `effect give ${player} minecraft:haste 600 1 true`,
+    ],
+  },
+  rescue: {
+    label: 'Rescue Bubble',
+    commands: (player: string) => [
+      `effect give ${player} minecraft:regeneration 45 1 true`,
+      `effect give ${player} minecraft:resistance 45 1 true`,
+      `effect give ${player} minecraft:fire_resistance 180 0 true`,
+      `effect give ${player} minecraft:slow_falling 90 0 true`,
+    ],
+  },
+} as const
+
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
@@ -55,14 +85,31 @@ async function assertAccess(req: NextRequest, action: string) {
     throw new Error('Players tab disabled by admin')
   }
 
-  const commandActions = new Set(['set_gamemode', 'set_dimension'])
-  const vitalsActions = new Set(['set_health', 'set_hunger_profile', 'set_experience', 'boost_xp', 'start_xp_booster', 'cancel_xp_booster'])
+  const commandActions = new Set([
+    'set_gamemode',
+    'set_dimension',
+    'teleport_to_spawn',
+    'set_spawn_to_current',
+    'nudge_vertical',
+    'teleport_to_coords',
+    'teleport_to_world_spawn',
+    'nudge_axis',
+    'clear_hotbar',
+    'clear_main_inventory',
+    'clear_armor',
+    'clear_offhand',
+  ])
+  const vitalsActions = new Set(['set_health', 'set_hunger_profile', 'set_experience', 'boost_xp', 'start_xp_booster', 'cancel_xp_booster', 'restore_vitals', 'extinguish'])
+  const effectActions = new Set(['apply_effect_loadout', 'clear_effects'])
 
   if (commandActions.has(action) && !checkFeatureAccess(features, 'enable_player_commands')) {
     throw new Error('Player commands disabled by admin')
   }
   if (vitalsActions.has(action) && !checkFeatureAccess(features, 'enable_player_vitals')) {
     throw new Error('Player vitals disabled by admin')
+  }
+  if (effectActions.has(action) && !checkFeatureAccess(features, 'enable_player_effects')) {
+    throw new Error('Player effects disabled by admin')
   }
 }
 
@@ -76,6 +123,14 @@ async function runCommands(req: NextRequest, commands: string[]) {
     if (result.stdout) outputs.push(result.stdout)
   }
   return outputs
+}
+
+function roundCoord(value: number) {
+  return Math.round(value * 100) / 100
+}
+
+function clearSlotCommands(player: string, slots: string[]) {
+  return slots.map(slot => `item replace entity ${player} ${slot} with minecraft:air`)
 }
 
 export async function GET(req: NextRequest) {
@@ -161,6 +216,17 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: true, message: `${player} health tuned to ${rounded}.` })
     }
 
+    if (action === 'restore_vitals') {
+      await runCommands(req, [
+        `heal ${player}`,
+        `effect clear ${player} minecraft:hunger`,
+        `feed ${player}`,
+        `effect give ${player} minecraft:saturation 8 1 true`,
+      ])
+      logAudit(userId, 'player_control', player, 'restore-vitals', serverId)
+      return Response.json({ ok: true, message: `${player} got a full vitals reset.` })
+    }
+
     if (action === 'set_hunger_profile') {
       const profile = String(body.profile ?? '').trim() as keyof typeof HUNGER_PROFILES
       if (!(profile in HUNGER_PROFILES)) {
@@ -189,6 +255,141 @@ export async function POST(req: NextRequest) {
       await runCommands(req, [`xp add ${player} ${amount} ${mode}`])
       logAudit(userId, 'player_control', player, `xp-boost:${amount}:${mode}`, serverId)
       return Response.json({ ok: true, message: `Boosted ${player} by ${amount} ${mode}.` })
+    }
+
+    if (action === 'teleport_to_coords') {
+      const x = Number(body.x)
+      const y = Number(body.y)
+      const z = Number(body.z)
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+        return Response.json({ ok: false, error: 'Coordinates are required' }, { status: 400 })
+      }
+      await runCommands(req, [`teleport ${player} ${roundCoord(x)} ${roundCoord(y)} ${roundCoord(z)}`])
+      logAudit(userId, 'player_control', player, `teleport-coords:${roundCoord(x)},${roundCoord(y)},${roundCoord(z)}`, serverId)
+      return Response.json({ ok: true, message: `${player} moved to ${roundCoord(x)}, ${roundCoord(y)}, ${roundCoord(z)}.` })
+    }
+
+    if (action === 'teleport_to_spawn') {
+      const spawn = body.spawn as { x?: unknown; y?: unknown; z?: unknown } | null | undefined
+      if (!spawn || !isFiniteNumber(spawn.x) || !isFiniteNumber(spawn.y) || !isFiniteNumber(spawn.z)) {
+        return Response.json({ ok: false, error: 'Spawn position is required' }, { status: 400 })
+      }
+      const x = Math.round(spawn.x)
+      const y = Math.round(spawn.y)
+      const z = Math.round(spawn.z)
+      await runCommands(req, [`teleport ${player} ${x} ${y} ${z}`])
+      logAudit(userId, 'player_control', player, `teleport-spawn:${x},${y},${z}`, serverId)
+      return Response.json({ ok: true, message: `${player} returned to their spawn anchor.` })
+    }
+
+    if (action === 'set_spawn_to_current') {
+      const pos = body.pos as { x?: unknown; y?: unknown; z?: unknown } | null | undefined
+      if (!pos || !isFiniteNumber(pos.x) || !isFiniteNumber(pos.y) || !isFiniteNumber(pos.z)) {
+        return Response.json({ ok: false, error: 'Current position is required' }, { status: 400 })
+      }
+      const x = Math.round(pos.x)
+      const y = Math.round(pos.y)
+      const z = Math.round(pos.z)
+      await runCommands(req, [`spawnpoint ${player} ${x} ${y} ${z}`])
+      logAudit(userId, 'player_control', player, `set-spawn:${x},${y},${z}`, serverId)
+      return Response.json({ ok: true, message: `${player} spawn point updated to current position.` })
+    }
+
+    if (action === 'teleport_to_world_spawn') {
+      const spawn = body.spawn as { x?: unknown; y?: unknown; z?: unknown } | null | undefined
+      if (!spawn || !isFiniteNumber(spawn.x) || !isFiniteNumber(spawn.y) || !isFiniteNumber(spawn.z)) {
+        return Response.json({ ok: false, error: 'World spawn coordinates are required' }, { status: 400 })
+      }
+      const x = Math.round(spawn.x)
+      const y = Math.round(spawn.y)
+      const z = Math.round(spawn.z)
+      await runCommands(req, [`teleport ${player} ${x} ${y} ${z}`])
+      logAudit(userId, 'player_control', player, `teleport-world-spawn:${x},${y},${z}`, serverId)
+      return Response.json({ ok: true, message: `${player} returned to the world spawn.` })
+    }
+
+    if (action === 'nudge_axis') {
+      const pos = body.pos as { x?: unknown; y?: unknown; z?: unknown } | null | undefined
+      const axis = String(body.axis ?? '').trim().toLowerCase()
+      const delta = Number(body.delta)
+      if (!pos || !isFiniteNumber(pos.x) || !isFiniteNumber(pos.y) || !isFiniteNumber(pos.z)) {
+        return Response.json({ ok: false, error: 'Current position is required' }, { status: 400 })
+      }
+      if (!['x', 'y', 'z'].includes(axis)) {
+        return Response.json({ ok: false, error: 'Axis must be x, y, or z' }, { status: 400 })
+      }
+      if (!Number.isFinite(delta) || Math.abs(delta) < 1 || Math.abs(delta) > 32) {
+        return Response.json({ ok: false, error: 'Axis nudge must be between 1 and 32 blocks' }, { status: 400 })
+      }
+      const next = { x: pos.x, y: pos.y, z: pos.z }
+      next[axis as 'x' | 'y' | 'z'] += delta
+      await runCommands(req, [`teleport ${player} ${roundCoord(next.x)} ${roundCoord(next.y)} ${roundCoord(next.z)}`])
+      logAudit(userId, 'player_control', player, `nudge-axis:${axis}:${delta}`, serverId)
+      return Response.json({ ok: true, message: `${player} nudged ${delta > 0 ? '+' : ''}${delta} on ${axis.toUpperCase()}.` })
+    }
+
+    if (action === 'nudge_vertical') {
+      const pos = body.pos as { x?: unknown; y?: unknown; z?: unknown } | null | undefined
+      const delta = Math.round(Number(body.delta))
+      if (!pos || !isFiniteNumber(pos.x) || !isFiniteNumber(pos.y) || !isFiniteNumber(pos.z)) {
+        return Response.json({ ok: false, error: 'Current position is required' }, { status: 400 })
+      }
+      if (!Number.isFinite(delta) || Math.abs(delta) < 1 || Math.abs(delta) > 32) {
+        return Response.json({ ok: false, error: 'Vertical nudge must be between 1 and 32 blocks' }, { status: 400 })
+      }
+      const x = Math.round(pos.x)
+      const y = Math.round(pos.y + delta)
+      const z = Math.round(pos.z)
+      await runCommands(req, [`teleport ${player} ${x} ${y} ${z}`])
+      logAudit(userId, 'player_control', player, `nudge-y:${delta}`, serverId)
+      return Response.json({ ok: true, message: `${player} moved ${delta > 0 ? 'up' : 'down'} ${Math.abs(delta)} blocks.` })
+    }
+
+    if (action === 'apply_effect_loadout') {
+      const loadout = String(body.loadout ?? '').trim() as keyof typeof EFFECT_LOADOUTS
+      const preset = EFFECT_LOADOUTS[loadout]
+      if (!preset) {
+        return Response.json({ ok: false, error: 'Invalid effect loadout' }, { status: 400 })
+      }
+      await runCommands(req, preset.commands(player))
+      logAudit(userId, 'player_control', player, `effect-loadout:${loadout}`, serverId)
+      return Response.json({ ok: true, message: `${preset.label} applied to ${player}.` })
+    }
+
+    if (action === 'extinguish') {
+      await runCommands(req, [`extinguish ${player}`])
+      logAudit(userId, 'player_control', player, 'extinguish', serverId)
+      return Response.json({ ok: true, message: `${player} is no longer on fire.` })
+    }
+
+    if (action === 'clear_effects') {
+      await runCommands(req, [`effect clear ${player}`])
+      logAudit(userId, 'player_control', player, 'clear-effects', serverId)
+      return Response.json({ ok: true, message: `${player}'s active effects were cleared.` })
+    }
+
+    if (action === 'clear_hotbar') {
+      await runCommands(req, clearSlotCommands(player, Array.from({ length: 9 }, (_, index) => `hotbar.${index}`)))
+      logAudit(userId, 'player_control', player, 'clear-hotbar', serverId)
+      return Response.json({ ok: true, message: `${player}'s hotbar was cleared.` })
+    }
+
+    if (action === 'clear_main_inventory') {
+      await runCommands(req, clearSlotCommands(player, Array.from({ length: 27 }, (_, index) => `inventory.${index}`)))
+      logAudit(userId, 'player_control', player, 'clear-main-inventory', serverId)
+      return Response.json({ ok: true, message: `${player}'s main inventory was cleared.` })
+    }
+
+    if (action === 'clear_armor') {
+      await runCommands(req, clearSlotCommands(player, ['armor.head', 'armor.chest', 'armor.legs', 'armor.feet']))
+      logAudit(userId, 'player_control', player, 'clear-armor', serverId)
+      return Response.json({ ok: true, message: `${player}'s armor slots were cleared.` })
+    }
+
+    if (action === 'clear_offhand') {
+      await runCommands(req, clearSlotCommands(player, ['weapon.offhand']))
+      logAudit(userId, 'player_control', player, 'clear-offhand', serverId)
+      return Response.json({ ok: true, message: `${player}'s offhand was cleared.` })
     }
 
     if (action === 'start_xp_booster') {

@@ -23,15 +23,6 @@ function EmptyState({ icon, message, action }: { icon: React.ReactNode; message:
   )
 }
 
-// Default empty state icons (using inline SVGs to avoid dependency issues)
-const EmptyBoxIcon = () => (
-  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-    <line x1="12" y1="22.08" x2="12" y2="12"/>
-  </svg>
-)
-
 const EmptyInventoryIcon = () => (
   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
@@ -84,6 +75,16 @@ type PlayerXpBooster = {
   lastRunAt: number | null
 }
 
+type WorldDirectoryData = {
+  ok: boolean
+  defaultWorld: string | null
+  worlds: Array<{
+    name: string
+    environment: string
+    spawn: { x: number; y: number; z: number; yaw: number; pitch: number } | null
+  }>
+}
+
 type Props = {
   onPlayersChange?: (players: string[]) => void
   minecraftVersion?: string | null
@@ -131,6 +132,23 @@ const XP_BOOSTER_PRESETS = [
   { id: '1h', label: 'Spark Hour', copy: '1 hour of +40 xp points every 5 minutes', tone: '#4ade80' },
   { id: '3h', label: 'Momentum Run', copy: '3 hours of +75 xp points every 5 minutes', tone: '#60a5fa' },
   { id: '5h', label: 'Overdrive Shift', copy: '5 hours of +110 xp points every 5 minutes', tone: '#f472b6' },
+] as const
+const EFFECT_LOADOUTS = [
+  { id: 'traversal', label: 'Traversal Boost', note: 'Speed and jump boost for quick repositioning', tone: '#38bdf8' },
+  { id: 'builder', label: 'Builder Focus', note: 'Night vision and haste for long build sessions', tone: '#a78bfa' },
+  { id: 'rescue', label: 'Rescue Bubble', note: 'Regeneration, resistance, and safety effects', tone: '#fb7185' },
+  { id: 'clear', label: 'Clear Effects', note: 'Strip the current potion stack instantly', tone: '#94a3b8' },
+] as const
+const AXIS_NUDGE_ROWS = [
+  { axis: 'x', label: 'X Drift', actions: [{ label: '-1', delta: -1 }, { label: '+1', delta: 1 }, { label: '-8', delta: -8 }, { label: '+8', delta: 8 }], tone: '#60a5fa' },
+  { axis: 'y', label: 'Y Lift', actions: [{ label: '-1', delta: -1 }, { label: '+1', delta: 1 }, { label: '-8', delta: -8 }, { label: '+8', delta: 8 }], tone: '#4ade80' },
+  { axis: 'z', label: 'Z Slide', actions: [{ label: '-1', delta: -1 }, { label: '+1', delta: 1 }, { label: '-8', delta: -8 }, { label: '+8', delta: 8 }], tone: '#f59e0b' },
+] as const
+const INVENTORY_UTILITY_ACTIONS = [
+  { id: 'clear_hotbar', label: 'Clear Hotbar', detail: 'Wipes only the 9 quick-access slots.', tone: '#fb7185' },
+  { id: 'clear_main_inventory', label: 'Clear Main', detail: 'Clears storage slots only, leaving hotbar untouched.', tone: '#f97316' },
+  { id: 'clear_armor', label: 'Clear Armor', detail: 'Removes helmet, chestplate, leggings, and boots.', tone: '#ef4444' },
+  { id: 'clear_offhand', label: 'Clear Offhand', detail: 'Clears shields, totems, and other offhand gear.', tone: '#f43f5e' },
 ] as const
 
 const PLAYERS_COLLAPSIBLE_GROUP = 'players-tab'
@@ -282,54 +300,75 @@ function CoordBlock({ label, pos }: { label: string; pos: { x: number; y: number
   )
 }
 
-function ControlSurface({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div
-      className={`rounded-[24px] border border-white/10 p-4 shadow-[0_22px_40px_rgba(0,0,0,0.24)] ${className}`}
-      style={{
-        background: 'linear-gradient(180deg, rgba(82,190,255,0.12), rgba(10,13,20,0.96))',
-      }}
-    >
-      {children}
-    </div>
-  )
-}
-
-function ControlHeader({ eyebrow, title, detail }: { eyebrow: string; title: string; detail: string }) {
-  return (
-    <div className="mb-3 space-y-1">
-      <div className="text-[10px] font-mono tracking-[0.38em] text-[var(--accent)]">{eyebrow}</div>
-      <div className="text-[16px] font-mono tracking-[0.08em] text-[var(--text)]">{title}</div>
-      <div className="text-[12px] font-mono leading-relaxed text-[var(--text-dim)]">{detail}</div>
-    </div>
-  )
-}
-
-function ControlButton({
-  active,
+function ActionChip({
+  icon,
+  label,
+  hint,
   onClick,
-  children,
-  tone = 'var(--accent)',
   disabled = false,
+  tone = 'var(--accent)',
+  active = false,
 }: {
-  active?: boolean
+  icon: string
+  label: string
+  hint: string
   onClick: () => void
-  children: React.ReactNode
-  tone?: string
   disabled?: boolean
+  tone?: string
+  active?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="rounded-2xl border px-3 py-2 text-left text-[12px] font-mono transition-all disabled:cursor-not-allowed disabled:opacity-40"
+      className="group relative inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-mono shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(0,0,0,0.18)]"
       style={active
-        ? { borderColor: tone, background: `${tone}22`, color: tone, boxShadow: `0 0 0 1px ${tone}22 inset` }
-        : { borderColor: 'var(--border)', background: 'rgba(255,255,255,0.03)', color: 'var(--text)' }}
+        ? { borderColor: tone, background: `linear-gradient(180deg, ${tone}24, ${tone}14)`, color: tone, boxShadow: `0 0 0 1px ${tone}22 inset` }
+        : { borderColor: 'var(--border)', background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))', color: 'var(--text)' }}
     >
-      {children}
+      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-current/15 bg-black/10 px-1 text-[10px] leading-none">{icon}</span>
+      <span className="tracking-[0.12em]">{label}</span>
+      <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 w-44 -translate-x-1/2 rounded-2xl border border-white/10 bg-[#0b1018]/95 px-3 py-2 text-left text-[10px] leading-relaxed text-[var(--text-dim)] opacity-0 shadow-[0_20px_40px_rgba(0,0,0,0.35)] backdrop-blur-sm transition-all duration-150 group-hover:translate-y-0.5 group-hover:opacity-100 group-focus-visible:opacity-100">
+        {hint}
+      </span>
     </button>
+  )
+}
+
+function InlineMenu({
+  label,
+  value,
+  color,
+  open,
+  onToggle,
+  children,
+}: {
+  label: string
+  value: string
+  color: string
+  open: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="relative inline-flex flex-col items-end gap-2">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="inline-flex items-center gap-2 rounded-full border px-2.5 py-1.5 text-[12px] font-mono shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-all duration-150 hover:-translate-y-0.5"
+        style={{ borderColor: `${color}44`, background: `linear-gradient(180deg, ${color}18, ${color}10)`, color }}
+      >
+        <span className="tracking-[0.14em]">{value}</span>
+        <span className="text-[10px] opacity-70">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-20 mt-1 min-w-44 rounded-2xl border border-white/10 bg-[#0c1118]/98 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.35)] backdrop-blur-sm">
+          <div className="px-2 pb-2 text-[10px] font-mono tracking-[0.18em] text-[var(--text-dim)]">{label}</div>
+          <div className="space-y-1">{children}</div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -386,10 +425,13 @@ function PlayerPanel({
   const { toasts, addToast } = useToast()
   const [boosters, setBoosters] = useState<PlayerXpBooster[]>([])
   const [controlBusy, setControlBusy] = useState<string | null>(null)
-  const [healthDraft, setHealthDraft] = useState('20')
-  const [xpLevelDraft, setXpLevelDraft] = useState('0')
-  const [xpProgressDraft, setXpProgressDraft] = useState('0')
   const [selectedHungerProfile, setSelectedHungerProfile] = useState<(typeof HUNGER_OPTIONS)[number]['id']>('full')
+  const [teleportXDraft, setTeleportXDraft] = useState('0')
+  const [teleportYDraft, setTeleportYDraft] = useState('0')
+  const [teleportZDraft, setTeleportZDraft] = useState('0')
+  const [worldDirectory, setWorldDirectory] = useState<WorldDirectoryData | null>(null)
+  const [openQuickMenu, setOpenQuickMenu] = useState<'gamemode' | 'dimension' | null>(null)
+  const [showMoreActions, setShowMoreActions] = useState(false)
 
   const canSession = features ? features.enable_player_session : true
   const canVitals = features ? features.enable_player_vitals : true
@@ -397,7 +439,7 @@ function PlayerPanel({
   const canEffects = features ? features.enable_player_effects : true
   const canInventory = features ? features.enable_inventory : true
   const canPlayerCommands = features ? features.enable_player_commands : true
-  const canControlDeck = canPlayerCommands || canVitals
+  const canControlDeck = canPlayerCommands || canVitals || canLocation || canEffects
 
   const loadFeatures = useCallback(async () => {
     try {
@@ -428,6 +470,25 @@ function PlayerPanel({
     }
   }, [canVitals, player])
 
+  const refreshWorldDirectory = useCallback(async () => {
+    if (!canLocation) {
+      setWorldDirectory(null)
+      return
+    }
+
+    try {
+      const response = await fetch('/api/minecraft/worlds', { cache: 'no-store' })
+      const payload = await response.json()
+      if (payload.ok) {
+        setWorldDirectory(payload)
+      } else {
+        setWorldDirectory(null)
+      }
+    } catch {
+      setWorldDirectory(null)
+    }
+  }, [canLocation])
+
   useEffect(() => {
     loadFeatures()
     const onFeatures = () => { void loadFeatures() }
@@ -440,6 +501,7 @@ function PlayerPanel({
     setStatsLoading(true); setInvLoading(true); setStatsError(null)
     setRefreshing(true)
     void refreshBoosters()
+    void refreshWorldDirectory()
 
     const needsStats = canSession || canVitals || canLocation
     const needsEffects = canEffects
@@ -471,7 +533,7 @@ function PlayerPanel({
       .then(d => { if (d.ok) setInventory(d.items ?? []) })
       .catch(() => {})
       .finally(() => setInvLoading(false))
-  }, [player, canInventory, canEffects, canLocation, canSession, canVitals, refreshBoosters])
+  }, [player, canInventory, canEffects, canLocation, canSession, canVitals, refreshBoosters, refreshWorldDirectory])
 
   const refreshInventory = useCallback(async () => {
     const response = await fetch(`/api/minecraft/inventory?player=${encodeURIComponent(player)}`)
@@ -513,15 +575,38 @@ function PlayerPanel({
 
   useEffect(() => {
     if (!stats) return
-    if (stats.health !== null) setHealthDraft(String(Math.round(stats.health * 2) / 2))
-    if (stats.xpLevel !== null) setXpLevelDraft(String(stats.xpLevel))
-    if (stats.xpP !== null) setXpProgressDraft(String(Math.round(stats.xpP * 100)))
+    if (stats.pos) {
+      setTeleportXDraft(String(Math.round(stats.pos.x * 100) / 100))
+      setTeleportYDraft(String(Math.round(stats.pos.y * 100) / 100))
+      setTeleportZDraft(String(Math.round(stats.pos.z * 100) / 100))
+    }
 
     if (stats.food !== null) {
       const nextProfile = stats.food >= 18 ? 'full' : stats.food >= 12 ? 'trail' : stats.food >= 6 ? 'low' : 'starve'
       setSelectedHungerProfile(nextProfile)
     }
   }, [stats])
+
+  const resolvedWorldSpawn = useMemo(() => {
+    if (!worldDirectory?.ok || worldDirectory.worlds.length === 0) return null
+    const dimensionEnvironment = stats?.dimension === 'Nether'
+      ? 'NETHER'
+      : stats?.dimension === 'The End'
+        ? 'THE_END'
+        : stats?.dimension === 'Overworld'
+          ? 'NORMAL'
+          : null
+
+    const directMatch = dimensionEnvironment
+      ? worldDirectory.worlds.find(world => world.environment === dimensionEnvironment && world.spawn)
+      : null
+    if (directMatch?.spawn) return directMatch.spawn
+
+    const defaultWorldMatch = worldDirectory.defaultWorld
+      ? worldDirectory.worlds.find(world => world.name === worldDirectory.defaultWorld && world.spawn)
+      : null
+    return defaultWorldMatch?.spawn ?? worldDirectory.worlds.find(world => world.spawn)?.spawn ?? null
+  }, [stats?.dimension, worldDirectory])
 
   const deleteItem = async (item: InvItem) => {
     setDeletingSlot(item.slot)
@@ -615,6 +700,7 @@ function PlayerPanel({
 
   const runPlayerControl = useCallback(async (action: string, payload: Record<string, unknown>) => {
     setControlBusy(action)
+    setOpenQuickMenu(null)
     try {
       const response = await fetch('/api/minecraft/player-control', {
         method: 'POST',
@@ -637,24 +723,40 @@ function PlayerPanel({
     }
   }, [addToast, player, refresh])
 
-  const applyHealth = useCallback(() => {
-    const value = Number(healthDraft)
-    if (!Number.isFinite(value) || value < 1 || value > 20) {
-      addToast('error', 'Health must be between 1 and 20')
+  const seedTeleportDraftsFromCurrent = useCallback(() => {
+    if (!stats?.pos) {
+      addToast('error', 'Current position is unavailable')
       return
     }
-    void runPlayerControl('set_health', { health: value })
-  }, [addToast, healthDraft, runPlayerControl])
+    setTeleportXDraft(String(Math.round(stats.pos.x * 100) / 100))
+    setTeleportYDraft(String(Math.round(stats.pos.y * 100) / 100))
+    setTeleportZDraft(String(Math.round(stats.pos.z * 100) / 100))
+    addToast('ok', 'Loaded current coordinates into the composer')
+  }, [addToast, stats?.pos])
 
-  const applyExperience = useCallback(() => {
-    const level = Number(xpLevelDraft)
-    const progress = Number(xpProgressDraft)
-    if (!Number.isFinite(level) || level < 0 || !Number.isFinite(progress) || progress < 0 || progress > 99) {
-      addToast('error', 'Use a level >= 0 and a progress between 0 and 99')
+  const applyCoordinateTeleport = useCallback(() => {
+    const x = Number(teleportXDraft)
+    const y = Number(teleportYDraft)
+    const z = Number(teleportZDraft)
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+      addToast('error', 'Use valid X, Y, and Z coordinates')
       return
     }
-    void runPlayerControl('set_experience', { level, progress })
-  }, [addToast, runPlayerControl, xpLevelDraft, xpProgressDraft])
+    void runPlayerControl('teleport_to_coords', { x, y, z })
+  }, [addToast, runPlayerControl, teleportXDraft, teleportYDraft, teleportZDraft])
+
+  const confirmInventoryUtility = useCallback((action: (typeof INVENTORY_UTILITY_ACTIONS)[number]) => {
+    setConfirmModal({
+      title: `${action.label}?`,
+      body: `${action.detail} This only affects ${player}.`,
+      confirmLabel: action.label,
+      destructive: true,
+      onConfirm: () => {
+        setConfirmModal(null)
+        void runPlayerControl(action.id, {})
+      },
+    })
+  }, [player, runPlayerControl])
 
   const { hotbar, main, armor, offhand } = buildInventoryLayout(inventory)
   const inventoryItemLookup = useMemo(() => buildInventoryItemLookup(minecraftVersion), [minecraftVersion])
@@ -748,16 +850,56 @@ function PlayerPanel({
                   }
                 </Row>
                 <Row label="DIMENSION">
-                  {stats?.dimension
-                    ? <Badge color={DIMENSION_COLORS[stats.dimension] ?? 'var(--accent)'}>{stats.dimension}</Badge>
-                    : <span className="text-[var(--text-dim)]">—</span>
-                  }
+                  {stats?.dimension ? (
+                    canPlayerCommands ? (
+                      <InlineMenu
+                        label="DIMENSION"
+                        value={stats.dimension}
+                        color={DIMENSION_COLORS[stats.dimension] ?? 'var(--accent)'}
+                        open={openQuickMenu === 'dimension'}
+                        onToggle={() => setOpenQuickMenu(current => current === 'dimension' ? null : 'dimension')}
+                      >
+                        {DIMENSION_OPTIONS.map(dimension => (
+                          <button
+                            key={dimension}
+                            type="button"
+                            onClick={() => void runPlayerControl('set_dimension', { dimension, pos: stats?.pos })}
+                            disabled={controlBusy !== null || !stats?.pos}
+                            className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-[11px] font-mono text-[var(--text)] transition-colors hover:bg-white/5 disabled:opacity-40"
+                          >
+                            <span>{dimension}</span>
+                            {stats.dimension === dimension && <span style={{ color: DIMENSION_COLORS[dimension] ?? 'var(--accent)' }}>✓</span>}
+                          </button>
+                        ))}
+                      </InlineMenu>
+                    ) : <Badge color={DIMENSION_COLORS[stats.dimension] ?? 'var(--accent)'}>{stats.dimension}</Badge>
+                  ) : <span className="text-[var(--text-dim)]">—</span>}
                 </Row>
                 <Row label="GAMEMODE">
-                  {stats?.gamemode
-                    ? <Badge color={GAMEMODE_COLORS[stats.gamemode] ?? 'var(--accent)'}>{stats.gamemode.toUpperCase()}</Badge>
-                    : <span className="text-[var(--text-dim)]">—</span>
-                  }
+                  {stats?.gamemode ? (
+                    canPlayerCommands ? (
+                      <InlineMenu
+                        label="GAMEMODE"
+                        value={stats.gamemode.toUpperCase()}
+                        color={GAMEMODE_COLORS[stats.gamemode] ?? 'var(--accent)'}
+                        open={openQuickMenu === 'gamemode'}
+                        onToggle={() => setOpenQuickMenu(current => current === 'gamemode' ? null : 'gamemode')}
+                      >
+                        {GAMEMODE_OPTIONS.map(mode => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => void runPlayerControl('set_gamemode', { gamemode: mode })}
+                            disabled={controlBusy !== null}
+                            className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-[11px] font-mono text-[var(--text)] transition-colors hover:bg-white/5 disabled:opacity-40"
+                          >
+                            <span>{mode.toUpperCase()}</span>
+                            {stats.gamemode === mode && <span style={{ color: GAMEMODE_COLORS[mode] ?? 'var(--accent)' }}>✓</span>}
+                          </button>
+                        ))}
+                      </InlineMenu>
+                    ) : <Badge color={GAMEMODE_COLORS[stats.gamemode] ?? 'var(--accent)'}>{stats.gamemode.toUpperCase()}</Badge>
+                  ) : <span className="text-[var(--text-dim)]">—</span>}
                 </Row>
               </div>
               )}
@@ -784,233 +926,165 @@ function PlayerPanel({
             {canControlDeck && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <SectionTitle>CONTROL DECK</SectionTitle>
-                  <span className="rounded-full border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-2 py-0.5 text-[10px] font-mono tracking-[0.25em] text-[var(--accent)]">
-                    LIVE EDITS
+                  <SectionTitle>QUICK EDIT</SectionTitle>
+                  <span className="rounded-full border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-2 py-0.5 text-[10px] font-mono tracking-[0.2em] text-[var(--accent)]">
+                    CLICK TO APPLY
                   </span>
                 </div>
 
-                <div className="grid gap-3 xl:grid-cols-[1.25fr,1fr]">
-                  {(canPlayerCommands || canVitals) && (
-                    <ControlSurface>
-                      <ControlHeader
-                        eyebrow="PLAYER STATE"
-                        title="Instant profile tuning"
-                        detail="Everything here is made for quick touch-ups while the player is online: travel, role changes, vitals shaping, and progression edits without leaving the panel."
-                      />
-
-                      <div className="grid gap-3 lg:grid-cols-2">
-                        {canPlayerCommands && (
-                          <div className="space-y-3 rounded-[20px] border border-white/10 bg-black/10 p-3">
-                            <div className="text-[10px] font-mono tracking-[0.32em] text-[var(--text-dim)]">MODE SWAP</div>
-                            <div className="grid grid-cols-2 gap-2">
-                              {GAMEMODE_OPTIONS.map(mode => (
-                                <ControlButton
-                                  key={mode}
-                                  active={stats?.gamemode === mode}
-                                  disabled={controlBusy !== null}
-                                  onClick={() => void runPlayerControl('set_gamemode', { gamemode: mode })}
-                                  tone={GAMEMODE_COLORS[mode] ?? 'var(--accent)'}
-                                >
-                                  <div className="tracking-[0.18em]">{mode.toUpperCase()}</div>
-                                </ControlButton>
-                              ))}
-                            </div>
-
-                            <div className="pt-1 text-[10px] font-mono tracking-[0.32em] text-[var(--text-dim)]">DIMENSION HOP</div>
-                            <div className="grid gap-2">
-                              {DIMENSION_OPTIONS.map(dimension => (
-                                <ControlButton
-                                  key={dimension}
-                                  active={stats?.dimension === dimension}
-                                  disabled={controlBusy !== null || !stats?.pos}
-                                  onClick={() => void runPlayerControl('set_dimension', { dimension, pos: stats?.pos })}
-                                  tone={DIMENSION_COLORS[dimension] ?? 'var(--accent)'}
-                                >
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="tracking-[0.16em]">{dimension}</span>
-                                    <span className="text-[10px] opacity-60">{stats?.pos ? 'jump now' : 'needs coords'}</span>
-                                  </div>
-                                </ControlButton>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {canVitals && (
-                          <div className="space-y-3 rounded-[20px] border border-white/10 bg-black/10 p-3">
-                            <div className="text-[10px] font-mono tracking-[0.32em] text-[var(--text-dim)]">VITAL SHAPER</div>
-                            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                              <div className="flex items-center justify-between text-[11px] font-mono text-[var(--text-dim)]">
-                                <span>Health</span>
-                                <span>{healthDraft}</span>
-                              </div>
-                              <input
-                                type="range"
-                                min="1"
-                                max="20"
-                                step="0.5"
-                                value={healthDraft}
-                                onChange={event => setHealthDraft(event.target.value)}
-                                className="mt-3 w-full accent-[var(--accent)]"
-                              />
-                              <div className="mt-3 flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  min="1"
-                                  max="20"
-                                  step="0.5"
-                                  value={healthDraft}
-                                  onChange={event => setHealthDraft(event.target.value)}
-                                  className="w-24 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[13px] font-mono text-[var(--text)]"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={applyHealth}
-                                  disabled={controlBusy !== null}
-                                  className="rounded-xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 text-[12px] font-mono tracking-[0.18em] text-[var(--accent)] disabled:opacity-40"
-                                >
-                                  {controlBusy === 'set_health' ? 'SYNCING' : 'SET HEALTH'}
-                                </button>
-                              </div>
-                            </div>
-
-                            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                              <div className="mb-2 text-[11px] font-mono text-[var(--text-dim)]">Hunger Profiles</div>
-                              <div className="grid gap-2 sm:grid-cols-2">
-                                {HUNGER_OPTIONS.map(option => (
-                                  <ControlButton
-                                    key={option.id}
-                                    active={selectedHungerProfile === option.id}
-                                    disabled={controlBusy !== null}
-                                    onClick={() => {
-                                      setSelectedHungerProfile(option.id)
-                                      void runPlayerControl('set_hunger_profile', { profile: option.id })
-                                    }}
-                                    tone="#f59e0b"
-                                  >
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span>{option.label}</span>
-                                      <span className="text-[10px] opacity-70">{option.value}/20</span>
-                                    </div>
-                                    <div className="mt-1 text-[10px] leading-relaxed text-[var(--text-dim)]">{option.note}</div>
-                                  </ControlButton>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        )}
+                <div className="grid gap-3 xl:grid-cols-2">
+                  {canVitals && (
+                    <div className="rounded-[26px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))] p-4 shadow-[0_22px_38px_rgba(0,0,0,0.14)] space-y-4">
+                      <div>
+                        <div className="text-[10px] font-mono tracking-[0.24em] text-[var(--text-dim)]">HEALTH</div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <ActionChip icon="++" label="Full" hint="Set health to full hearts instantly." onClick={() => void runPlayerControl('set_health', { health: 20 })} tone="#4ade80" />
+                          <ActionChip icon="+-" label="Half" hint="Set health to a mid-fight 10.0/20 state." onClick={() => void runPlayerControl('set_health', { health: 10 })} tone="#fb7185" />
+                          <ActionChip icon="!!" label="Critical" hint="Drop health to a dangerous 4.0/20 state." onClick={() => void runPlayerControl('set_health', { health: 4 })} tone="#f97316" />
+                          <ActionChip icon="OK" label="Restore" hint="Heal, feed, and stabilize the player immediately." onClick={() => void runPlayerControl('restore_vitals', {})} tone="#38bdf8" />
+                        </div>
                       </div>
-                    </ControlSurface>
+
+                      <div>
+                        <div className="text-[10px] font-mono tracking-[0.24em] text-[var(--text-dim)]">HUNGER</div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {HUNGER_OPTIONS.map(option => (
+                            <ActionChip
+                              key={option.id}
+                              icon={option.id === 'full' ? '[]' : option.id === 'trail' ? '/=' : option.id === 'low' ? '/-' : '!!'}
+                              label={option.label}
+                              hint={option.note}
+                              onClick={() => {
+                                setSelectedHungerProfile(option.id)
+                                void runPlayerControl('set_hunger_profile', { profile: option.id })
+                              }}
+                              tone="#f59e0b"
+                              active={selectedHungerProfile === option.id}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-[10px] font-mono tracking-[0.24em] text-[var(--text-dim)]">EXPERIENCE</div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {XP_BOOST_ACTIONS.map(boost => (
+                            <ActionChip
+                              key={boost.id}
+                              icon={boost.mode === 'levels' ? 'Lv' : 'XP'}
+                              label={boost.label}
+                              hint={`Instantly boost ${player} by ${boost.amount} ${boost.mode}.`}
+                              onClick={() => void runPlayerControl('boost_xp', { mode: boost.mode, amount: boost.amount })}
+                              tone={boost.tone}
+                            />
+                          ))}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {XP_BOOSTER_PRESETS.map(preset => (
+                            <ActionChip
+                              key={preset.id}
+                              icon="++"
+                              label={preset.label}
+                              hint={preset.copy}
+                              onClick={() => void runPlayerControl('start_xp_booster', { tier: preset.id })}
+                              tone={preset.tone}
+                            />
+                          ))}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {boosters.length === 0 ? (
+                            <span className="text-[11px] font-mono text-[var(--text-dim)]">No timed boosters active.</span>
+                          ) : boosters.map(booster => (
+                            <button
+                              key={booster.id}
+                              type="button"
+                              onClick={() => void runPlayerControl('cancel_xp_booster', { boosterId: booster.id })}
+                              disabled={controlBusy !== null}
+                              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-mono text-[var(--text)] transition-all hover:border-[#f87171] hover:text-[#fca5a5] disabled:opacity-40"
+                            >
+                              <span>++</span>
+                              <span>{booster.label}</span>
+                              <span className="text-[var(--text-dim)]">{formatRemainingTime(booster.endsAt)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   )}
 
-                  {canVitals && (
-                    <ControlSurface className="relative overflow-hidden">
-                      <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_70%)]" />
-                      <ControlHeader
-                        eyebrow="XP FOUNDRY"
-                        title="Progression without page hops"
-                        detail="Tune the live bar, fire one-shot boosts, or stage timed boosters that keep dripping extra experience while the player is online."
-                      />
-
-                      <div className="space-y-3">
-                        <div className="rounded-[20px] border border-white/10 bg-black/10 p-3">
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            <label className="space-y-1 text-[11px] font-mono text-[var(--text-dim)]">
-                              <span>Level</span>
-                              <input
-                                type="number"
-                                min="0"
-                                value={xpLevelDraft}
-                                onChange={event => setXpLevelDraft(event.target.value)}
-                                className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[13px] font-mono text-[var(--text)]"
-                              />
-                            </label>
-                            <label className="space-y-1 text-[11px] font-mono text-[var(--text-dim)]">
-                              <span>Bar %</span>
-                              <input
-                                type="number"
-                                min="0"
-                                max="99"
-                                value={xpProgressDraft}
-                                onChange={event => setXpProgressDraft(event.target.value)}
-                                className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[13px] font-mono text-[var(--text)]"
-                              />
-                            </label>
+                  {(canLocation || canEffects || canInventory) && (
+                    <div className="rounded-[26px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))] p-4 shadow-[0_22px_38px_rgba(0,0,0,0.14)] space-y-4">
+                      {canLocation && (
+                        <div>
+                          <div className="text-[10px] font-mono tracking-[0.24em] text-[var(--text-dim)]">LOCATION ACTIONS</div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <ActionChip icon="W" label="World Spawn" hint="Return the player to the current world's spawn." onClick={() => void runPlayerControl('teleport_to_world_spawn', { spawn: resolvedWorldSpawn })} tone="#38bdf8" disabled={!resolvedWorldSpawn} />
+                            <ActionChip icon="B" label="Bed / Anchor" hint="Return the player to their saved respawn point." onClick={() => void runPlayerControl('teleport_to_spawn', { spawn: stats?.spawnPos })} tone="#f59e0b" disabled={!stats?.spawnPos} />
+                            <ActionChip icon="S" label="Set Spawn" hint="Make the current player position their new spawnpoint." onClick={() => void runPlayerControl('set_spawn_to_current', { pos: stats?.pos })} tone="#4ade80" disabled={!stats?.pos} />
                           </div>
-                          <button
-                            type="button"
-                            onClick={applyExperience}
-                            disabled={controlBusy !== null}
-                            className="mt-3 w-full rounded-xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 text-[12px] font-mono tracking-[0.2em] text-[var(--accent)] disabled:opacity-40"
-                          >
-                            {controlBusy === 'set_experience' ? 'UPDATING XP' : 'SET LIVE EXPERIENCE'}
-                          </button>
                         </div>
+                      )}
 
-                        <div className="rounded-[20px] border border-white/10 bg-black/10 p-3">
-                          <div className="mb-2 text-[11px] font-mono text-[var(--text-dim)]">One-Time Boosts</div>
-                          <div className="grid gap-2 sm:grid-cols-3">
-                            {XP_BOOST_ACTIONS.map(boost => (
-                              <ControlButton
-                                key={boost.id}
-                                disabled={controlBusy !== null}
-                                onClick={() => void runPlayerControl('boost_xp', { mode: boost.mode, amount: boost.amount })}
-                                tone={boost.tone}
-                              >
-                                <div className="tracking-[0.16em]">{boost.label}</div>
-                                <div className="mt-1 text-[10px] text-[var(--text-dim)]">Instant progression spike</div>
-                              </ControlButton>
+                      {canEffects && (
+                        <div>
+                          <div className="text-[10px] font-mono tracking-[0.24em] text-[var(--text-dim)]">EFFECTS</div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {EFFECT_LOADOUTS.map(loadout => (
+                              <ActionChip key={loadout.id} icon={loadout.id === 'clear' ? 'X' : 'FX'} label={loadout.label} hint={loadout.note} onClick={() => void runPlayerControl(loadout.id === 'clear' ? 'clear_effects' : 'apply_effect_loadout', loadout.id === 'clear' ? {} : { loadout: loadout.id })} tone={loadout.tone} />
                             ))}
                           </div>
                         </div>
+                      )}
 
-                        <div className="rounded-[20px] border border-white/10 bg-black/10 p-3">
-                          <div className="mb-2 text-[11px] font-mono text-[var(--text-dim)]">Timed XP Boosters</div>
-                          <div className="grid gap-2">
-                            {XP_BOOSTER_PRESETS.map(preset => (
-                              <ControlButton
-                                key={preset.id}
-                                disabled={controlBusy !== null}
-                                onClick={() => void runPlayerControl('start_xp_booster', { tier: preset.id })}
-                                tone={preset.tone}
-                              >
-                                <div className="flex items-center justify-between gap-2">
-                                  <span>{preset.label}</span>
-                                  <span className="text-[10px] opacity-70">{preset.id}</span>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setShowMoreActions(open => !open)}
+                          className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] px-3 py-1.5 text-[11px] font-mono text-[var(--text-dim)] transition-colors hover:border-[var(--accent-mid)] hover:text-[var(--text)]"
+                        >
+                          <span>{showMoreActions ? '▲' : '▼'}</span>
+                          <span>More Actions</span>
+                        </button>
+
+                        {showMoreActions && (
+                          <div className="mt-3 space-y-3 rounded-2xl border border-[var(--border)] bg-black/10 p-3">
+                            {canLocation && (
+                              <>
+                                <div className="grid gap-2 sm:grid-cols-3">
+                                  <input type="number" value={teleportXDraft} onChange={event => setTeleportXDraft(event.target.value)} placeholder="X" className="rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[12px] font-mono text-[var(--text)]" />
+                                  <input type="number" value={teleportYDraft} onChange={event => setTeleportYDraft(event.target.value)} placeholder="Y" className="rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[12px] font-mono text-[var(--text)]" />
+                                  <input type="number" value={teleportZDraft} onChange={event => setTeleportZDraft(event.target.value)} placeholder="Z" className="rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[12px] font-mono text-[var(--text)]" />
                                 </div>
-                                <div className="mt-1 text-[10px] leading-relaxed text-[var(--text-dim)]">{preset.copy}</div>
-                              </ControlButton>
-                            ))}
-                          </div>
-
-                          <div className="mt-3 space-y-2">
-                            {boosters.length === 0 ? (
-                              <div className="rounded-2xl border border-dashed border-white/10 px-3 py-3 text-[11px] font-mono text-[var(--text-dim)]">
-                                No timed boosters armed right now.
-                              </div>
-                            ) : boosters.map(booster => (
-                              <div key={booster.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
-                                <div>
-                                  <div className="text-[12px] font-mono text-[var(--text)]">{booster.label}</div>
-                                  <div className="mt-1 text-[10px] font-mono text-[var(--text-dim)]">
-                                    +{booster.bonusPoints} xp / {Math.round(booster.intervalSeconds / 60)}m • {formatRemainingTime(booster.endsAt)}
-                                  </div>
+                                <div className="flex flex-wrap gap-2">
+                                  <ActionChip icon="@" label="Use Current" hint="Seed the coordinate editor with the player's live position." onClick={seedTeleportDraftsFromCurrent} disabled={!stats?.pos} tone="#94a3b8" />
+                                  <ActionChip icon="TP" label="Teleport" hint="Move the player to the typed coordinates." onClick={applyCoordinateTeleport} tone="#38bdf8" />
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => void runPlayerControl('cancel_xp_booster', { boosterId: booster.id })}
-                                  disabled={controlBusy !== null}
-                                  className="rounded-xl border border-[#f87171] px-3 py-2 text-[11px] font-mono tracking-[0.18em] text-[#fca5a5] disabled:opacity-40"
-                                >
-                                  STOP
-                                </button>
+                                <div className="space-y-2 pt-1">
+                                  {AXIS_NUDGE_ROWS.map(row => (
+                                    <div key={row.axis} className="grid gap-2 sm:grid-cols-[80px,1fr] sm:items-center">
+                                      <div className="text-[11px] font-mono text-[var(--text-dim)]">{row.label}</div>
+                                      <div className="flex flex-wrap gap-2">
+                                        {row.actions.map(action => (
+                                          <ActionChip key={`${row.axis}-${action.label}`} icon={row.axis.toUpperCase()} label={action.label} hint={`Move ${action.label} on ${row.axis.toUpperCase()}.`} onClick={() => void runPlayerControl('nudge_axis', { pos: stats?.pos, axis: row.axis, delta: action.delta })} disabled={!stats?.pos} tone={row.tone} />
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+
+                            {canInventory && (
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                {INVENTORY_UTILITY_ACTIONS.map(action => (
+                                  <ActionChip key={action.id} icon="!!" label={action.label} hint={action.detail} onClick={() => confirmInventoryUtility(action)} tone={action.tone} />
+                                ))}
                               </div>
-                            ))}
+                            )}
                           </div>
-                        </div>
+                        )}
                       </div>
-                    </ControlSurface>
+                    </div>
                   )}
                 </div>
               </div>
