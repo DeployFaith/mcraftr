@@ -35,12 +35,8 @@ export const { handlers, auth: nodeAuth, signIn, signOut } = NextAuth({
       if (user?.id) {
         token.id = user.id
       }
-      const tokenEmail = typeof token.email === 'string' ? token.email.trim().toLowerCase() : null
-      if ((!token.id || !getUserById(token.id as string)) && tokenEmail) {
-        const fallbackUser = getUserByEmail(tokenEmail)
-        if (fallbackUser) {
-          token.id = fallbackUser.id
-        }
+      if (token.id && !getUserById(token.id as string)) {
+        token.id = null
       }
       // Refresh hasServer and role on every JWT evaluation: sign-in, token
       // rotation, and explicit update() calls from the client. This ensures

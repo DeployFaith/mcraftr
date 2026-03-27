@@ -4,7 +4,7 @@
  * All users connect directly via the RCON TCP protocol (rcon-client).
  */
 import { rconDirect, type RconResult } from './rcon-client'
-import { getActiveServer, getUserByEmail, getUserById, getUserFeatures, type UserFeatures } from './users'
+import { getActiveServer, getUserById, getUserFeatures, type UserFeatures } from './users'
 import { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { checkRateLimit } from './ratelimit'
@@ -27,20 +27,7 @@ async function resolveSessionUser(req: NextRequest): Promise<{ userId: string | 
     }
   }
 
-  const tokenEmail = typeof token?.email === 'string' ? token.email.trim().toLowerCase() : null
-  if (!tokenEmail) {
-    return { userId: null, activeServerId: null }
-  }
-
-  const user = getUserByEmail(tokenEmail)
-  if (!user) {
-    return { userId: null, activeServerId: null }
-  }
-
-  return {
-    userId: user.id,
-    activeServerId: user.activeServerId ?? null,
-  }
+  return { userId: null, activeServerId: null }
 }
 
 // ── Feature flag helpers ─────────────────────────────────────────────────────────
