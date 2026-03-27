@@ -4,6 +4,7 @@ import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState
 import { ArrowUpRight, BookOpen, Command, ExternalLink, GripVertical, LayoutPanelLeft, LayoutPanelTop, Maximize2, Minimize2, Play, Plus, Search, Star, Trash2, X } from 'lucide-react'
 import ConfirmModal from './ConfirmModal'
 import CapabilityLockCard from './CapabilityLockCard'
+import IntegrationRecommendationModal from './IntegrationRecommendationModal'
 import type { FeatureKey } from '@/lib/features'
 import type {
   TerminalCatalogEntry,
@@ -50,6 +51,47 @@ type WorldEditSchematic = {
 }
 
 type FeatureFlags = Record<FeatureKey, boolean>
+
+type IntegrationStatus = {
+  id: string
+  label: string
+  installState: 'ready' | 'missing' | 'unsupported' | 'unknown' | 'outdated' | 'drifted' | 'user-managed'
+  detectedVersion: string | null
+  pinnedVersion: string
+  reasons: string[]
+}
+
+type IntegrationPreference = {
+  integrationId: string
+  reason: string | null
+}
+
+type IntegrationRecommendation = {
+  recommendedId: string | null
+  confidence: 'high' | 'medium' | 'low'
+  summary: string
+  reasons: string[]
+  alternatives: Array<{
+    id: string
+    acceptable: boolean
+    reason: string
+  }>
+  restartRequired: boolean
+  pinnedVersion: string | null
+}
+
+type IntegrationsData = {
+  ok: boolean
+  error?: string
+  integrations?: IntegrationStatus[]
+  preferences?: {
+    structureEditorProvider: IntegrationPreference | null
+    shouldPromptForStructureEditor: boolean
+  }
+  recommendations?: {
+    structureEditor: IntegrationRecommendation
+  }
+}
 
 type WizardTabId = NonNullable<TerminalState['activeInspectorTab']>
 
@@ -194,6 +236,7 @@ export default function AdminTerminalWorkspace({
   const [suggestionIndex, setSuggestionIndex] = useState(0)
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [confirmCommand, setConfirmCommand] = useState<string | null>(null)
+  const [confirmIntegrationInstall, setConfirmIntegrationInstall] = useState<string | null>(null)
   const [favoriteId, setFavoriteId] = useState<string | null>(null)
   const [favoriteLabel, setFavoriteLabel] = useState('')
   const [favoriteDescription, setFavoriteDescription] = useState('')
@@ -201,6 +244,10 @@ export default function AdminTerminalWorkspace({
   const [worldeditSchematics, setWorldeditSchematics] = useState<WorldEditSchematic[]>([])
   const [worldeditLoading, setWorldeditLoading] = useState(false)
   const [worldeditHint, setWorldeditHint] = useState<string | null>(null)
+  const [integrationsData, setIntegrationsData] = useState<IntegrationsData | null>(null)
+  const [integrationsBusy, setIntegrationsBusy] = useState<string | null>(null)
+  const [integrationsStatus, setIntegrationsStatus] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [integrationRecommendationOpen, setIntegrationRecommendationOpen] = useState(false)
   const [features, setFeatures] = useState<FeatureFlags | null>(null)
 
   const effectiveMode = standalone ? state.mode : (state.mode === 'popout' ? 'embedded' : state.mode)
@@ -420,6 +467,16 @@ export default function AdminTerminalWorkspace({
     })
   }
 
+  const loadIntegrations = async () => {
+    try {
+      const response = await fetch('/api/minecraft/integrations', { cache: 'no-store' })
+      const data = await response.json()
+      setIntegrationsData(data)
+    } catch {
+      setIntegrationsData({ ok: false, error: 'Failed to load integration status' })
+    }
+  }
+
   useEffect(() => {
     if (!relayEnabled || currentWizardId !== 'worldedit-basic') return
     let cancelled = false
@@ -447,6 +504,7 @@ export default function AdminTerminalWorkspace({
       }
     }
     void loadWorldEditContext()
+    void loadIntegrations()
     return () => { cancelled = true }
   }, [currentWizardId, relayEnabled])
 
@@ -460,6 +518,65 @@ export default function AdminTerminalWorkspace({
     }
     return 'Live command discovery is currently unavailable. Raw RCON commands still run here.'
   }, [catalogWarning, catalogWarningCode])
+
+  const structureProviderStatuses = useMemo(
+    () => (integrationsData?.integrations ?? []).filter(integration => integration.id === 'worldedit' || integration.id === 'fawe'),
+    [integrationsData],
+  )
+  const structureProviderPreference = integrationsData?.preferences?.structureEditorProvider ?? null
+  const structureProviderRecommendation = integrationsData?.recommendations?.structureEditor ?? null
+
+  const runIntegrationAction = async (action: 'install' | 'repair', integrationId: string) => {
+    setIntegrationsBusy(`${action}:${integrationId}`)
+    setIntegrationsStatus(null)
+    try {
+      const response = await fetch(`/api/minecraft/integrations/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ integrationId }),
+      })
+      const data = await response.json()
+      if (!data.ok) throw new Error(data.error || `Failed to ${action} integration`)
+      setIntegrationsStatus({ ok: true, msg: data.message || `${integrationId} ${action} complete.` })
+      await loadIntegrations()
+    } catch (error) {
+      setIntegrationsStatus({ ok: false, msg: error instanceof Error ? error.message : `Failed to ${action} integration.` })
+    } finally {
+      setIntegrationsBusy(null)
+    }
+  }
+
+  const saveStructureEditorPreference = async (integrationId: string, reason: string) => {
+    setIntegrationsBusy(`preference:${integrationId}`)
+    setIntegrationsStatus(null)
+    try {
+      const response = await fetch('/api/minecraft/integrations/preference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preferenceKey: 'structure_editor_provider', integrationId, reason }),
+      })
+      const data = await response.json()
+      if (!data.ok) throw new Error(data.error || 'Failed to save structure editor preference')
+      setIntegrationsStatus({ ok: true, msg: `Structure editor provider set to ${integrationId}.` })
+      setIntegrationRecommendationOpen(false)
+      await loadIntegrations()
+    } catch (error) {
+      setIntegrationsStatus({ ok: false, msg: error instanceof Error ? error.message : 'Failed to save structure editor preference.' })
+    } finally {
+      setIntegrationsBusy(null)
+    }
+  }
+
+  const requestStructureProviderInstall = (integrationId: string) => {
+    const selected = structureProviderStatuses.find(entry => entry.id === integrationId)
+    const conflicting = structureProviderStatuses.filter(entry => entry.id !== integrationId && ['ready', 'outdated', 'drifted', 'user-managed'].includes(entry.installState))
+    if (!selected) return
+    if (conflicting.length === 0) {
+      void runIntegrationAction('install', integrationId)
+      return
+    }
+    setConfirmIntegrationInstall(integrationId)
+  }
 
   const filteredGroups = useMemo(() => {
     const needle = deferredExplorerQuery.trim().toLowerCase()
@@ -1108,6 +1225,94 @@ export default function AdminTerminalWorkspace({
             )}
             {currentWizardId === 'worldedit-basic' && (
               <>
+                <div className="rounded-2xl border border-[var(--accent-mid)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--accent)_12%,transparent),rgba(10,12,20,0.72))] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="font-mono text-[10px] tracking-[0.24em] text-[var(--accent)]">BUILD PROVIDERS</div>
+                      <div className="mt-1 font-mono text-[13px] text-[var(--text)]">WorldEdit wizard provider</div>
+                      <div className="mt-1 text-[12px] text-[var(--text-dim)]">
+                        Use a curated provider for the stronger structure-editing flow, then keep a per-server preference so this wizard knows which editor path to favor.
+                      </div>
+                    </div>
+                    {structureProviderPreference && (
+                      <div className="rounded-full border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-2 py-1 font-mono text-[10px] tracking-[0.16em] text-[var(--accent)]">
+                        SELECTED: {structureProviderPreference.integrationId.toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+
+                  {integrationsStatus && (
+                    <div className={`mt-3 rounded-2xl border px-3 py-3 text-[11px] font-mono ${integrationsStatus.ok ? 'border-emerald-900/60 bg-emerald-950/20 text-emerald-300' : 'border-red-900/60 bg-red-950/20 text-red-300'}`}>
+                      {integrationsStatus.msg}
+                    </div>
+                  )}
+
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    {structureProviderStatuses.map(integration => {
+                      const isInstalled = ['ready', 'outdated', 'drifted', 'user-managed'].includes(integration.installState)
+                      const canInstall = ['missing', 'unknown', 'outdated'].includes(integration.installState)
+                      const canRepair = ['ready', 'outdated', 'drifted'].includes(integration.installState)
+                      const isBusy = integrationsBusy === `install:${integration.id}` || integrationsBusy === `repair:${integration.id}` || integrationsBusy === `preference:${integration.id}`
+
+                      return (
+                        <div key={integration.id} className="rounded-2xl border border-[var(--border)] bg-black/10 p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="font-mono text-[12px] text-[var(--text)]">{integration.label}</div>
+                              <div className="mt-1 text-[11px] text-[var(--text-dim)]">{integration.detectedVersion ? `Detected ${integration.detectedVersion}` : 'Not detected'} • Pin {integration.pinnedVersion}</div>
+                            </div>
+                            <div className="rounded-full border border-[var(--border)] px-2 py-1 font-mono text-[10px] tracking-[0.14em] text-[var(--text-dim)]">{integration.installState.toUpperCase()}</div>
+                          </div>
+                          <div className="mt-2 text-[11px] text-[var(--text-dim)]">{integration.reasons[0] || 'Available for wizard-driven structure editing.'}</div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {canInstall && (
+                              <button
+                                type="button"
+                                disabled={!!integrationsBusy}
+                                onClick={() => requestStructureProviderInstall(integration.id)}
+                                className="rounded-xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 font-mono text-[10px] tracking-[0.14em] text-[var(--accent)] disabled:opacity-40"
+                              >
+                                {isBusy ? 'WORKING...' : `INSTALL ${integration.label.toUpperCase()}`}
+                              </button>
+                            )}
+                            {canRepair && (
+                              <button
+                                type="button"
+                                disabled={!!integrationsBusy}
+                                onClick={() => void runIntegrationAction('repair', integration.id)}
+                                className="rounded-xl border border-[var(--border)] px-3 py-2 font-mono text-[10px] tracking-[0.14em] text-[var(--text-dim)] disabled:opacity-40"
+                              >
+                                {isBusy ? 'WORKING...' : 'REPAIR'}
+                              </button>
+                            )}
+                            {isInstalled && (
+                              <button
+                                type="button"
+                                disabled={!!integrationsBusy}
+                                onClick={() => void saveStructureEditorPreference(integration.id, `Terminal wizard selected ${integration.id} as the structure editor provider.`)}
+                                className="rounded-xl border border-[var(--border)] px-3 py-2 font-mono text-[10px] tracking-[0.14em] text-[var(--text-dim)] disabled:opacity-40"
+                              >
+                                {structureProviderPreference?.integrationId === integration.id ? 'SELECTED' : 'USE HERE'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={!!integrationsBusy}
+                      onClick={() => setIntegrationRecommendationOpen(true)}
+                      className="rounded-xl border border-[var(--accent-mid)] bg-[var(--accent-dim)] px-3 py-2 font-mono text-[10px] tracking-[0.14em] text-[var(--accent)] disabled:opacity-40"
+                    >
+                      LET MCRAFTR CHOOSE
+                    </button>
+                  </div>
+                </div>
+
                 <select value={String(state.wizardDraft?.action ?? 'info')} onChange={event => setWizardValue('action', event.target.value)}
                   className="w-full rounded-2xl border border-[var(--border)] bg-black/15 px-3 py-2 font-mono text-[13px] text-[var(--text)] outline-none">
                   <option value="info">worldedit info</option>
@@ -1582,6 +1787,39 @@ export default function AdminTerminalWorkspace({
       {effectiveMode === 'maximized' && !standalone && (
         <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={() => updateState({ mode: initialMode })} />
       )}
+
+      <IntegrationRecommendationModal
+        open={integrationRecommendationOpen}
+        recommendation={structureProviderRecommendation ?? null}
+        onClose={() => setIntegrationRecommendationOpen(false)}
+        onChoose={(integrationId) => {
+          const selected = structureProviderStatuses.find(entry => entry.id === integrationId)
+          if (selected && ['ready', 'outdated', 'drifted', 'user-managed'].includes(selected.installState)) {
+            void saveStructureEditorPreference(integrationId, `Terminal recommendation flow selected ${integrationId} as the structure editor provider.`)
+            return
+          }
+          requestStructureProviderInstall(integrationId)
+        }}
+      />
+
+      {confirmIntegrationInstall && (() => {
+        const selected = structureProviderStatuses.find(entry => entry.id === confirmIntegrationInstall)
+        const conflicting = structureProviderStatuses.filter(entry => entry.id !== confirmIntegrationInstall && ['ready', 'outdated', 'drifted', 'user-managed'].includes(entry.installState))
+        if (!selected) return null
+        return (
+          <ConfirmModal
+            title={`Install ${selected.label}?`}
+            body={`${conflicting.map(entry => entry.label).join(', ')} ${conflicting.length === 1 ? 'is' : 'are'} already present on this server. Mcraftr can install ${selected.label} too, but it will not remove the existing provider automatically.`}
+            confirmLabel={`Install ${selected.label}`}
+            onConfirm={() => {
+              const next = confirmIntegrationInstall
+              setConfirmIntegrationInstall(null)
+              if (next) void runIntegrationAction('install', next)
+            }}
+            onCancel={() => setConfirmIntegrationInstall(null)}
+          />
+        )
+      })()}
 
       {confirmCommand && (
         <ConfirmModal
