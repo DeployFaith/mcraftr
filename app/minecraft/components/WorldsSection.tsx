@@ -13,6 +13,8 @@ import CapabilityLockCard from './CapabilityLockCard'
 import IntegrationDependencyPrompt from './IntegrationDependencyPrompt'
 import IntegrationRecommendationModal from './IntegrationRecommendationModal'
 import { useIntegrationManager } from './useIntegrationManager'
+import Toasts from './Toasts'
+import { useToast } from './useToast'
 import { playSound } from '@/app/components/soundfx'
 import type { CatalogArtPayload } from '@/lib/catalog-art/types'
 import type { FeatureKey } from '@/lib/features'
@@ -448,6 +450,14 @@ function structurePlacementStatus(entry: StructureCatalogEntry) {
   }
 }
 
+function displayLiveEntityLabel(entry: LiveEntityEntry) {
+  const raw = entry.label?.trim() || entry.customName?.trim() || entry.id
+  if (raw.toLowerCase() === 'item' || entry.id === 'minecraft:item') {
+    return entry.customName?.trim() || 'Dropped Item'
+  }
+  return raw
+}
+
 function entityCardPalette(entry: EntityCatalogEntry): CatalogCardPalette {
   void entry
   return accentCardPalette()
@@ -481,6 +491,7 @@ export default function WorldsSection({
   onSelectedPlayerChange: (player: string) => void
   stackMode: ServerStackMode
 }) {
+  const { toasts, addToast } = useToast()
   const [features, setFeatures] = useState<FeatureFlags | null>(null)
   const [worldsData, setWorldsData] = useState<WorldsData | null>(null)
   const [structures, setStructures] = useState<StructureCatalogEntry[]>([])
@@ -1256,12 +1267,17 @@ export default function WorldsSection({
         rotation: placementToRemove.rotation,
         includeAir: placementToRemove.include_air === 1,
       })
-      setStatus(`Removed ${placementToRemove.structure_label}.`)
+      setPlacements(current => current.filter(entry => entry.id !== placementToRemove.id))
+      const message = `Removed ${placementToRemove.structure_label}.`
+      setStatus(message)
+      addToast('ok', message)
       setPlacementToRemove(null)
       setSelectedStructure(null)
       await loadData(false)
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'Failed to remove structure')
+      const message = nextError instanceof Error ? nextError.message : 'Failed to remove structure'
+      setError(message)
+      addToast('error', message)
     } finally {
       setStructureBusy(false)
     }
@@ -1438,15 +1454,24 @@ export default function WorldsSection({
       async () => {
         setLiveEntityActionBusy(entry.uuid)
         try {
-          await postJson('/api/minecraft/entities/remove', {
+          const payload = await postJson('/api/minecraft/entities/remove', {
             uuid: entry.uuid,
             label: entry.label,
             world: entry.world,
           })
-          setStatus(`Removed ${entry.label} from ${entry.world}.`)
+          const displayLabel = displayLiveEntityLabel(entry)
+          setLiveEntities(current => current.filter(candidate => candidate.uuid !== entry.uuid))
+          setLiveEntitySummary(current => ({ ...current, totalEntities: Math.max(0, current.totalEntities - 1) }))
+          const message = payload.warning
+            ? `${displayLabel} removed from ${entry.world}. ${payload.warning}`
+            : `${displayLabel} removed from ${entry.world}.`
+          setStatus(message)
+          addToast('ok', message)
           await loadData(false)
         } catch (nextError) {
-          setError(nextError instanceof Error ? nextError.message : 'Failed to remove live entity')
+          const message = nextError instanceof Error ? nextError.message : 'Failed to remove live entity'
+          setError(message)
+          addToast('error', message)
         } finally {
           setLiveEntityActionBusy(null)
         }
@@ -2768,7 +2793,7 @@ export default function WorldsSection({
                 key={entry.uuid}
                 title={
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-[13px] font-mono text-[var(--text)]">{entry.label}</div>
+                    <div className="text-[13px] font-mono text-[var(--text)]">{displayLiveEntityLabel(entry)}</div>
                     <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">{entry.world}</div>
                   </div>
                 }
@@ -2784,7 +2809,7 @@ export default function WorldsSection({
                   <div>World: <span className="text-[var(--text)]">{entry.world}</span></div>
                   <div>Location: <span className="text-[var(--text)]">{entry.location ? `${Math.round(entry.location.x)}, ${Math.round(entry.location.y)}, ${Math.round(entry.location.z)}` : '—'}</span></div>
                   <div>Health: <span className="text-[var(--text)]">{entry.health ?? '—'}</span></div>
-                  <div>Name: <span className="text-[var(--text)]">{entry.customName ?? '—'}</span></div>
+                  <div>Name: <span className="text-[var(--text)]">{entry.customName ?? displayLiveEntityLabel(entry)}</span></div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -2951,6 +2976,7 @@ export default function WorldsSection({
           onCancel={() => setConfirmModal(null)}
         />
       )}
+      <Toasts toasts={toasts} />
     </div>
   )
 }
