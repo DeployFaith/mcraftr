@@ -25,6 +25,8 @@ type StructureResponse = {
     sizeBytes?: number | null
     updatedAt?: number | null
     imageUrl?: string | null
+    artUrl?: string | null
+    iconId?: string | null
     summary?: string | null
     dimensions?: { width: number | null; height: number | null; length: number | null } | null
     removable?: boolean
@@ -68,7 +70,7 @@ export async function GET(req: NextRequest) {
   return Response.json({
     ok: true,
     structures: await Promise.all((sidecar.data.structures ?? []).map(async structure => {
-      const candidateUrl = structure.imageUrl ?? (minecraftVersion
+      const candidateUrl = structure.artUrl ?? structure.imageUrl ?? (minecraftVersion
         ? `/api/minecraft/art/structure?${new URLSearchParams({
             version: minecraftVersion,
             placementKind: structure.placementKind,
@@ -90,11 +92,12 @@ export async function GET(req: NextRequest) {
           }))
         : null
       const art = descriptor ? buildCatalogArtPayload(descriptor, candidateUrl) : null
-      return {
-        ...structure,
-        imageUrl: art?.url ?? candidateUrl,
-        art,
-      }
+        return {
+          ...structure,
+          artUrl: art?.url ?? candidateUrl,
+          imageUrl: art?.url ?? candidateUrl,
+          art,
+        }
     })),
     scan: sidecar.data.scan ?? null,
     sidecar: { ok: true, capabilities: sidecar.data.capabilities ?? [] },

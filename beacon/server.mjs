@@ -19,6 +19,8 @@ const SCHEMATICS_DIRS = resolveSchematicDirs(process.env.MCRAFTR_SCHEMATICS_DIR)
 const ENTITY_PRESET_DIRS = resolveEntityPresetDirs(process.env.MCRAFTR_ENTITY_PRESET_DIR)
 const BLUEMAP_BASE_URL = (process.env.MCRAFTR_BLUEMAP_URL || '').trim().replace(/\/+$/, '')
 const DYNMAP_BASE_URL = (process.env.MCRAFTR_DYNMAP_URL || '').trim().replace(/\/+$/, '')
+const APP_BASE_URL = (process.env.MCRAFTR_APP_BASE_URL || '').trim().replace(/\/+$/, '')
+const ART_VERSION = (process.env.MCRAFTR_ART_VERSION || process.env.MCRAFTR_MINECRAFT_VERSION || '').trim()
 const CACHE_DIR = '/tmp/mcraftr-beacon'
 const MANAGED_INTEGRATIONS_FILE = '.mcraftr-managed.json'
 const MANAGED_BACKUPS_DIR = '.mcraftr-backups'
@@ -32,8 +34,10 @@ const BUILTIN_CAPABILITIES = [
   'structures',
   'structure-upload',
   'entities',
+  'entity-art',
   'entity-upload',
   'entity-delete',
+  'structure-art',
   'clone-world',
   'integrations',
   'integration-install',
@@ -88,6 +92,11 @@ function sendJson(res, status, payload) {
     'Content-Length': Buffer.byteLength(body),
   })
   res.end(body)
+}
+
+function sendRedirect(res, status, location) {
+  res.writeHead(status, { Location: location })
+  res.end()
 }
 
 function readBody(req) {
@@ -153,6 +162,29 @@ function displayPath(value) {
   if (absolute === root) return '.'
   if (absolute.startsWith(root + path.sep)) return absolute.slice(root.length + 1)
   return absolute
+}
+
+function getEntityArtUrl(entityId) {
+  if (!ART_VERSION || !entityId) return null
+  return `/art/entity/${encodeURIComponent(ART_VERSION)}/${encodeURIComponent(entityId)}`
+}
+
+function getStructureArtUrl(entry) {
+  if (!ART_VERSION || !entry?.placementKind) return null
+  const params = new URLSearchParams({
+    version: ART_VERSION,
+    placementKind: entry.placementKind,
+    label: entry.label || 'Structure',
+  })
+  if (entry.resourceKey) params.set('resourceKey', entry.resourceKey)
+  if (entry.relativePath) params.set('relativePath', entry.relativePath)
+  if (entry.format) params.set('format', entry.format)
+  return `/art/structure?${params.toString()}`
+}
+
+function buildAppArtUrl(relativePath) {
+  if (!APP_BASE_URL) return null
+  return `${APP_BASE_URL}${relativePath.startsWith('/') ? relativePath : `/${relativePath}`}`
 }
 
 function parseRootsHeader(req, headerName) {
@@ -699,7 +731,9 @@ function listStructureFiles(root, rootKind, current = '') {
       format: entry.name.toLowerCase().endsWith('.schematic') ? 'schematic' : 'schem',
       sizeBytes: stat?.size ?? null,
       updatedAt: stat ? Math.floor(stat.mtimeMs / 1000) : null,
-      imageUrl: null,
+      imageUrl: getStructureArtUrl({ placementKind: 'schematic', relativePath: relative, format: entry.name.toLowerCase().endsWith('.schematic') ? 'schematic' : 'schem', label: labelize(entry.name) }),
+      artUrl: getStructureArtUrl({ placementKind: 'schematic', relativePath: relative, format: entry.name.toLowerCase().endsWith('.schematic') ? 'schematic' : 'schem', label: labelize(entry.name) }),
+      iconId: relative,
       summary: `${labelize(entry.name)} ready for structure placement.`,
       dimensions: null,
       removable: true,
@@ -818,7 +852,9 @@ function buildNativeStructureCatalog() {
         format: 'native',
         sizeBytes: null,
         updatedAt: null,
-        imageUrl: null,
+        imageUrl: getStructureArtUrl({ placementKind: 'native-worldgen', resourceKey, label: labelize(resourceKey.split('/').at(-1) || resourceKey), format: 'native' }),
+        artUrl: getStructureArtUrl({ placementKind: 'native-worldgen', resourceKey, label: labelize(resourceKey.split('/').at(-1) || resourceKey), format: 'native' }),
+        iconId: resourceKey,
         summary: `Vanilla worldgen structure ${titleizePath(resourceKey)}.`,
         dimensions: null,
         removable: false,
@@ -844,7 +880,9 @@ function buildNativeStructureCatalog() {
         format: 'native',
         sizeBytes: null,
         updatedAt: null,
-        imageUrl: null,
+        imageUrl: getStructureArtUrl({ placementKind: 'native-template', resourceKey, label: labelize(resourceKey.split('/').at(-1) || resourceKey), format: 'native' }),
+        artUrl: getStructureArtUrl({ placementKind: 'native-template', resourceKey, label: labelize(resourceKey.split('/').at(-1) || resourceKey), format: 'native' }),
+        iconId: resourceKey,
         summary: `Vanilla template ${titleizePath(resourceKey)}.`,
         dimensions: null,
         removable: true,
@@ -1227,7 +1265,9 @@ function normalizeEntityPreset(raw, relativePath, sourceKind) {
     category,
     dangerous: raw.dangerous === true,
     summary,
-    imageUrl: null,
+    imageUrl: getEntityArtUrl(entityId),
+    artUrl: getEntityArtUrl(entityId),
+    iconId: entityId,
     sourceKind,
     editable: sourceKind === 'upload',
     defaultCount: Number.isFinite(Number(raw.defaultCount)) ? Math.max(1, Math.min(64, Math.floor(Number(raw.defaultCount)))) : 1,
@@ -1402,6 +1442,37 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && pathname === '/plugin-stack') {
       sendJson(res, 200, { ok: true, capabilities: BUILTIN_CAPABILITIES, plugins: listPlugins() })
+      return
+    }
+
+    const entityArtMatch = pathname.match(/^\/art\/entity\/([^/]+)\/([^/]+)$/)
+    if (req.method === 'GET' && entityArtMatch) {
+      if (!APP_BASE_URL) {
+        sendJson(res, 503, { ok: false, error: 'MCRAFTR_APP_BASE_URL is not configured for art redirects' })
+        return
+      }
+      const version = decodeURIComponent(entityArtMatch[1])
+      const entityId = decodeURIComponent(entityArtMatch[2])
+      const target = buildAppArtUrl(`/api/minecraft/art/entity/${encodeURIComponent(version)}/${encodeURIComponent(entityId)}`)
+      if (!target) {
+        sendJson(res, 503, { ok: false, error: 'Beacon could not build the entity art target URL' })
+        return
+      }
+      sendRedirect(res, 302, target)
+      return
+    }
+
+    if (req.method === 'GET' && pathname === '/art/structure') {
+      if (!APP_BASE_URL) {
+        sendJson(res, 503, { ok: false, error: 'MCRAFTR_APP_BASE_URL is not configured for art redirects' })
+        return
+      }
+      const target = buildAppArtUrl(`/api/minecraft/art/structure?${url.searchParams.toString()}`)
+      if (!target) {
+        sendJson(res, 503, { ok: false, error: 'Beacon could not build the structure art target URL' })
+        return
+      }
+      sendRedirect(res, 302, target)
       return
     }
 

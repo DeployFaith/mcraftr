@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getUserFeatureFlags } from '@/lib/rcon'
 import { requireServerCapability } from '@/lib/server-capability'
 import { runBridgeJson } from '@/lib/server-bridge'
+import { getSessionUserId } from '@/lib/rcon'
+import { getActiveServer } from '@/lib/users'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -28,8 +30,9 @@ type LiveEntityResponse = {
     invulnerable?: boolean
     silent?: boolean
     gravity?: boolean
-    health?: number | null
-  }>
+      health?: number | null
+      imageUrl?: string | null
+    }>
   totalEntities?: number
   truncated?: boolean
   limit?: number
@@ -121,6 +124,9 @@ export async function GET(req: NextRequest) {
   const capability = await requireServerCapability(req, 'relay')
   if (!capability.ok) return capability.response
 
+  const userId = await getSessionUserId(req)
+  const minecraftVersion = userId ? getActiveServer(userId)?.minecraftVersion.resolved ?? null : null
+
   const world = req.nextUrl.searchParams.get('world')?.trim() ?? ''
   const command = world ? `entities live ${world}` : 'entities live'
   const bridge = await runBridgeJson<LiveEntityResponse>(req, command)
@@ -129,11 +135,15 @@ export async function GET(req: NextRequest) {
       const fallback = await loadLiveEntitiesByWorld(req)
       if (fallback) {
         const limitedEntities = fallback.entities.slice(0, MAX_LIVE_ENTITIES)
+        const withArt = limitedEntities.map(entity => ({
+          ...entity,
+          imageUrl: minecraftVersion ? `/api/minecraft/art/entity/${encodeURIComponent(minecraftVersion)}/${encodeURIComponent(entity.id)}` : null,
+        }))
         const totalEntities = Math.max(fallback.totalEntities, fallback.entities.length)
         const responseTruncated = fallback.truncated || totalEntities > limitedEntities.length
-          return Response.json({
+           return Response.json({
             ok: true,
-            entities: limitedEntities,
+            entities: withArt,
             totalEntities,
             truncated: responseTruncated,
             warning: fallback.partial
@@ -164,11 +174,15 @@ export async function GET(req: NextRequest) {
   const entities = normalizeLiveEntities(bridge.data)
   const totalEntities = Math.max(resolveLiveEntityTotal(bridge.data), entities.length)
   const limitedEntities = entities.slice(0, MAX_LIVE_ENTITIES)
+  const withArt = limitedEntities.map(entity => ({
+    ...entity,
+    imageUrl: minecraftVersion ? `/api/minecraft/art/entity/${encodeURIComponent(minecraftVersion)}/${encodeURIComponent(entity.id)}` : null,
+  }))
   const truncated = isLiveEntityPayloadTruncated(bridge.data) || totalEntities > limitedEntities.length
 
   return Response.json({
     ok: true,
-    entities: limitedEntities,
+    entities: withArt,
     totalEntities,
     truncated,
     warning: truncated

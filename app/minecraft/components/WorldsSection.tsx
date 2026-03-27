@@ -130,6 +130,7 @@ type LiveEntityEntry = {
   uuid: string
   id: string
   label: string
+  imageUrl?: string | null
   category: string
   dangerous: boolean
   world: string
@@ -2793,7 +2794,12 @@ export default function WorldsSection({
                 key={entry.uuid}
                 title={
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-[13px] font-mono text-[var(--text)]">{displayLiveEntityLabel(entry)}</div>
+                    <div className="flex items-center gap-3">
+                      {entry.imageUrl && isCatalogArtworkEnabled('entity') && (
+                        <CatalogArtwork kind="entity" label={displayLiveEntityLabel(entry)} category={entry.category} sourceKind="live" imageUrl={entry.imageUrl} art={null} className="h-9 w-9 rounded-xl border border-[var(--border)] bg-black/10 p-1.5" />
+                      )}
+                      <div className="text-[13px] font-mono text-[var(--text)]">{displayLiveEntityLabel(entry)}</div>
+                    </div>
                     <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">{entry.world}</div>
                   </div>
                 }

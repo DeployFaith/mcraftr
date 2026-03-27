@@ -42,11 +42,13 @@ type BridgeResponse = {
 type NativeEntityEntry = {
   id: string
   entityId: string
+  iconId?: string | null
   label: string
   category: string
   dangerous: boolean
   summary: string | null
   imageUrl: string | null
+  artUrl?: string | null
   sourceKind: string
   editable: boolean
   defaultCount: number
@@ -116,6 +118,8 @@ function normalizeEntityEntry(raw: unknown, fallbackSourceKind: string): Catalog
     dangerous: row.dangerous === true,
     summary: typeof row.summary === 'string' && row.summary.trim() ? row.summary.trim() : null,
     imageUrl: typeof row.imageUrl === 'string' && row.imageUrl.trim() ? row.imageUrl.trim() : null,
+    artUrl: typeof row.artUrl === 'string' && row.artUrl.trim() ? row.artUrl.trim() : null,
+    iconId: typeof row.iconId === 'string' && row.iconId.trim() ? row.iconId.trim() : null,
     sourceKind,
     editable: row.editable === true,
     defaultCount,
@@ -243,7 +247,7 @@ export async function GET(req: NextRequest) {
     ok: true,
     entities: (await Promise.all([...nativeEntities, ...customEntities]
       .map(async entry => {
-        const candidateUrl = entry.imageUrl ?? (minecraftVersion && entry.entityId
+        const candidateUrl = entry.artUrl ?? entry.imageUrl ?? (minecraftVersion && entry.entityId
           ? `/api/minecraft/art/entity/${encodeURIComponent(minecraftVersion)}/${encodeURIComponent(entry.entityId)}`
           : null)
         const descriptor = minecraftVersion && entry.entityId
@@ -256,6 +260,7 @@ export async function GET(req: NextRequest) {
         const art = descriptor ? buildCatalogArtPayload(descriptor, candidateUrl) : null
         return {
           ...entry,
+          artUrl: art?.url ?? candidateUrl,
           imageUrl: art?.url ?? candidateUrl,
           art,
         }
