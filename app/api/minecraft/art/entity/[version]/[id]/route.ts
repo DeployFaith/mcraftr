@@ -10,7 +10,8 @@ function sanitizeVersion(raw: string) {
 }
 
 function sanitizeEntityId(raw: string) {
-  return /^[a-z0-9_:./-]+$/.test(raw) ? raw : null
+  if (!/^[a-z0-9_:./-]+$/.test(raw)) return null
+  return raw.includes(':') ? raw : `minecraft:${raw}`
 }
 
 function labelFromEntityId(entityId: string) {

@@ -1624,6 +1624,7 @@ const server = http.createServer(async (req, res) => {
           totalStructures: scan.totalStructures,
           uploadRoot: scan.uploadRoot,
           nativeCounts: scan.nativeCounts,
+          nativeScan: scan.nativeScan,
         },
       })
       return

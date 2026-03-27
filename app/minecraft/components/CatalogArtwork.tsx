@@ -13,10 +13,9 @@ type Props = {
   className?: string
 }
 
-// Keep this code-only so artwork can be turned back on per catalog later.
 export const CATALOG_ARTWORK_ENABLED: Record<Props['kind'], boolean> = {
-  structure: false,
-  entity: false,
+  structure: true,
+  entity: true,
   item: true,
 }
 

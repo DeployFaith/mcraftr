@@ -2829,7 +2829,7 @@ export default function WorldsSection({
                 title={
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      {entry.imageUrl && isCatalogArtworkEnabled('entity') && (
+                      {isCatalogArtworkEnabled('entity') && (
                         <CatalogArtwork kind="entity" label={displayLiveEntityLabel(entry)} category={entry.category} sourceKind="live" imageUrl={entry.imageUrl} art={null} className="h-9 w-9 rounded-xl border border-[var(--border)] bg-black/10 p-1.5" />
                       )}
                       <div className="text-[13px] font-mono text-[var(--text)]">{displayLiveEntityLabel(entry)}</div>
