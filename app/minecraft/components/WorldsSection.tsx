@@ -1314,6 +1314,7 @@ export default function WorldsSection({
       const data = await postJson('/api/minecraft/entities/spawn', payload)
       setStatus(`Spawned ${data.count} ${selectedEntity.label}${data.world ? ` in ${data.world}` : ''}.`)
       setSelectedEntity(null)
+      await loadData(false)
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Failed to spawn entity')
     } finally {

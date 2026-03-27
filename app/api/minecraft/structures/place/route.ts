@@ -16,6 +16,18 @@ type BridgeResponse = {
   error?: string
 }
 
+type PlayerLocateResponse = {
+  ok: boolean
+  world?: string
+  location?: { x: number; y: number; z: number }
+  error?: string
+}
+
+type StructureMetadataResponse = {
+  ok: boolean
+  dimensions?: { width: number | null; height: number | null; length: number | null } | null
+}
+
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
@@ -39,6 +51,90 @@ function boundsFromDimensions(origin: { x: number; y: number; z: number }, rotat
     maxX: Math.floor(origin.x) + Math.max(1, width) - 1,
     maxY: Math.floor(origin.y) + Math.max(1, dimensions.height) - 1,
     maxZ: Math.floor(origin.z) + Math.max(1, length) - 1,
+  }
+}
+
+function normalizeDimensions(dimensions: StructureMetadataResponse['dimensions']) {
+  if (!dimensions) return null
+  if (!isFiniteNumber(dimensions.width) || !isFiniteNumber(dimensions.height) || !isFiniteNumber(dimensions.length)) {
+    return null
+  }
+  return {
+    width: dimensions.width,
+    height: dimensions.height,
+    length: dimensions.length,
+  }
+}
+
+async function loadStructureDimensions(req: NextRequest, bridgeRef: string) {
+  const metadata = await callSidecarForRequest<StructureMetadataResponse>(
+    req,
+    `/structures/metadata?resourceKey=${encodeURIComponent(bridgeRef)}`,
+  )
+  return metadata.ok ? normalizeDimensions(metadata.data.dimensions) : null
+}
+
+async function resolvePlayerOrigin(req: NextRequest, player: string, expectedWorld?: string) {
+  const locate = await runBridgeJson<PlayerLocateResponse>(req, `player locate ${player}`)
+  if (!locate.ok || locate.data.ok === false || !locate.data.location || typeof locate.data.world !== 'string') {
+    return null
+  }
+  if (expectedWorld && locate.data.world !== expectedWorld) {
+    return null
+  }
+  return {
+    world: locate.data.world,
+    origin: locate.data.location,
+  }
+}
+
+async function resolveTrackedPlacementFallback(
+  req: NextRequest,
+  options: {
+    bridgeRef: string
+    locationMode: 'coords' | 'player'
+    player: string
+    world: string
+    x: number
+    y: number
+    z: number
+    rotation: number
+    bridgeWorld?: string | null
+    bridgeOrigin?: BridgeResponse['origin']
+    bridgeBounds?: BridgeResponse['bounds']
+  },
+) {
+  if (
+    options.bridgeWorld
+    && options.bridgeOrigin
+    && options.bridgeBounds
+  ) {
+    return {
+      world: options.bridgeWorld,
+      origin: options.bridgeOrigin,
+      bounds: options.bridgeBounds,
+    }
+  }
+
+  const dimensions = await loadStructureDimensions(req, options.bridgeRef)
+  if (!dimensions) return null
+
+  if (options.locationMode === 'coords') {
+    const origin = { x: options.x, y: options.y, z: options.z }
+    return {
+      world: options.world,
+      origin,
+      bounds: boundsFromDimensions(origin, options.rotation, dimensions),
+    }
+  }
+
+  const playerOrigin = await resolvePlayerOrigin(req, options.player, options.bridgeWorld ?? undefined)
+  if (!playerOrigin) return null
+
+  return {
+    world: playerOrigin.world,
+    origin: playerOrigin.origin,
+    bounds: boundsFromDimensions(playerOrigin.origin, options.rotation, dimensions),
   }
 }
 
@@ -95,46 +191,43 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: false, error: placed.error || 'Failed to place native structure' }, { status: 502 })
     }
 
-    if (placementKind === 'native-template' && userId && serverId && locationMode === 'coords') {
-      const metadata = await callSidecarForRequest<{ ok: boolean; dimensions?: { width: number | null; height: number | null; length: number | null } | null }>(
-        req,
-        `/structures/metadata?resourceKey=${encodeURIComponent(bridgeRef)}`,
-      )
-      const dimensions = metadata.ok && metadata.data.dimensions
-        && isFiniteNumber(metadata.data.dimensions.width)
-        && isFiniteNumber(metadata.data.dimensions.height)
-        && isFiniteNumber(metadata.data.dimensions.length)
-        ? metadata.data.dimensions
-        : null
-      if (dimensions) {
-        const origin = { x, y, z }
-        const width = dimensions.width as number
-        const height = dimensions.height as number
-        const length = dimensions.length as number
-        const bounds = boundsFromDimensions(origin, rotation, {
-          width,
-          height,
-          length,
-        })
+    if (placementKind === 'native-template' && userId && serverId) {
+      const trackedPlacement = await resolveTrackedPlacementFallback(req, {
+        bridgeRef,
+        locationMode,
+        player,
+        world,
+        x,
+        y,
+        z,
+        rotation,
+      })
+      if (trackedPlacement) {
         const placementId = createStructurePlacement({
           userId,
           serverId,
-          world,
+          world: trackedPlacement.world,
           structureId,
           structureLabel,
           sourceKind,
           bridgeRef,
-          origin,
+          origin: trackedPlacement.origin,
           rotation,
           includeAir,
-          bounds,
+          bounds: trackedPlacement.bounds,
           metadata: {
             placementKind,
             resourceKey: bridgeRef,
           },
         })
-        logAudit(userId, 'structure_place', structureLabel, `${world} @ ${x},${y},${z}`, serverId)
-        return Response.json({ ok: true, placementId, world, origin, bounds })
+        logAudit(
+          userId,
+          'structure_place',
+          structureLabel,
+          `${trackedPlacement.world} @ ${trackedPlacement.origin.x},${trackedPlacement.origin.y},${trackedPlacement.origin.z}`,
+          serverId,
+        )
+        return Response.json({ ok: true, placementId, world: trackedPlacement.world, origin: trackedPlacement.origin, bounds: trackedPlacement.bounds })
       }
     }
 
@@ -160,25 +253,46 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: bridge.ok ? bridge.data.error || 'Failed to place structure' : bridge.error }, { status: 502 })
   }
 
-  if (userId && serverId && bridge.data.world && bridge.data.origin && bridge.data.bounds) {
+  if (userId && serverId) {
+    const trackedPlacement = await resolveTrackedPlacementFallback(req, {
+      bridgeRef,
+      locationMode,
+      player,
+      world,
+      x,
+      y,
+      z,
+      rotation,
+      bridgeWorld: bridge.data.world ?? null,
+      bridgeOrigin: bridge.data.origin,
+      bridgeBounds: bridge.data.bounds,
+    })
+    if (trackedPlacement) {
     const placementId = createStructurePlacement({
       userId,
       serverId,
-      world: bridge.data.world,
+      world: trackedPlacement.world,
       structureId,
       structureLabel,
       sourceKind,
       bridgeRef,
-      origin: bridge.data.origin,
+      origin: trackedPlacement.origin,
       rotation,
       includeAir,
-      bounds: bridge.data.bounds,
+      bounds: trackedPlacement.bounds,
       metadata: {
         locationMode,
       },
     })
-    logAudit(userId, 'structure_place', structureLabel, `${bridge.data.world} @ ${bridge.data.origin.x},${bridge.data.origin.y},${bridge.data.origin.z}`, serverId)
-    return Response.json({ ok: true, placementId, world: bridge.data.world, origin: bridge.data.origin, bounds: bridge.data.bounds })
+      logAudit(
+        userId,
+        'structure_place',
+        structureLabel,
+        `${trackedPlacement.world} @ ${trackedPlacement.origin.x},${trackedPlacement.origin.y},${trackedPlacement.origin.z}`,
+        serverId,
+      )
+      return Response.json({ ok: true, placementId, world: trackedPlacement.world, origin: trackedPlacement.origin, bounds: trackedPlacement.bounds })
+    }
   }
 
   return Response.json({ ok: true, world: bridge.data.world ?? null, origin: bridge.data.origin ?? null, bounds: bridge.data.bounds ?? null })
