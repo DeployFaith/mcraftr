@@ -239,6 +239,13 @@ Mcraftr is open source and free to use. If you'd like to support ongoing develop
 
 - https://buymeacoffee.com/deployfaith
 
+Hosted website and public demo policies:
+
+- `https://mcraftr.deployfaith.xyz/privacy`
+- `https://mcraftr.deployfaith.xyz/terms`
+
+Those pages apply to the DeployFaith-operated hosted site and public demo. Self-hosted operators remain responsible for their own deployment, data handling, and compliance obligations.
+
 ## License
 
 MIT. See `LICENSE`.
