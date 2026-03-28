@@ -1,4 +1,5 @@
 import { getItemTextureLayers } from './item-art'
+import { CATALOG_ART_THEME } from '@/lib/catalog-art/theme'
 
 export type StructurePreviewDescriptor = {
   blocks: string[]
@@ -20,12 +21,9 @@ function escapeXml(value: string) {
 }
 
 function placeholderTile(label: string, index: number) {
-  const colors = [
-    ['#2b3348', '#9ed8ff'],
-    ['#2f2d44', '#e5b8ff'],
-    ['#243a33', '#b7ffd8'],
-  ]
-  const [bg, fg] = colors[index % colors.length]
+  const palette = CATALOG_ART_THEME.placeholderPalettes[index % CATALOG_ART_THEME.placeholderPalettes.length]
+  const bg = palette.bg
+  const fg = palette.fg
   return `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
       <rect width="48" height="48" rx="10" fill="${bg}" />
@@ -124,16 +122,16 @@ export async function getStructureArtSvg(version: string, label: string, preview
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220">
       <defs>
         <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0%" stop-color="#142033" />
-          <stop offset="100%" stop-color="#365173" />
+          <stop offset="0%" stop-color="${CATALOG_ART_THEME.panelGradientStart}" />
+          <stop offset="100%" stop-color="${CATALOG_ART_THEME.panelGradientEnd}" />
         </linearGradient>
       </defs>
       <rect width="320" height="220" rx="30" fill="url(#bg)" />
-      <rect x="12" y="12" width="296" height="196" rx="24" fill="rgba(8,12,18,0.18)" stroke="rgba(255,255,255,0.14)" />
-      <text x="28" y="28" font-size="10" fill="#9ed8ff" font-family="monospace">${gridScene ? 'TOP-DOWN PREVIEW' : 'BUILD MATERIALS'}</text>
-      <text x="292" y="28" text-anchor="end" font-size="10" fill="rgba(245,247,255,0.82)" font-family="monospace">${escapeXml(dimsLabel)}</text>
+      <rect x="12" y="12" width="296" height="196" rx="24" fill="${CATALOG_ART_THEME.panelInsetFill}" stroke="${CATALOG_ART_THEME.panelInsetStroke}" />
+      <text x="28" y="28" font-size="10" fill="${CATALOG_ART_THEME.accent}" font-family="monospace">${gridScene ? 'TOP-DOWN PREVIEW' : 'BUILD MATERIALS'}</text>
+      <text x="292" y="28" text-anchor="end" font-size="10" fill="${CATALOG_ART_THEME.textStrong}" font-family="monospace">${escapeXml(dimsLabel)}</text>
       ${gridScene ? gridScene.content : tiles}
-      <text x="160" y="204" text-anchor="middle" font-size="11" fill="rgba(245,247,255,0.8)" font-family="monospace">${escapeXml(label)}</text>
+      <text x="160" y="204" text-anchor="middle" font-size="11" fill="${CATALOG_ART_THEME.text}" font-family="monospace">${escapeXml(label)}</text>
     </svg>
   `.trim()
 }
