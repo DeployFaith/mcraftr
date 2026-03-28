@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import type { CatalogArtPayload } from '@/lib/catalog-art/types'
+import { getStructure3DPreview } from '@/lib/catalog-art/structure-3d'
 import CatalogArtwork, { isCatalogArtworkEnabled } from './CatalogArtwork'
 import type { PlacementCheckResult } from '@/lib/placement-randomize'
 import type { StructurePreviewDescriptor } from '@/lib/minecraft-assets/structure-art'
@@ -252,6 +253,7 @@ export default function SpawnInspectModal({
   }, [structure])
 
   if (!target) return null
+  const hasStructure3DPreview = Boolean(getStructure3DPreview(structurePreview))
 
   return (
     <div
@@ -296,7 +298,7 @@ export default function SpawnInspectModal({
                       ['3d', '3D'],
                       ['materials', 'Materials'],
                     ] as const).map(([modeValue, modeLabel]) => {
-                      const disabled = modeValue === '3d' && !structurePreview?.preview3d
+                      const disabled = modeValue === '3d' && !hasStructure3DPreview
                       return (
                         <button
                           key={modeValue}
@@ -329,7 +331,7 @@ export default function SpawnInspectModal({
                         ? 'h-[260px] w-full rounded-[22px] border bg-[var(--bg2)] object-contain p-3'
                         : 'mx-auto h-[260px] w-full max-w-[22rem] rounded-[22px] border bg-[var(--bg2)] object-contain p-3'}
                     />}
-                {structure && structureRenderMode === '3d' && !structurePreview?.preview3d && structurePreviewError && (
+                {structure && structureRenderMode === '3d' && !hasStructure3DPreview && structurePreviewError && (
                   <div className="mt-2 text-[10px] font-mono text-[var(--text-dim)]">{structurePreviewError}</div>
                 )}
               </>

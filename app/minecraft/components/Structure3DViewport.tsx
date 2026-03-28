@@ -52,18 +52,20 @@ export default function Structure3DViewport({ preview3d }: { preview3d: Structur
   const groups = useMemo(() => groupVoxelsByBlockId(preview3d), [preview3d])
   const target = useMemo(() => computeStructureCameraTarget(preview3d), [preview3d])
   const distance = useMemo(() => computeStructureCameraDistance(preview3d), [preview3d])
-  const cameraPosition: [number, number, number] = [target[0] + distance, target[1] + distance * 0.7, target[2] + distance]
+  const cameraPosition: [number, number, number] = [target[0] + distance * 0.9, target[1] + distance * 1.05, target[2] + distance * 0.9]
 
   return (
     <Canvas camera={{ position: cameraPosition, fov: 42 }} dpr={[1, 1.5]}>
-      <color attach="background" args={['#0d0d14']} />
-      <ambientLight intensity={1.5} />
-      <directionalLight position={[10, 18, 12]} intensity={2.1} />
-      <directionalLight position={[-8, 10, -6]} intensity={0.65} />
-      <group position={[-target[0], 0, -target[2]]}>
+      <color attach="background" args={['#151a22']} />
+      <ambientLight intensity={2.4} />
+      <hemisphereLight args={['#d9fff4', '#182026', 1.25]} />
+      <directionalLight position={[10, 18, 12]} intensity={2.8} />
+      <directionalLight position={[-8, 14, -6]} intensity={1.15} />
+      <pointLight position={[target[0], target[1] + distance * 0.8, target[2]]} intensity={1.1} />
+      <group position={[-target[0], -0.5, -target[2]]}>
         {groups.map(group => <VoxelGroup key={group.blockId} blockId={group.blockId} positions={group.positions} />)}
       </group>
-      <gridHelper args={[Math.max(8, preview3d.bounds.width + preview3d.bounds.length), Math.max(8, preview3d.bounds.width + preview3d.bounds.length), '#1f2d2a', '#15201d']} position={[0, -0.51, 0]} />
+      <gridHelper args={[Math.max(8, preview3d.bounds.width + preview3d.bounds.length), Math.max(8, preview3d.bounds.width + preview3d.bounds.length), '#2b4b45', '#20312d']} position={[0, -0.51, 0]} />
       <OrbitControls makeDefault target={target} enablePan={false} minDistance={4} maxDistance={distance * 2.4} />
     </Canvas>
   )

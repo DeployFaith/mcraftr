@@ -17,7 +17,7 @@ export default function Structure3DPreview({ preview, className = '' }: { previe
         <div>
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-black/10 text-[var(--text-dim)]"><Box size={20} /></div>
           <div className="text-[12px] font-mono text-[var(--text)]">3D preview unavailable</div>
-          <div className="mt-1 text-[10px] font-mono text-[var(--text-dim)]">This structure does not have a bounded voxel preview yet.</div>
+          <div className="mt-1 text-[10px] font-mono text-[var(--text-dim)]">This structure does not have enough preview data for a 3D render yet.</div>
         </div>
       </div>
     )

@@ -8,8 +8,43 @@ export type Structure3DRenderGroup = {
   positions: Array<[number, number, number]>
 }
 
+function synthesizeStructure3DPreview(preview: StructurePreviewDescriptor): Structure3DPreview | null {
+  if (!Array.isArray(preview.cells) || preview.cells.length === 0) return null
+
+  const rows = preview.cells.length
+  const cols = Math.max(...preview.cells.map(row => row.length), 0)
+  if (rows === 0 || cols === 0) return null
+
+  const heights = Array.isArray(preview.heights) && preview.heights.length > 0 ? preview.heights : null
+  const voxels: Structure3DVoxel[] = []
+
+  for (let z = 0; z < rows; z += 1) {
+    for (let x = 0; x < cols; x += 1) {
+      const blockId = preview.cells[z]?.[x]
+      if (!blockId || blockId === 'air') continue
+      const height = Math.max(1, heights?.[z]?.[x] ?? 1)
+      voxels.push({ x, y: height - 1, z, blockId })
+    }
+  }
+
+  if (voxels.length === 0) return null
+
+  return {
+    voxels,
+    bounds: {
+      width: cols,
+      height: Math.max(1, ...voxels.map(voxel => voxel.y + 1)),
+      length: rows,
+    },
+    truncated: false,
+    sampled: true,
+    voxelCount: voxels.length,
+  }
+}
+
 export function getStructure3DPreview(preview: StructurePreviewDescriptor | null | undefined): Structure3DPreview | null {
-  return preview?.preview3d ?? null
+  if (!preview) return null
+  return preview.preview3d ?? synthesizeStructure3DPreview(preview)
 }
 
 export function groupVoxelsByBlockId(preview3d: Structure3DPreview): Structure3DRenderGroup[] {
