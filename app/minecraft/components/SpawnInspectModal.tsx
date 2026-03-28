@@ -9,7 +9,7 @@ import CatalogArtwork, { isCatalogArtworkEnabled } from './CatalogArtwork'
 import type { PlacementCheckResult } from '@/lib/placement-randomize'
 import type { StructurePreviewDescriptor } from '@/lib/minecraft-assets/structure-art'
 
-const Structure3DPreview = dynamic(() => import('./Structure3DPreview'), {
+const Minecraft3DPreview = dynamic(() => import('@/app/components/minecraft/Minecraft3DPreview'), {
   ssr: false,
   loading: () => <div className="flex h-full w-full items-center justify-center rounded-[inherit] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] text-[11px] font-mono text-[var(--text-dim)]">Loading 3D preview…</div>,
 })
@@ -257,7 +257,20 @@ export default function SpawnInspectModal({
   }, [structure])
 
   if (!target) return null
-  const hasStructure3DPreview = Boolean(getStructure3DPreview(structurePreview))
+  const resolvedStructure3DPreview = getStructure3DPreview(structurePreview)
+  const hasStructure3DPreview = Boolean(resolvedStructure3DPreview)
+  const structureVoxelData = useMemo(() => resolvedStructure3DPreview ? {
+    voxels: resolvedStructure3DPreview.voxels.map(voxel => ({
+      x: voxel.x,
+      y: voxel.y,
+      z: voxel.z,
+      blockId: voxel.blockId,
+    })),
+    bounds: resolvedStructure3DPreview.bounds,
+    sampled: resolvedStructure3DPreview.sampled,
+    truncated: resolvedStructure3DPreview.truncated,
+    voxelCount: resolvedStructure3DPreview.voxelCount,
+  } : null, [resolvedStructure3DPreview])
 
   return (
     <div
@@ -319,7 +332,17 @@ export default function SpawnInspectModal({
                   </div>
                 )}
                 {structure && structureRenderMode === '3d'
-                  ? <Structure3DPreview preview={structurePreview} className="h-[260px] w-full rounded-[22px]" />
+                  ? <Minecraft3DPreview
+                      id={structure.id}
+                      type="structure"
+                      voxelData={structureVoxelData}
+                      fallbackSrc={target.imageUrl}
+                      autoRotate={false}
+                      showGrid={true}
+                      shadows={true}
+                      heightClassName="h-[260px]"
+                      className="w-full rounded-[22px]"
+                    />
                   : <CatalogArtwork
                       kind={structure ? 'structure' : 'entity'}
                       label={target.label}
