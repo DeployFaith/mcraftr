@@ -5,8 +5,6 @@ import { callSidecarForRequest, runBridgeJson } from '@/lib/server-bridge'
 import { FALLBACK_ENTITY_CATALOG } from '@/lib/entity-catalog'
 import { getSessionUserId } from '@/lib/rcon'
 import { getActiveServer } from '@/lib/users'
-import { resolveEntityArtDescriptor } from '@/lib/catalog-art/resolvers/entity'
-import { buildCatalogArtPayload, getReviewedCatalogArtDescriptor } from '@/lib/catalog-art/service'
 import { hasEntityIcon, normalizeEntityIconId } from '@/lib/minecraft-assets/entity-icons'
 
 export const runtime = 'nodejs'
@@ -253,14 +251,6 @@ export async function GET(req: NextRequest) {
           ? `/api/minecraft/art/entity/${encodeURIComponent(artVersion)}/${encodeURIComponent(entry.entityId)}`
           : null)
         const hasRealArt = entry.entityId ? await hasEntityIcon(entry.entityId) : false
-        const descriptor = minecraftVersion && entry.entityId
-          ? await getReviewedCatalogArtDescriptor(await resolveEntityArtDescriptor({
-              version: minecraftVersion,
-              entityId: entry.entityId,
-              label: entry.label,
-            }))
-          : null
-        const art = descriptor ? buildCatalogArtPayload(descriptor, candidateUrl) : null
         return {
           ...entry,
           iconId: entry.entityId ? normalizeEntityIconId(entry.entityId) : null,
@@ -268,20 +258,7 @@ export async function GET(req: NextRequest) {
           hasRealArt,
           artUrl: hasRealArt ? candidateUrl : null,
           imageUrl: hasRealArt ? candidateUrl : null,
-          art: hasRealArt ? (art ?? buildCatalogArtPayload({
-            key: `entity-icons:${artVersion}:${entry.entityId}`,
-            subject: 'entity',
-            subjectId: entry.entityId ?? entry.id,
-            version: artVersion,
-            source: 'derived',
-            assetClass: 'flat-icon',
-            strategy: 'item-single-icon',
-            confidence: 1,
-            fallbackReason: null,
-            reviewState: 'approved',
-            dependencies: [],
-            meta: { label: entry.label },
-          }, candidateUrl)) : null,
+          art: null,
         }
       })))
       .sort((a, b) => a.label.localeCompare(b.label)),
