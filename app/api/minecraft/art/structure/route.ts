@@ -1,36 +1,52 @@
 import { NextRequest } from 'next/server'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
-import { resolveStructureArtDescriptor } from '@/lib/catalog-art/resolvers/structure'
-import { getCatalogArtArtifact } from '@/lib/catalog-art/service'
-import { callSidecarForRequest } from '@/lib/server-bridge'
-import type { StructurePreviewDescriptor } from '@/lib/minecraft-assets/structure-art'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
-type PreviewResponse = {
-  ok: boolean
-  preview?: StructurePreviewDescriptor
-}
 
 function sanitizeVersion(raw: string | null) {
   return raw && /^[A-Za-z0-9._-]+$/.test(raw) ? raw : null
 }
 
 function normalizeStructureId(value: string) {
-  const lower = value.trim().toLowerCase()
+  const lower = decodeURIComponent(value).trim().toLowerCase()
   return lower.includes(':') ? lower : `minecraft:${lower}`
 }
 
-async function getRealStructureIcon(structureId: string) {
-  const id = normalizeStructureId(structureId)
+function resolveStructureIconFilename(values: string[]) {
+  const normalized = values
+    .filter(Boolean)
+    .map(value => normalizeStructureId(value))
+
+  const mansionAliases = new Set([
+    'mansion',
+    'minecraft:mansion',
+    'woodland_mansion',
+    'minecraft:woodland_mansion',
+  ])
+  const monumentAliases = new Set([
+    'monument',
+    'minecraft:monument',
+    'ocean_monument',
+    'minecraft:ocean_monument',
+  ])
+
+  for (const id of normalized) {
+    if (mansionAliases.has(id) || id.includes('/mansion') || id.endsWith(':mansion')) {
+      return 'woodland_mansion.png'
+    }
+    if (monumentAliases.has(id) || id.includes('/monument') || id.endsWith(':monument')) {
+      return 'ocean_monument.png'
+    }
+  }
+
+  return 'generic_structure.png'
+}
+
+async function getRealStructureIcon(values: string[]) {
   const realDir = path.join(process.cwd(), 'beacon/catalog-art/structures/real')
-  const filename = id === 'minecraft:woodland_mansion'
-    ? 'woodland_mansion.png'
-    : id === 'minecraft:ocean_monument'
-      ? 'ocean_monument.png'
-      : 'generic_structure.png'
+  const filename = resolveStructureIconFilename(values)
   const filePath = path.join(realDir, filename)
   try {
     return await fs.readFile(filePath)
@@ -45,14 +61,13 @@ export async function GET(req: NextRequest) {
   const resourceKey = req.nextUrl.searchParams.get('resourceKey')?.trim() || ''
   const relativePath = req.nextUrl.searchParams.get('relativePath')?.trim() || ''
   const label = req.nextUrl.searchParams.get('label')?.trim() || 'Structure'
-  const format = req.nextUrl.searchParams.get('format')?.trim() || ''
   const iconId = req.nextUrl.searchParams.get('iconId')?.trim() || ''
 
   if (!version || !placementKind) {
     return new Response('Invalid structure art request', { status: 400 })
   }
 
-  const realIcon = await getRealStructureIcon(iconId || resourceKey || label)
+  const realIcon = await getRealStructureIcon([iconId, resourceKey, relativePath, label])
   if (realIcon) {
     return new Response(new Uint8Array(realIcon), {
       headers: {
@@ -62,42 +77,5 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  const preview = await callSidecarForRequest<PreviewResponse>(
-    req,
-    `/structures/preview?${new URLSearchParams({
-      placementKind,
-      ...(resourceKey ? { resourceKey } : {}),
-      ...(relativePath ? { relativePath } : {}),
-      ...(format ? { format } : {}),
-    }).toString()}`,
-  )
-
-  if (!preview.ok) {
-    return new Response('Structure art unavailable', { status: preview.status ?? 404 })
-  }
-
-  if (!preview.data.preview) {
-    return new Response('Structure art unavailable', { status: 404 })
-  }
-
-  try {
-    const descriptor = await resolveStructureArtDescriptor({
-      version,
-      label,
-      placementKind,
-      resourceKey: resourceKey || null,
-      relativePath: relativePath || null,
-      format: format || null,
-      preview: preview.data.preview,
-    })
-    const artifact = await getCatalogArtArtifact(descriptor)
-    return new Response(new Uint8Array(artifact.content), {
-      headers: {
-        'Content-Type': artifact.mimeType,
-        'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
-      },
-    })
-  } catch {
-    return new Response('Structure art unavailable', { status: 404 })
-  }
+  return new Response('Structure art unavailable', { status: 404 })
 }
