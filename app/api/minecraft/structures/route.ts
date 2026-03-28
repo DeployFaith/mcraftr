@@ -53,6 +53,20 @@ type StructureResponse = {
   capabilities?: string[]
 }
 
+function makeAbsoluteBeaconUrl(value: string | null) {
+  if (!value) return null
+  if (value.startsWith('http://') || value.startsWith('https://')) return value
+
+  const base = process.env.NEXT_PUBLIC_BEACON_URL?.trim()
+  if (!base) return value
+
+  try {
+    return new URL(value, base).toString()
+  } catch {
+    return value
+  }
+}
+
 export async function GET(req: NextRequest) {
   const features = await getUserFeatureFlags(req)
   if (!checkFeatureAccess(features, 'enable_structure_catalog')) {
@@ -69,12 +83,15 @@ export async function GET(req: NextRequest) {
 
   return Response.json({
     ok: true,
-    structures: (sidecar.data.structures ?? []).map(structure => ({
-      ...structure,
-      artUrl: structure.artUrl ?? structure.imageUrl ?? null,
-      imageUrl: structure.artUrl ?? structure.imageUrl ?? null,
-      art: null,
-    })),
+    structures: (sidecar.data.structures ?? []).map(structure => {
+      const resolvedArtUrl = makeAbsoluteBeaconUrl(structure.artUrl ?? structure.imageUrl ?? null)
+      return {
+        ...structure,
+        artUrl: resolvedArtUrl,
+        imageUrl: resolvedArtUrl,
+        art: null,
+      }
+    }),
     scan: sidecar.data.scan ?? null,
     sidecar: { ok: true, capabilities: sidecar.data.capabilities ?? [] },
   })
