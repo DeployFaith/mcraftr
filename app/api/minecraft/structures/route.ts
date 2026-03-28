@@ -2,10 +2,6 @@ import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getUserFeatureFlags } from '@/lib/rcon'
 import { requireServerCapability } from '@/lib/server-capability'
 import { callSidecarForRequest } from '@/lib/server-bridge'
-import { getSessionUserId } from '@/lib/rcon'
-import { getActiveServer } from '@/lib/users'
-import { resolveStructureArtDescriptor } from '@/lib/catalog-art/resolvers/structure'
-import { buildCatalogArtPayload, getReviewedCatalogArtDescriptor } from '@/lib/catalog-art/service'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -66,10 +62,6 @@ export async function GET(req: NextRequest) {
   const capability = await requireServerCapability(req, 'full')
   if (!capability.ok) return capability.response
 
-  const userId = await getSessionUserId(req)
-  const activeServer = userId ? getActiveServer(userId) : null
-  const minecraftVersion = activeServer?.minecraftVersion.resolved ?? null
-
   const sidecar = await callSidecarForRequest<StructureResponse>(req, '/structures')
   if (!sidecar.ok) {
     return Response.json({ ok: false, error: sidecar.error }, { status: sidecar.status ?? 502 })
@@ -77,35 +69,11 @@ export async function GET(req: NextRequest) {
 
   return Response.json({
     ok: true,
-    structures: await Promise.all((sidecar.data.structures ?? []).map(async structure => {
-      const candidateUrl = structure.artUrl ?? structure.imageUrl ?? (minecraftVersion
-        ? `/api/minecraft/art/structure?${new URLSearchParams({
-            version: minecraftVersion,
-            placementKind: structure.placementKind,
-            ...(structure.resourceKey ? { resourceKey: structure.resourceKey } : {}),
-            ...(structure.relativePath ? { relativePath: structure.relativePath } : {}),
-            ...(structure.format ? { format: structure.format } : {}),
-            label: structure.label,
-          }).toString()}`
-        : null)
-      const descriptor = minecraftVersion
-        ? await getReviewedCatalogArtDescriptor(await resolveStructureArtDescriptor({
-            version: minecraftVersion,
-            label: structure.label,
-            placementKind: structure.placementKind,
-            resourceKey: structure.resourceKey ?? null,
-            relativePath: structure.relativePath ?? null,
-            format: structure.format ?? null,
-            preview: null,
-          }))
-        : null
-      const art = descriptor ? buildCatalogArtPayload(descriptor, candidateUrl) : null
-        return {
-          ...structure,
-          artUrl: art?.url ?? candidateUrl,
-          imageUrl: art?.url ?? candidateUrl,
-          art,
-        }
+    structures: (sidecar.data.structures ?? []).map(structure => ({
+      ...structure,
+      artUrl: null,
+      imageUrl: null,
+      art: null,
     })),
     scan: sidecar.data.scan ?? null,
     sidecar: { ok: true, capabilities: sidecar.data.capabilities ?? [] },
