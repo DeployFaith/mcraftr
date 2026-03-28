@@ -66,6 +66,7 @@ export async function GET(req: NextRequest) {
 
   const userId = await getSessionUserId(req)
   const minecraftVersion = userId ? getActiveServer(userId)?.minecraftVersion.resolved ?? null : null
+  const artVersion = minecraftVersion ?? 'structure-icons'
 
   const sidecar = await callSidecarForRequest<StructureResponse>(req, '/structures')
   if (!sidecar.ok) {
@@ -76,28 +77,24 @@ export async function GET(req: NextRequest) {
     ok: true,
     structures: (sidecar.data.structures ?? []).map(structure => ({
       ...structure,
-      artUrl: minecraftVersion
-        ? `/api/minecraft/art/structure?${new URLSearchParams({
-            version: minecraftVersion,
-            placementKind: structure.placementKind,
-            ...(structure.resourceKey ? { resourceKey: structure.resourceKey } : {}),
-            ...(structure.relativePath ? { relativePath: structure.relativePath } : {}),
-            ...(structure.format ? { format: structure.format } : {}),
-            ...(structure.iconId ? { iconId: structure.iconId } : {}),
-            label: structure.label,
-          }).toString()}`
-        : null,
-      imageUrl: minecraftVersion
-        ? `/api/minecraft/art/structure?${new URLSearchParams({
-            version: minecraftVersion,
-            placementKind: structure.placementKind,
-            ...(structure.resourceKey ? { resourceKey: structure.resourceKey } : {}),
-            ...(structure.relativePath ? { relativePath: structure.relativePath } : {}),
-            ...(structure.format ? { format: structure.format } : {}),
-            ...(structure.iconId ? { iconId: structure.iconId } : {}),
-            label: structure.label,
-          }).toString()}`
-        : null,
+      artUrl: `/api/minecraft/art/structure?${new URLSearchParams({
+        version: artVersion,
+        placementKind: structure.placementKind,
+        ...(structure.resourceKey ? { resourceKey: structure.resourceKey } : {}),
+        ...(structure.relativePath ? { relativePath: structure.relativePath } : {}),
+        ...(structure.format ? { format: structure.format } : {}),
+        ...(structure.iconId ? { iconId: structure.iconId } : {}),
+        label: structure.label,
+      }).toString()}`,
+      imageUrl: `/api/minecraft/art/structure?${new URLSearchParams({
+        version: artVersion,
+        placementKind: structure.placementKind,
+        ...(structure.resourceKey ? { resourceKey: structure.resourceKey } : {}),
+        ...(structure.relativePath ? { relativePath: structure.relativePath } : {}),
+        ...(structure.format ? { format: structure.format } : {}),
+        ...(structure.iconId ? { iconId: structure.iconId } : {}),
+        label: structure.label,
+      }).toString()}`,
       art: null,
     })),
     scan: sidecar.data.scan ?? null,
