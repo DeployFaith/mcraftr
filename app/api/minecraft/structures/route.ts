@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server'
-import { checkFeatureAccess, getUserFeatureFlags } from '@/lib/rcon'
+import { checkFeatureAccess, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
+import { buildStructureArtUrl } from '@/lib/catalog-art/structure-list'
 import { requireServerCapability } from '@/lib/server-capability'
 import { callSidecarForRequest } from '@/lib/server-bridge'
+import { getActiveServer } from '@/lib/users'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -55,19 +57,6 @@ type StructureEntry = {
   editable?: boolean
 }
 
-function buildStructureArtUrl(structure: StructureEntry) {
-  const iconId = structure.iconId || structure.resourceKey || structure.bridgeRef || structure.id || structure.label
-  return `/api/minecraft/art/structure?${new URLSearchParams({
-    version: 'structure-icons',
-    placementKind: structure.placementKind,
-    ...(structure.resourceKey ? { resourceKey: structure.resourceKey } : {}),
-    ...(structure.relativePath ? { relativePath: structure.relativePath } : {}),
-    ...(structure.format ? { format: structure.format } : {}),
-    ...(iconId ? { iconId } : {}),
-    label: structure.label,
-  }).toString()}`
-}
-
 export async function GET(req: NextRequest) {
   const features = await getUserFeatureFlags(req)
   if (!checkFeatureAccess(features, 'enable_structure_catalog')) {
@@ -77,6 +66,10 @@ export async function GET(req: NextRequest) {
   const capability = await requireServerCapability(req, 'full')
   if (!capability.ok) return capability.response
 
+  const userId = await getSessionUserId(req)
+  const activeServer = userId ? getActiveServer(userId) : null
+  const minecraftVersion = activeServer?.minecraftVersion.resolved ?? null
+
   const sidecar = await callSidecarForRequest<StructureResponse>(req, '/structures')
   if (!sidecar.ok) {
     return Response.json({ ok: false, error: sidecar.error }, { status: sidecar.status ?? 502 })
@@ -85,7 +78,7 @@ export async function GET(req: NextRequest) {
   return Response.json({
     ok: true,
     structures: (sidecar.data.structures ?? []).map(structure => {
-      const resolvedArtUrl = buildStructureArtUrl(structure)
+      const resolvedArtUrl = buildStructureArtUrl(structure, minecraftVersion)
       return {
         ...structure,
         iconId: structure.iconId || structure.resourceKey || structure.bridgeRef || structure.id || structure.label,
