@@ -14,7 +14,7 @@ type Props = {
 }
 
 export const CATALOG_ARTWORK_ENABLED: Record<Props['kind'], boolean> = {
-  structure: false,
+  structure: true,
   entity: true,
   item: true,
 }

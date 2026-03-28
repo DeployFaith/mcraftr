@@ -71,8 +71,8 @@ export async function GET(req: NextRequest) {
     ok: true,
     structures: (sidecar.data.structures ?? []).map(structure => ({
       ...structure,
-      artUrl: null,
-      imageUrl: null,
+      artUrl: structure.artUrl ?? structure.imageUrl ?? null,
+      imageUrl: structure.artUrl ?? structure.imageUrl ?? null,
       art: null,
     })),
     scan: sidecar.data.scan ?? null,

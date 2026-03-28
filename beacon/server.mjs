@@ -170,16 +170,22 @@ function getEntityArtUrl(entityId) {
 }
 
 function getStructureArtUrl(entry) {
-  if (!ART_VERSION || !entry?.placementKind) return null
-  const params = new URLSearchParams({
-    version: ART_VERSION,
-    placementKind: entry.placementKind,
-    label: entry.label || 'Structure',
-  })
-  if (entry.resourceKey) params.set('resourceKey', entry.resourceKey)
-  if (entry.relativePath) params.set('relativePath', entry.relativePath)
-  if (entry.format) params.set('format', entry.format)
-  return `/art/structure?${params.toString()}`
+  const rawId = entry?.resourceKey || entry?.bridgeRef || entry?.id || entry?.label
+  if (!rawId) return null
+  return `/art/structures/${encodeURIComponent(rawId)}.png`
+}
+
+function normalizeStructureArtId(raw) {
+  const value = decodeURIComponent(String(raw || '').trim().toLowerCase())
+  return value.includes(':') ? value : `minecraft:${value}`
+}
+
+function resolveStructureArtFile(structureId) {
+  const id = normalizeStructureArtId(structureId)
+  const realDir = path.join(process.cwd(), 'beacon/catalog-art/structures/real')
+  if (id === 'minecraft:woodland_mansion') return path.join(realDir, 'woodland_mansion.png')
+  if (id === 'minecraft:ocean_monument') return path.join(realDir, 'ocean_monument.png')
+  return path.join(realDir, 'generic_structure.png')
 }
 
 function buildAppArtUrl(relativePath) {
@@ -1523,6 +1529,23 @@ const server = http.createServer(async (req, res) => {
         return
       }
       sendRedirect(res, 302, target)
+      return
+    }
+
+    const structureArtMatch = pathname.match(/^\/art\/structures\/(.+)\.png$/)
+    if (req.method === 'GET' && structureArtMatch) {
+      const filePath = resolveStructureArtFile(structureArtMatch[1])
+      if (!fs.existsSync(filePath)) {
+        sendJson(res, 404, { ok: false, error: 'Structure art not found' })
+        return
+      }
+      const buffer = fs.readFileSync(filePath)
+      res.writeHead(200, {
+        'Content-Type': 'image/png',
+        'Content-Length': buffer.length,
+        'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
+      })
+      res.end(buffer)
       return
     }
 
