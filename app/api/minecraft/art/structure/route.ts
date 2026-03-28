@@ -1,9 +1,19 @@
 import { NextRequest } from 'next/server'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
+import { getCatalogArtArtifact } from '@/lib/catalog-art/service'
+import { resolveStructureArtContent, type StructureArtInput } from '@/lib/catalog-art/structure-route'
+import { resolveStructureArtDescriptor } from '@/lib/catalog-art/resolvers/structure'
+import { callSidecarForRequest } from '@/lib/server-bridge'
+import type { StructurePreviewDescriptor } from '@/lib/minecraft-assets/structure-art'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+type StructurePreviewResponse = {
+  ok: boolean
+  preview?: StructurePreviewDescriptor | null
+}
 
 function sanitizeVersion(raw: string | null) {
   return raw && /^[A-Za-z0-9._-]+$/.test(raw) ? raw : null
@@ -62,11 +72,21 @@ async function getRealStructureIcon(values: string[]) {
   }
 }
 
+function buildPreviewEndpoint(input: StructureArtInput) {
+  return `/structures/preview?${new URLSearchParams({
+    placementKind: input.placementKind,
+    ...(input.resourceKey ? { resourceKey: input.resourceKey } : {}),
+    ...(input.relativePath ? { relativePath: input.relativePath } : {}),
+    ...(input.format ? { format: input.format } : {}),
+  }).toString()}`
+}
+
 export async function GET(req: NextRequest) {
   const version = sanitizeVersion(req.nextUrl.searchParams.get('version'))
   const placementKind = req.nextUrl.searchParams.get('placementKind')?.trim() || ''
   const resourceKey = req.nextUrl.searchParams.get('resourceKey')?.trim() || ''
   const relativePath = req.nextUrl.searchParams.get('relativePath')?.trim() || ''
+  const format = req.nextUrl.searchParams.get('format')?.trim() || ''
   const label = req.nextUrl.searchParams.get('label')?.trim() || 'Structure'
   const iconId = req.nextUrl.searchParams.get('iconId')?.trim() || ''
 
@@ -74,11 +94,42 @@ export async function GET(req: NextRequest) {
     return new Response('Invalid structure art request', { status: 400 })
   }
 
-  const realIcon = await getRealStructureIcon([iconId, resourceKey, relativePath, label])
-  if (realIcon) {
-    return new Response(new Uint8Array(realIcon), {
+  const input: StructureArtInput = {
+    version,
+    placementKind,
+    resourceKey,
+    relativePath,
+    format,
+    label,
+    iconId,
+  }
+
+  const result = await resolveStructureArtContent(input, {
+    getPreview: async previewInput => {
+      const sidecar = await callSidecarForRequest<StructurePreviewResponse>(req, buildPreviewEndpoint(previewInput))
+      if (!sidecar.ok || sidecar.data.ok === false || !sidecar.data.preview) {
+        return null
+      }
+      return sidecar.data.preview
+    },
+    getFallbackIcon: getRealStructureIcon,
+    resolveDescriptor: resolveStructureArtDescriptor,
+    getArtifact: getCatalogArtArtifact,
+  })
+
+  if (result.kind === 'artifact') {
+    return new Response(new Uint8Array(result.artifact.content), {
       headers: {
-        'Content-Type': 'image/png',
+        'Content-Type': result.artifact.mimeType,
+        'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
+      },
+    })
+  }
+
+  if (result.kind === 'fallback') {
+    return new Response(new Uint8Array(result.content), {
+      headers: {
+        'Content-Type': result.mimeType,
         'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
       },
     })
