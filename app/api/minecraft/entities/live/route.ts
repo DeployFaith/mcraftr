@@ -126,6 +126,7 @@ export async function GET(req: NextRequest) {
 
   const userId = await getSessionUserId(req)
   const minecraftVersion = userId ? getActiveServer(userId)?.minecraftVersion.resolved ?? null : null
+  const artVersion = minecraftVersion ?? 'entity-icons'
 
   const world = req.nextUrl.searchParams.get('world')?.trim() ?? ''
   const command = world ? `entities live ${world}` : 'entities live'
@@ -137,7 +138,7 @@ export async function GET(req: NextRequest) {
         const limitedEntities = fallback.entities.slice(0, MAX_LIVE_ENTITIES)
         const withArt = limitedEntities.map(entity => ({
           ...entity,
-          imageUrl: minecraftVersion ? `/api/minecraft/art/entity/${encodeURIComponent(minecraftVersion)}/${encodeURIComponent(entity.id)}` : null,
+          imageUrl: `/api/minecraft/art/entity/${encodeURIComponent(artVersion)}/${encodeURIComponent(entity.id)}`,
         }))
         const totalEntities = Math.max(fallback.totalEntities, fallback.entities.length)
         const responseTruncated = fallback.truncated || totalEntities > limitedEntities.length
@@ -176,7 +177,7 @@ export async function GET(req: NextRequest) {
   const limitedEntities = entities.slice(0, MAX_LIVE_ENTITIES)
   const withArt = limitedEntities.map(entity => ({
     ...entity,
-    imageUrl: minecraftVersion ? `/api/minecraft/art/entity/${encodeURIComponent(minecraftVersion)}/${encodeURIComponent(entity.id)}` : null,
+    imageUrl: `/api/minecraft/art/entity/${encodeURIComponent(artVersion)}/${encodeURIComponent(entity.id)}`,
   }))
   const truncated = isLiveEntityPayloadTruncated(bridge.data) || totalEntities > limitedEntities.length
 

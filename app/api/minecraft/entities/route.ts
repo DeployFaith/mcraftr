@@ -242,13 +242,14 @@ export async function GET(req: NextRequest) {
   }
 
   const dedupedWarnings = Array.from(new Set(warnings.filter(Boolean)))
+  const artVersion = minecraftVersion ?? 'entity-icons'
 
   return Response.json({
     ok: true,
     entities: (await Promise.all([...nativeEntities, ...customEntities]
       .map(async entry => {
-        const candidateUrl = entry.artUrl ?? entry.imageUrl ?? (minecraftVersion && entry.entityId
-          ? `/api/minecraft/art/entity/${encodeURIComponent(minecraftVersion)}/${encodeURIComponent(entry.entityId)}`
+        const candidateUrl = entry.artUrl ?? entry.imageUrl ?? (entry.entityId
+          ? `/api/minecraft/art/entity/${encodeURIComponent(artVersion)}/${encodeURIComponent(entry.entityId)}`
           : null)
         const descriptor = minecraftVersion && entry.entityId
           ? await getReviewedCatalogArtDescriptor(await resolveEntityArtDescriptor({
