@@ -170,7 +170,7 @@ function getEntityArtUrl(entityId) {
 }
 
 function getStructureArtUrl(entry) {
-  const rawId = entry?.resourceKey || entry?.bridgeRef || entry?.id || entry?.label
+  const rawId = entry?.iconId || entry?.resourceKey || entry?.bridgeRef || entry?.id || entry?.label
   if (!rawId) return null
   return `/art/structures/${encodeURIComponent(rawId)}.png`
 }
@@ -182,9 +182,26 @@ function normalizeStructureArtId(raw) {
 
 function resolveStructureArtFile(structureId) {
   const id = normalizeStructureArtId(structureId)
+  const alias = id.replace(/^minecraft:/, '')
   const realDir = path.join(process.cwd(), 'beacon/catalog-art/structures/real')
-  if (id === 'minecraft:woodland_mansion') return path.join(realDir, 'woodland_mansion.png')
-  if (id === 'minecraft:ocean_monument') return path.join(realDir, 'ocean_monument.png')
+  if (
+    id === 'minecraft:woodland_mansion' ||
+    id === 'minecraft:mansion' ||
+    alias === 'woodland_mansion' ||
+    alias === 'mansion' ||
+    alias.includes('/mansion')
+  ) {
+    return path.join(realDir, 'woodland_mansion.png')
+  }
+  if (
+    id === 'minecraft:ocean_monument' ||
+    id === 'minecraft:monument' ||
+    alias === 'ocean_monument' ||
+    alias === 'monument' ||
+    alias.includes('/monument')
+  ) {
+    return path.join(realDir, 'ocean_monument.png')
+  }
   return path.join(realDir, 'generic_structure.png')
 }
 
