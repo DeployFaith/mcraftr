@@ -24,6 +24,8 @@
   },
   "dependencies": {
     "@radix-ui/react-switch": "^1.2.6",
+    "@react-three/drei": "^10.7.6",
+    "@react-three/fiber": "^9.4.0",
     "@types/ioredis": "^4.28.10",
     "@uiw/react-color": "^2.9.6",
     "adm-zip": "^0.5.16",
@@ -38,7 +40,8 @@
     "rate-limiter-flexible": "^9.1.1",
     "rcon-client": "^4.2.5",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "three": "^0.180.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.51.1",

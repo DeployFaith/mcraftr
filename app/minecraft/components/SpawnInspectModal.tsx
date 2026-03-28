@@ -1,10 +1,17 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import dynamic from 'next/dynamic'
+import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import type { CatalogArtPayload } from '@/lib/catalog-art/types'
 import CatalogArtwork, { isCatalogArtworkEnabled } from './CatalogArtwork'
 import type { PlacementCheckResult } from '@/lib/placement-randomize'
+import type { StructurePreviewDescriptor } from '@/lib/minecraft-assets/structure-art'
+
+const Structure3DPreview = dynamic(() => import('./Structure3DPreview'), {
+  ssr: false,
+  loading: () => <div className="flex h-full w-full items-center justify-center rounded-[inherit] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] text-[11px] font-mono text-[var(--text-dim)]">Loading 3D preview…</div>,
+})
 
 const ENTITY_COUNT_PRESETS = ['1', '4', '8', '16', '32', '64']
 
@@ -194,6 +201,9 @@ export default function SpawnInspectModal({
   onConfirm,
 }: Props) {
   const target = structure ?? entity
+  const [structureRenderMode, setStructureRenderMode] = useState<'preview' | '3d' | 'materials'>('preview')
+  const [structurePreview, setStructurePreview] = useState<StructurePreviewDescriptor | null>(null)
+  const [structurePreviewError, setStructurePreviewError] = useState<string | null>(null)
   const selectedPlayerWorld = selectedPlayer ? playerWorlds[selectedPlayer] ?? null : null
   const worldPlayers = useMemo(
     () => players.filter(player => !world || playerWorlds[player] === world),
@@ -207,6 +217,39 @@ export default function SpawnInspectModal({
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onCancel])
+
+  useEffect(() => {
+    setStructureRenderMode('preview')
+    setStructurePreview(null)
+    setStructurePreviewError(null)
+  }, [structure?.id])
+
+  useEffect(() => {
+    if (!structure) return
+    const controller = new AbortController()
+    const loadPreview = async () => {
+      try {
+        setStructurePreviewError(null)
+        const response = await fetch(`/api/minecraft/structures/preview?${new URLSearchParams({
+          placementKind: structure.placementKind ?? 'schematic',
+          ...(structure.resourceKey ? { resourceKey: structure.resourceKey } : {}),
+          ...(structure.relativePath ? { relativePath: structure.relativePath } : {}),
+          ...(structure.format ? { format: structure.format } : {}),
+        }).toString()}`, { signal: controller.signal, cache: 'no-store' })
+        const payload = await response.json().catch(() => null) as { ok?: boolean; preview?: StructurePreviewDescriptor | null; error?: string } | null
+        if (!response.ok || payload?.ok === false) {
+          setStructurePreviewError(typeof payload?.error === 'string' ? payload.error : 'Preview unavailable')
+          return
+        }
+        setStructurePreview(payload?.preview ?? null)
+      } catch (error) {
+        if ((error as Error).name === 'AbortError') return
+        setStructurePreviewError(error instanceof Error ? error.message : 'Preview unavailable')
+      }
+    }
+    void loadPreview()
+    return () => controller.abort()
+  }, [structure])
 
   if (!target) return null
 
@@ -245,17 +288,51 @@ export default function SpawnInspectModal({
           <div className={`grid gap-0 ${isCatalogArtworkEnabled(structure ? 'structure' : 'entity') ? 'md:grid-cols-[1.05fr_0.95fr]' : ''}`}>
           <div className={`p-5 ${isCatalogArtworkEnabled(structure ? 'structure' : 'entity') ? 'border-b md:border-b-0 md:border-r' : ''}`} style={{ borderColor: 'var(--border)' }}>
             {isCatalogArtworkEnabled(structure ? 'structure' : 'entity') && (
-              <CatalogArtwork
-                kind={structure ? 'structure' : 'entity'}
-                label={target.label}
-                category={target.category}
-                sourceKind={structure?.sourceKind ?? null}
-                imageUrl={target.imageUrl}
-                art={target.art}
-                className={structure
-                  ? 'h-[260px] w-full rounded-[22px] border bg-[var(--bg2)] object-contain p-3'
-                  : 'mx-auto h-[260px] w-full max-w-[22rem] rounded-[22px] border bg-[var(--bg2)] object-contain p-3'}
-              />
+              <>
+                {structure && (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {([
+                      ['preview', 'Preview'],
+                      ['3d', '3D'],
+                      ['materials', 'Materials'],
+                    ] as const).map(([modeValue, modeLabel]) => {
+                      const disabled = modeValue === '3d' && !structurePreview?.preview3d
+                      return (
+                        <button
+                          key={modeValue}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => setStructureRenderMode(modeValue)}
+                          className="rounded-full border px-3 py-1 text-[10px] font-mono tracking-[0.16em] transition-all disabled:opacity-40"
+                          style={structureRenderMode === modeValue
+                            ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
+                            : { borderColor: 'var(--border)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)' }}
+                        >
+                          {modeLabel}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                {structure && structureRenderMode === '3d'
+                  ? <Structure3DPreview preview={structurePreview} className="h-[260px] w-full rounded-[22px]" />
+                  : <CatalogArtwork
+                      kind={structure ? 'structure' : 'entity'}
+                      label={target.label}
+                      category={target.category}
+                      sourceKind={structure?.sourceKind ?? null}
+                      imageUrl={target.imageUrl}
+                      art={target.art}
+                      structureArtView={structureRenderMode === 'materials' ? 'materials' : 'preview'}
+                      hideStructureViewToggle={Boolean(structure)}
+                      className={structure
+                        ? 'h-[260px] w-full rounded-[22px] border bg-[var(--bg2)] object-contain p-3'
+                        : 'mx-auto h-[260px] w-full max-w-[22rem] rounded-[22px] border bg-[var(--bg2)] object-contain p-3'}
+                    />}
+                {structure && structureRenderMode === '3d' && !structurePreview?.preview3d && structurePreviewError && (
+                  <div className="mt-2 text-[10px] font-mono text-[var(--text-dim)]">{structurePreviewError}</div>
+                )}
+              </>
             )}
             <div className="mt-4">
               <div className="font-mono text-[18px] tracking-[0.12em]" style={{ color: 'var(--text)' }}>

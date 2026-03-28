@@ -12,6 +12,9 @@ type Props = {
   imageUrl?: string | null
   art?: CatalogArtPayload | null
   className?: string
+  structureArtView?: StructureArtView
+  onStructureArtViewChange?: (view: StructureArtView) => void
+  hideStructureViewToggle?: boolean
 }
 
 export const CATALOG_ARTWORK_ENABLED: Record<Props['kind'], boolean> = {
@@ -32,21 +35,25 @@ export default function CatalogArtwork({
   imageUrl,
   art,
   className = '',
+  structureArtView,
+  onStructureArtViewChange,
+  hideStructureViewToggle = false,
 }: Props) {
   const placeholderMeta = [category, sourceKind].filter(Boolean).join(' · ') || `${kind} art unavailable`
-  return <ArtworkImage key={`${art?.url ?? imageUrl ?? 'missing'}:${label}`} src={art?.url ?? imageUrl ?? null} label={label} className={className} artClass={art?.class ?? kind} artStrategy={art?.strategy ?? 'missing-real-art'} placeholderMeta={placeholderMeta} kind={kind} />
+  return <ArtworkImage key={`${art?.url ?? imageUrl ?? 'missing'}:${label}`} src={art?.url ?? imageUrl ?? null} label={label} className={className} artClass={art?.class ?? kind} artStrategy={art?.strategy ?? 'missing-real-art'} placeholderMeta={placeholderMeta} kind={kind} structureArtView={structureArtView} onStructureArtViewChange={onStructureArtViewChange} hideStructureViewToggle={hideStructureViewToggle} />
 }
 
-function ArtworkImage({ src, label, className, artClass, artStrategy, placeholderMeta, kind }: { src: string | null; label: string; className: string; artClass: string; artStrategy: string; placeholderMeta: string; kind: Props['kind'] }) {
+function ArtworkImage({ src, label, className, artClass, artStrategy, placeholderMeta, kind, structureArtView: controlledStructureArtView, onStructureArtViewChange, hideStructureViewToggle }: { src: string | null; label: string; className: string; artClass: string; artStrategy: string; placeholderMeta: string; kind: Props['kind']; structureArtView?: StructureArtView; onStructureArtViewChange?: (view: StructureArtView) => void; hideStructureViewToggle: boolean }) {
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
-  const [structureArtView, setStructureArtView] = useState<StructureArtView>('preview')
+  const [uncontrolledStructureArtView, setStructureArtView] = useState<StructureArtView>('preview')
   const glyph = useMemo(() => (kind === 'entity' ? 'E' : kind === 'structure' ? 'S' : 'I'), [kind])
+  const structureArtView = controlledStructureArtView ?? uncontrolledStructureArtView
   useEffect(() => {
-    setStructureArtView('preview')
+    if (!controlledStructureArtView) setStructureArtView('preview')
     setLoaded(false)
     setFailed(false)
-  }, [src])
+  }, [controlledStructureArtView, src])
 
   const structureViewUrls = useMemo(() => {
     if (kind !== 'structure' || !src || !src.includes('/api/minecraft/art/structure')) return null
@@ -67,7 +74,7 @@ function ArtworkImage({ src, label, className, artClass, artStrategy, placeholde
       data-art-class={artClass}
       data-art-strategy={effectiveStrategy}
     >
-      {structureViewUrls && !showPlaceholder && (
+      {structureViewUrls && !showPlaceholder && !hideStructureViewToggle && (
         <div className="absolute left-3 top-3 z-10 flex gap-2 rounded-full border border-white/10 bg-[rgba(8,12,18,0.72)] p-1 backdrop-blur-sm">
           {([
             ['preview', 'Preview'],
@@ -76,7 +83,10 @@ function ArtworkImage({ src, label, className, artClass, artStrategy, placeholde
             <button
               key={view}
               type="button"
-              onClick={() => setStructureArtView(view)}
+              onClick={() => {
+                if (!controlledStructureArtView) setStructureArtView(view)
+                onStructureArtViewChange?.(view)
+              }}
               className="rounded-full px-3 py-1 text-[10px] font-mono tracking-[0.16em] transition-all"
               style={structureArtView === view
                 ? { background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-mid)' }

@@ -1056,6 +1056,39 @@ function buildTopDownPreview(dimensions, positionedBlocks) {
   return { cells: grid, heights }
 }
 
+function buildStructure3DPreview(dimensions, positionedBlocks) {
+  if (!dimensions?.width || !dimensions?.height || !dimensions?.length || positionedBlocks.length === 0) {
+    return null
+  }
+
+  const width = Math.max(1, Number(dimensions.width) || 1)
+  const height = Math.max(1, Number(dimensions.height) || 1)
+  const length = Math.max(1, Number(dimensions.length) || 1)
+  const renderable = positionedBlocks
+    .filter(block => isPreviewableBlock(block.name))
+    .map(block => ({
+      x: Number(block.x) || 0,
+      y: Number(block.y) || 0,
+      z: Number(block.z) || 0,
+      blockId: stripBlockState(block.name),
+    }))
+
+  if (renderable.length === 0) return null
+
+  const maxVoxels = 6000
+  const sampled = renderable.length > maxVoxels
+  const stride = sampled ? Math.ceil(renderable.length / maxVoxels) : 1
+  const voxels = renderable.filter((_, index) => index % stride === 0).slice(0, maxVoxels)
+
+  return {
+    voxels,
+    bounds: { width, height, length },
+    truncated: sampled,
+    sampled,
+    voxelCount: voxels.length,
+  }
+}
+
 function readVarIntArray(buffer) {
   const values = []
   let current = 0
@@ -1103,6 +1136,7 @@ function worldgenPreview(resourceKey) {
     blocks,
     dimensions: null,
     cells: makePatternGrid(blocks, 8),
+    preview3d: null,
   }
 }
 
@@ -1131,11 +1165,13 @@ async function readNativeStructurePreview(resourceKey) {
     name: palette[block.state]?.Name,
   })).filter(block => block.name)
   const topDown = buildTopDownPreview(dimensions, positionedBlocks)
+  const preview3d = buildStructure3DPreview(dimensions, positionedBlocks)
   return {
     blocks: sample.length > 0 ? sample : worldgenPreviewBlocks(resourceKey),
     dimensions,
     cells: topDown.cells,
     heights: topDown.heights,
+    preview3d,
   }
 }
 
@@ -1191,11 +1227,13 @@ async function readFileStructurePreview(req, relativePath, formatHint) {
     })).filter(block => block.name)
     const sample = summarizeBlocks(names.length > 0 ? names : Array.from(paletteByIndex.values()))
     const topDown = buildTopDownPreview(dimensions, positionedBlocks)
+    const preview3d = buildStructure3DPreview(dimensions, positionedBlocks)
     return {
       blocks: sample,
       dimensions,
       cells: topDown.cells,
       heights: topDown.heights,
+      preview3d,
     }
   }
 
@@ -1213,11 +1251,13 @@ async function readFileStructurePreview(req, relativePath, formatHint) {
         })).filter(block => block.name)
       : []
     const topDown = buildTopDownPreview(dimensions, positionedBlocks)
+    const preview3d = buildStructure3DPreview(dimensions, positionedBlocks)
     return {
       blocks: summarizeBlocks(blockNames.length > 0 ? blockNames : paletteNames),
       dimensions,
       cells: topDown.cells,
       heights: topDown.heights,
+      preview3d,
     }
   }
 
@@ -1225,6 +1265,7 @@ async function readFileStructurePreview(req, relativePath, formatHint) {
     blocks: formatHint === 'schematic' ? ['stone_bricks', 'oak_planks', 'glass'] : ['cobblestone', 'oak_planks', 'lantern'],
     dimensions,
     cells: makePatternGrid(formatHint === 'schematic' ? ['stone_bricks', 'oak_planks', 'glass'] : ['cobblestone', 'oak_planks', 'lantern'], 8),
+    preview3d: null,
   }
 }
 

@@ -5,6 +5,22 @@ export type StructurePreviewDescriptor = {
   blocks: string[]
   cells?: string[][] | null
   heights?: number[][] | null
+  preview3d?: {
+    voxels: Array<{
+      x: number
+      y: number
+      z: number
+      blockId: string
+    }>
+    bounds: {
+      width: number
+      height: number
+      length: number
+    }
+    truncated: boolean
+    sampled: boolean
+    voxelCount: number
+  } | null
   dimensions?: {
     width: number | null
     height: number | null
