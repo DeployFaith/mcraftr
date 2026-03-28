@@ -1022,8 +1022,8 @@ function makePatternGrid(materials, size = 8) {
   return grid
 }
 
-function buildTopDownCells(dimensions, positionedBlocks) {
-  if (!dimensions?.width || !dimensions?.length || positionedBlocks.length === 0) return null
+function buildTopDownPreview(dimensions, positionedBlocks) {
+  if (!dimensions?.width || !dimensions?.length || positionedBlocks.length === 0) return { cells: null, heights: null }
   const width = Math.max(1, Number(dimensions.width) || 1)
   const length = Math.max(1, Number(dimensions.length) || 1)
   const target = 8
@@ -1032,6 +1032,7 @@ function buildTopDownCells(dimensions, positionedBlocks) {
   const cellsWide = Math.max(1, Math.ceil(width / stepX))
   const cellsLong = Math.max(1, Math.ceil(length / stepZ))
   const grid = Array.from({ length: cellsLong }, () => Array.from({ length: cellsWide }, () => 'air'))
+  const heights = Array.from({ length: cellsLong }, () => Array.from({ length: cellsWide }, () => 0))
 
   for (let cellZ = 0; cellZ < cellsLong; cellZ += 1) {
     const zStart = cellZ * stepZ
@@ -1048,10 +1049,11 @@ function buildTopDownCells(dimensions, positionedBlocks) {
         }
       }
       grid[cellZ][cellX] = best ? stripBlockState(best.name) : 'air'
+      heights[cellZ][cellX] = best ? (Number(best.y) || 0) : 0
     }
   }
 
-  return grid
+  return { cells: grid, heights }
 }
 
 function readVarIntArray(buffer) {
@@ -1128,10 +1130,12 @@ async function readNativeStructurePreview(resourceKey) {
     z: Array.isArray(block.pos) ? Number(block.pos[2]) || 0 : 0,
     name: palette[block.state]?.Name,
   })).filter(block => block.name)
+  const topDown = buildTopDownPreview(dimensions, positionedBlocks)
   return {
     blocks: sample.length > 0 ? sample : worldgenPreviewBlocks(resourceKey),
     dimensions,
-    cells: buildTopDownCells(dimensions, positionedBlocks),
+    cells: topDown.cells,
+    heights: topDown.heights,
   }
 }
 
@@ -1186,10 +1190,12 @@ async function readFileStructurePreview(req, relativePath, formatHint) {
       name: paletteByIndex.get(index),
     })).filter(block => block.name)
     const sample = summarizeBlocks(names.length > 0 ? names : Array.from(paletteByIndex.values()))
+    const topDown = buildTopDownPreview(dimensions, positionedBlocks)
     return {
       blocks: sample,
       dimensions,
-      cells: buildTopDownCells(dimensions, positionedBlocks),
+      cells: topDown.cells,
+      heights: topDown.heights,
     }
   }
 
@@ -1206,10 +1212,12 @@ async function readFileStructurePreview(req, relativePath, formatHint) {
           name: data.palette?.[block.state]?.Name,
         })).filter(block => block.name)
       : []
+    const topDown = buildTopDownPreview(dimensions, positionedBlocks)
     return {
       blocks: summarizeBlocks(blockNames.length > 0 ? blockNames : paletteNames),
       dimensions,
-      cells: buildTopDownCells(dimensions, positionedBlocks),
+      cells: topDown.cells,
+      heights: topDown.heights,
     }
   }
 

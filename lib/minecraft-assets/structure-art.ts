@@ -4,6 +4,7 @@ import { CATALOG_ART_THEME } from '@/lib/catalog-art/theme'
 export type StructurePreviewDescriptor = {
   blocks: string[]
   cells?: string[][] | null
+  heights?: number[][] | null
   dimensions?: {
     width: number | null
     height: number | null
@@ -40,6 +41,21 @@ function renderCellTexture(texture: string, x: number, y: number, size: number, 
       <rect width="${size}" height="${size}" rx="${Math.max(3, Math.round(size * 0.18))}" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" />
       <image href="${texture}" x="2" y="2" width="${size - 4}" height="${size - 4}" preserveAspectRatio="xMidYMid meet" style="image-rendering: pixelated;" />
       <title>${escapeXml(key)}</title>
+    </g>
+  `
+}
+
+function renderHeightOverlay(height: number | null, minHeight: number, maxHeight: number, x: number, y: number, size: number) {
+  if (!height || maxHeight <= 0) return ''
+  const span = Math.max(1, maxHeight - minHeight)
+  const normalized = (height - minHeight) / span
+  const overlayOpacity = 0.08 + (normalized * 0.2)
+  const badgeOpacity = 0.55 + (normalized * 0.25)
+  return `
+    <g transform="translate(${x} ${y})">
+      <rect width="${size}" height="${size}" rx="${Math.max(3, Math.round(size * 0.18))}" fill="rgba(0,255,200,${overlayOpacity.toFixed(3)})" />
+      <rect x="${Math.max(2, size - 16)}" y="2" width="14" height="10" rx="4" fill="rgba(8,12,18,${badgeOpacity.toFixed(3)})" stroke="rgba(255,255,255,0.08)" />
+      <text x="${Math.max(9, size - 9)}" y="10" text-anchor="middle" font-size="6" fill="${CATALOG_ART_THEME.accentSoft}" font-family="monospace">${height}</text>
     </g>
   `
 }
@@ -93,6 +109,7 @@ export function renderStructurePreviewSvg(label: string, preview: StructurePrevi
   const dimsLabel = buildDimensionsLabel(preview.dimensions)
   const textureCache = new Map(swatches.map(swatch => [swatch.blockId, swatch.texture]))
   const cells = Array.isArray(preview.cells) && preview.cells.length > 0 ? preview.cells : null
+  const heights = Array.isArray(preview.heights) && preview.heights.length > 0 ? preview.heights : null
   const gridScene = cells
     ? (() => {
         const cropped = cropCells(cells)
@@ -103,13 +120,24 @@ export function renderStructurePreviewSvg(label: string, preview: StructurePrevi
         const gridHeight = rows * tileSize
         const originX = Math.round((320 - gridWidth) / 2)
         const originY = Math.round(34 + Math.max(0, (148 - gridHeight) / 2))
+        const croppedHeights = heights
+          ? cropped.map((row, rowIndex) => row.map((_, colIndex) => heights?.[rowIndex]?.[colIndex] ?? 0))
+          : null
+        const flatHeights = (croppedHeights ?? []).flat().filter(value => Number.isFinite(value) && value > 0) as number[]
+        const minHeight = flatHeights.length > 0 ? Math.min(...flatHeights) : 0
+        const maxHeight = flatHeights.length > 0 ? Math.max(...flatHeights) : 0
         const tiles = cropped.flatMap((row, rowIndex) => row.map((blockId, colIndex) => {
           if (!blockId || blockId === 'air') return ''
           const texture = textureCache.get(blockId) ?? `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(placeholderTile(blockId.replace(/^minecraft:/, ''), rowIndex + colIndex))}`
-          return renderCellTexture(texture, originX + (colIndex * tileSize), originY + (rowIndex * tileSize), tileSize, blockId)
+          const x = originX + (colIndex * tileSize)
+          const y = originY + (rowIndex * tileSize)
+          const height = croppedHeights?.[rowIndex]?.[colIndex] ?? null
+          return `${renderCellTexture(texture, x, y, tileSize, blockId)}${renderHeightOverlay(height, minHeight, maxHeight, x, y, tileSize)}`
         })).join('')
         return {
           content: tiles,
+          reliefLevels: flatHeights.length > 0 ? (maxHeight - minHeight + 1) : null,
+          peakHeight: maxHeight > 0 ? maxHeight : null,
         }
       })()
     : null
@@ -140,6 +168,7 @@ export function renderStructurePreviewSvg(label: string, preview: StructurePrevi
       <rect x="12" y="12" width="296" height="196" rx="24" fill="${CATALOG_ART_THEME.panelInsetFill}" stroke="${CATALOG_ART_THEME.panelInsetStroke}" />
       <text x="28" y="28" font-size="10" fill="${CATALOG_ART_THEME.accent}" font-family="monospace">${gridScene ? 'TOP-DOWN PREVIEW' : 'BUILD MATERIALS'}</text>
       <text x="292" y="28" text-anchor="end" font-size="10" fill="${CATALOG_ART_THEME.textStrong}" font-family="monospace">${escapeXml(dimsLabel)}</text>
+      ${gridScene?.reliefLevels ? `<text x="28" y="42" font-size="9" fill="${CATALOG_ART_THEME.text}" font-family="monospace">RELIEF ${gridScene.reliefLevels} LEVELS · HEIGHT ${gridScene.peakHeight}</text>` : ''}
       ${gridScene ? gridScene.content : tiles}
       <text x="160" y="204" text-anchor="middle" font-size="11" fill="${CATALOG_ART_THEME.text}" font-family="monospace">${escapeXml(label)}</text>
     </svg>
