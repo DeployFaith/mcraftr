@@ -1,6 +1,4 @@
 import { NextRequest } from 'next/server'
-import { resolveEntityArtDescriptor } from '@/lib/catalog-art/resolvers/entity'
-import { getCatalogArtArtifact } from '@/lib/catalog-art/service'
 import { getEntityIconPng } from '@/lib/minecraft-assets/entity-icons'
 
 export const runtime = 'nodejs'
@@ -45,20 +43,5 @@ export async function GET(
     })
   }
 
-  try {
-    const descriptor = await resolveEntityArtDescriptor({
-      version: safeVersion,
-      entityId: safeEntityId,
-      label: labelFromEntityId(safeEntityId),
-    })
-    const artifact = await getCatalogArtArtifact(descriptor)
-    return new Response(new Uint8Array(artifact.content), {
-      headers: {
-        'Content-Type': artifact.mimeType,
-        'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
-      },
-    })
-  } catch {
-    return new Response('Entity art unavailable', { status: 404 })
-  }
+  return new Response(`Real entity art is not available yet for ${labelFromEntityId(safeEntityId)}.`, { status: 404 })
 }

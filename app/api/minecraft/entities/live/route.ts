@@ -4,6 +4,7 @@ import { requireServerCapability } from '@/lib/server-capability'
 import { runBridgeJson } from '@/lib/server-bridge'
 import { getSessionUserId } from '@/lib/rcon'
 import { getActiveServer } from '@/lib/users'
+import { hasEntityIcon } from '@/lib/minecraft-assets/entity-icons'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -136,10 +137,12 @@ export async function GET(req: NextRequest) {
       const fallback = await loadLiveEntitiesByWorld(req)
       if (fallback) {
         const limitedEntities = fallback.entities.slice(0, MAX_LIVE_ENTITIES)
-        const withArt = limitedEntities.map(entity => ({
+        const withArt = await Promise.all(limitedEntities.map(async entity => ({
           ...entity,
-          imageUrl: `/api/minecraft/art/entity/${encodeURIComponent(artVersion)}/${encodeURIComponent(entity.id)}`,
-        }))
+          imageUrl: await hasEntityIcon(entity.id)
+            ? `/api/minecraft/art/entity/${encodeURIComponent(artVersion)}/${encodeURIComponent(entity.id)}`
+            : null,
+        })))
         const totalEntities = Math.max(fallback.totalEntities, fallback.entities.length)
         const responseTruncated = fallback.truncated || totalEntities > limitedEntities.length
            return Response.json({
@@ -175,10 +178,12 @@ export async function GET(req: NextRequest) {
   const entities = normalizeLiveEntities(bridge.data)
   const totalEntities = Math.max(resolveLiveEntityTotal(bridge.data), entities.length)
   const limitedEntities = entities.slice(0, MAX_LIVE_ENTITIES)
-  const withArt = limitedEntities.map(entity => ({
+  const withArt = await Promise.all(limitedEntities.map(async entity => ({
     ...entity,
-    imageUrl: `/api/minecraft/art/entity/${encodeURIComponent(artVersion)}/${encodeURIComponent(entity.id)}`,
-  }))
+    imageUrl: await hasEntityIcon(entity.id)
+      ? `/api/minecraft/art/entity/${encodeURIComponent(artVersion)}/${encodeURIComponent(entity.id)}`
+      : null,
+  })))
   const truncated = isLiveEntityPayloadTruncated(bridge.data) || totalEntities > limitedEntities.length
 
   return Response.json({

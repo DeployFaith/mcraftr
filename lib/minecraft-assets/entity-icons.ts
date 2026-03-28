@@ -59,6 +59,15 @@ async function loadManifestMap() {
   return map
 }
 
+export async function hasEntityIcon(entityId: string) {
+  const manifest = await loadManifestMap()
+  return manifest.has(canonicalEntityId(entityId))
+}
+
+export function normalizeEntityIconId(entityId: string) {
+  return canonicalEntityId(entityId)
+}
+
 async function loadSheet() {
   if (sheetCache) return sheetCache
   sheetCache = PNG.sync.read(await fs.readFile(SHEET_PATH))
