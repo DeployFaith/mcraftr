@@ -87,6 +87,7 @@ export async function GET(req: NextRequest) {
   const resourceKey = req.nextUrl.searchParams.get('resourceKey')?.trim() || ''
   const relativePath = req.nextUrl.searchParams.get('relativePath')?.trim() || ''
   const format = req.nextUrl.searchParams.get('format')?.trim() || ''
+  const artView = req.nextUrl.searchParams.get('artView')?.trim() || ''
   const label = req.nextUrl.searchParams.get('label')?.trim() || 'Structure'
   const iconId = req.nextUrl.searchParams.get('iconId')?.trim() || ''
 
@@ -100,6 +101,7 @@ export async function GET(req: NextRequest) {
     resourceKey,
     relativePath,
     format,
+    artView: artView === 'materials' ? 'materials' : artView === 'preview' ? 'preview' : null,
     label,
     iconId,
   }

@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CatalogArtPayload } from '@/lib/catalog-art/types'
+import { withStructureArtView, type StructureArtView } from '@/lib/catalog-art/structure-list'
 
 type Props = {
   kind: 'structure' | 'entity' | 'item'
@@ -39,15 +40,53 @@ export default function CatalogArtwork({
 function ArtworkImage({ src, label, className, artClass, artStrategy, placeholderMeta, kind }: { src: string | null; label: string; className: string; artClass: string; artStrategy: string; placeholderMeta: string; kind: Props['kind'] }) {
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [structureArtView, setStructureArtView] = useState<StructureArtView>('preview')
   const glyph = useMemo(() => (kind === 'entity' ? 'E' : kind === 'structure' ? 'S' : 'I'), [kind])
-  const showPlaceholder = !src || failed
+  useEffect(() => {
+    setStructureArtView('preview')
+    setLoaded(false)
+    setFailed(false)
+  }, [src])
+
+  const structureViewUrls = useMemo(() => {
+    if (kind !== 'structure' || !src || !src.includes('/api/minecraft/art/structure')) return null
+    return {
+      preview: withStructureArtView(src, 'preview'),
+      materials: withStructureArtView(src, 'materials'),
+    }
+  }, [kind, src])
+  const resolvedSrc = structureViewUrls ? structureViewUrls[structureArtView] : src
+  const showPlaceholder = !resolvedSrc || failed
+  const effectiveStrategy = kind === 'structure'
+    ? (structureArtView === 'materials' ? 'structure-material-board' : 'structure-grid')
+    : artStrategy
 
   return (
     <div
       className={`relative overflow-hidden ${className}`}
       data-art-class={artClass}
-      data-art-strategy={artStrategy}
+      data-art-strategy={effectiveStrategy}
     >
+      {structureViewUrls && !showPlaceholder && (
+        <div className="absolute left-3 top-3 z-10 flex gap-2 rounded-full border border-white/10 bg-[rgba(8,12,18,0.72)] p-1 backdrop-blur-sm">
+          {([
+            ['preview', 'Preview'],
+            ['materials', 'Materials'],
+          ] as const).map(([view, title]) => (
+            <button
+              key={view}
+              type="button"
+              onClick={() => setStructureArtView(view)}
+              className="rounded-full px-3 py-1 text-[10px] font-mono tracking-[0.16em] transition-all"
+              style={structureArtView === view
+                ? { background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-mid)' }
+                : { background: 'transparent', color: 'var(--text-dim)', border: '1px solid transparent' }}
+            >
+              {title}
+            </button>
+          ))}
+        </div>
+      )}
       {!loaded && !showPlaceholder && (
         <div className="absolute inset-0 animate-pulse bg-[linear-gradient(120deg,rgba(255,255,255,0.04),rgba(255,255,255,0.12),rgba(255,255,255,0.04))]" />
       )}
@@ -63,7 +102,7 @@ function ArtworkImage({ src, label, className, artClass, artStrategy, placeholde
         <>
           {/* eslint-disable-next-line @next/next/no-img-element -- dynamic fallback/data URL artwork is not a good fit for next/image */}
           <img
-            src={src}
+            src={resolvedSrc}
             alt={`${label} preview`}
             className={`h-full w-full object-contain transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
             loading="lazy"

@@ -14,12 +14,21 @@ export async function resolveStructureArtDescriptor(input: {
   resourceKey?: string | null
   relativePath?: string | null
   format?: string | null
+  artView?: 'preview' | 'materials' | null
   preview?: StructurePreviewDescriptor | null
 }): Promise<CatalogArtDescriptor> {
-  const classification = classifyStructureArt({
+  const autoClassification = classifyStructureArt({
     hasCells: Array.isArray(input.preview?.cells) && input.preview.cells.length > 0,
     placementKind: input.placementKind,
   })
+  const classification = input.artView === 'materials'
+    ? {
+        assetClass: 'structure-materials' as const,
+        strategy: 'structure-material-board' as const,
+        confidence: autoClassification.confidence,
+        fallbackReason: null,
+      }
+    : autoClassification
   const sourceId = input.resourceKey || input.relativePath || input.label
 
   return {
@@ -44,6 +53,7 @@ export async function resolveStructureArtDescriptor(input: {
       resourceKey: input.resourceKey ?? null,
       relativePath: input.relativePath ?? null,
       format: input.format ?? null,
+      artView: input.artView ?? 'preview',
     },
   }
 }

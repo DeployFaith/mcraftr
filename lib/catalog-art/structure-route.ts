@@ -1,12 +1,15 @@
 import type { CatalogArtArtifact, CatalogArtDescriptor } from './types'
 import type { StructurePreviewDescriptor } from '../minecraft-assets/structure-art'
 
+import type { StructureArtView } from './structure-list'
+
 export type StructureArtInput = {
   version: string
   placementKind: string
   resourceKey: string
   relativePath: string
   format: string
+  artView?: StructureArtView | null
   label: string
   iconId: string
 }
