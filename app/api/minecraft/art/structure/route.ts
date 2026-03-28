@@ -14,10 +14,17 @@ function normalizeStructureId(value: string) {
   return lower.includes(':') ? lower : `minecraft:${lower}`
 }
 
+function extractStructureAliases(value: string) {
+  const normalized = normalizeStructureId(value)
+  const noNamespace = normalized.replace(/^minecraft:/, '')
+  const noKindPrefix = noNamespace.replace(/^(native-worldgen|native-template|schematic):/, '')
+  return [normalized, noNamespace, noKindPrefix]
+}
+
 function resolveStructureIconFilename(values: string[]) {
   const normalized = values
     .filter(Boolean)
-    .map(value => normalizeStructureId(value))
+    .flatMap(value => extractStructureAliases(value))
 
   const mansionAliases = new Set([
     'mansion',

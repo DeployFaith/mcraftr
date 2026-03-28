@@ -170,7 +170,7 @@ function getEntityArtUrl(entityId) {
 }
 
 function getStructureArtUrl(entry) {
-  const rawId = entry?.iconId || entry?.resourceKey || entry?.bridgeRef || entry?.id || entry?.label
+  const rawId = entry?.id || entry?.iconId || entry?.resourceKey || entry?.bridgeRef || entry?.label
   if (!rawId) return null
   return `/art/structures/${encodeURIComponent(rawId)}.png`
 }
