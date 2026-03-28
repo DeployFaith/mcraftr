@@ -240,12 +240,16 @@ export default function SpawnInspectModal({
         const payload = await response.json().catch(() => null) as { ok?: boolean; preview?: StructurePreviewDescriptor | null; error?: string } | null
         if (!response.ok || payload?.ok === false) {
           setStructurePreviewError(typeof payload?.error === 'string' ? payload.error : 'Preview unavailable')
+          setStructureRenderMode('preview')
           return
         }
-        setStructurePreview(payload?.preview ?? null)
+        const nextPreview = payload?.preview ?? null
+        setStructurePreview(nextPreview)
+        setStructureRenderMode(getStructure3DPreview(nextPreview) ? '3d' : 'preview')
       } catch (error) {
         if ((error as Error).name === 'AbortError') return
         setStructurePreviewError(error instanceof Error ? error.message : 'Preview unavailable')
+        setStructureRenderMode('preview')
       }
     }
     void loadPreview()
@@ -295,17 +299,15 @@ export default function SpawnInspectModal({
                   <div className="mb-3 flex flex-wrap gap-2">
                     {([
                       ['preview', 'Preview'],
-                      ['3d', '3D'],
+                      ...(hasStructure3DPreview ? [['3d', '3D']] as const : []),
                       ['materials', 'Materials'],
                     ] as const).map(([modeValue, modeLabel]) => {
-                      const disabled = modeValue === '3d' && !hasStructure3DPreview
                       return (
                         <button
                           key={modeValue}
                           type="button"
-                          disabled={disabled}
                           onClick={() => setStructureRenderMode(modeValue)}
-                          className="rounded-full border px-3 py-1 text-[10px] font-mono tracking-[0.16em] transition-all disabled:opacity-40"
+                          className="rounded-full border px-3 py-1 text-[10px] font-mono tracking-[0.16em] transition-all"
                           style={structureRenderMode === modeValue
                             ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
                             : { borderColor: 'var(--border)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)' }}

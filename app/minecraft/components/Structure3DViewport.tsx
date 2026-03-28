@@ -43,7 +43,7 @@ function VoxelGroup({ blockId, positions }: { blockId: string; positions: Array<
       }}
     >
       <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial vertexColors roughness={0.9} metalness={0.04} />
+      <meshStandardMaterial vertexColors roughness={0.72} metalness={0.02} emissive={color} emissiveIntensity={0.1} />
     </instancedMesh>
   )
 }
@@ -57,16 +57,16 @@ export default function Structure3DViewport({ preview3d }: { preview3d: Structur
   return (
     <Canvas camera={{ position: cameraPosition, fov: 42 }} dpr={[1, 1.5]}>
       <color attach="background" args={['#151a22']} />
-      <ambientLight intensity={2.4} />
-      <hemisphereLight args={['#d9fff4', '#182026', 1.25]} />
-      <directionalLight position={[10, 18, 12]} intensity={2.8} />
-      <directionalLight position={[-8, 14, -6]} intensity={1.15} />
-      <pointLight position={[target[0], target[1] + distance * 0.8, target[2]]} intensity={1.1} />
+      <ambientLight intensity={3.1} />
+      <hemisphereLight args={['#ecfff8', '#223038', 1.7]} />
+      <directionalLight position={[10, 18, 12]} intensity={3.6} />
+      <directionalLight position={[-8, 14, -6]} intensity={1.8} />
+      <pointLight position={[target[0], target[1] + distance * 0.8, target[2]]} intensity={1.7} />
       <group position={[-target[0], -0.5, -target[2]]}>
         {groups.map(group => <VoxelGroup key={group.blockId} blockId={group.blockId} positions={group.positions} />)}
       </group>
       <gridHelper args={[Math.max(8, preview3d.bounds.width + preview3d.bounds.length), Math.max(8, preview3d.bounds.width + preview3d.bounds.length), '#2b4b45', '#20312d']} position={[0, -0.51, 0]} />
-      <OrbitControls makeDefault target={target} enablePan={false} minDistance={4} maxDistance={distance * 2.4} />
+      <OrbitControls makeDefault target={target} enablePan={false} enableDamping dampingFactor={0.08} rotateSpeed={0.65} zoomSpeed={0.85} minPolarAngle={0.45} maxPolarAngle={1.35} minDistance={4} maxDistance={distance * 2.1} />
     </Canvas>
   )
 }
