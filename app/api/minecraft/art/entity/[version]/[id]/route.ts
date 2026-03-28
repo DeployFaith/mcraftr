@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { resolveEntityArtDescriptor } from '@/lib/catalog-art/resolvers/entity'
 import { getCatalogArtArtifact } from '@/lib/catalog-art/service'
+import { getEntityIconPng } from '@/lib/minecraft-assets/entity-icons'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -32,6 +33,16 @@ export async function GET(
 
   if (!safeVersion || !safeEntityId) {
     return new Response('Invalid entity art request', { status: 400 })
+  }
+
+  const sprite = await getEntityIconPng(safeEntityId)
+  if (sprite) {
+    return new Response(new Uint8Array(sprite), {
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
+      },
+    })
   }
 
   try {
