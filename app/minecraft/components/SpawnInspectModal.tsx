@@ -64,7 +64,7 @@ export type EntityCatalogEntry = {
 }
 
 type Props = {
-  mode: 'place-structure' | 'remove-structure' | 'spawn-entity'
+  mode: 'place-structure' | 'inspect-structure' | 'remove-structure' | 'spawn-entity'
   structure?: StructureCatalogEntry | null
   entity?: EntityCatalogEntry | null
   locationMode: LocationMode
@@ -277,7 +277,7 @@ export default function SpawnInspectModal({
       >
         <div className="flex items-start justify-between gap-3 border-b px-5 py-4 sm:px-6" style={{ borderColor: 'var(--border)' }}>
           <div className="font-mono text-[12px] tracking-[0.16em]" style={{ color: 'var(--text-dim)' }}>
-            {mode === 'remove-structure' ? 'REMOVE TARGET' : 'PLACEMENT TARGET'}
+            {mode === 'remove-structure' ? 'REMOVE TARGET' : mode === 'inspect-structure' ? 'STRUCTURE PREVIEW' : 'PLACEMENT TARGET'}
           </div>
           <button
             type="button"
@@ -384,7 +384,7 @@ export default function SpawnInspectModal({
 
           <div className="p-5">
             <div className="mt-4 space-y-4">
-              {mode !== 'remove-structure' && (
+              {mode !== 'remove-structure' && mode !== 'inspect-structure' && (
                 <>
                   <div className="grid gap-2 sm:grid-cols-3">
                     {(['player', 'world-player', 'coords'] as const).map(entry => (
@@ -556,7 +556,13 @@ export default function SpawnInspectModal({
                 </>
               )}
 
-              {structure && onRotationChange && (
+              {mode === 'inspect-structure' && structure && (
+                <div className="rounded-2xl border px-4 py-4 font-mono text-[11px]" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg) 70%, transparent)', color: 'var(--text-dim)' }}>
+                  This is a preview-first structure view. Use the 3D, Preview, or Materials modes to inspect the build before opening placement.
+                </div>
+              )}
+
+              {structure && onRotationChange && mode !== 'inspect-structure' && (
                 <label className="block space-y-1">
                   <div className="font-mono text-[11px] tracking-[0.14em]" style={{ color: 'var(--text-dim)' }}>
                     ROTATION
@@ -630,31 +636,43 @@ export default function SpawnInspectModal({
                 </div>
               )}
             </div>
-
           </div>
         </div>
         </div>
 
-        <div className="flex shrink-0 gap-3 border-t px-5 py-4 sm:px-6" style={{ borderColor: 'var(--border)' }}>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="flex-1 rounded-2xl border px-4 py-3 font-mono text-[12px] tracking-[0.16em]"
-            style={{ borderColor: 'var(--border)', color: 'var(--text-dim)', background: 'var(--panel)' }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onConfirm}
-            className="flex-1 rounded-2xl border px-4 py-3 font-mono text-[12px] tracking-[0.16em] disabled:opacity-50"
-            style={dangerLabel
-              ? { borderColor: 'rgba(255,90,114,0.48)', background: 'rgba(255,90,114,0.12)', color: '#ffb3bd' }
-              : { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}
-          >
-            {busy ? 'Working…' : confirmLabel}
-          </button>
+        <div className="flex items-center justify-between gap-3 border-t px-5 py-4 sm:px-6" style={{ borderColor: 'var(--border)' }}>
+          <div className="font-mono text-[11px]" style={{ color: 'var(--text-dim)' }}>
+            {mode === 'inspect-structure'
+              ? 'Preview-only mode. Close this panel or open placement when you are ready.'
+              : dangerLabel
+                ? 'This action cannot be undone.'
+                : mode === 'spawn-entity'
+                  ? 'Review the placement target before spawning.'
+                  : 'Preview the target, then confirm to continue.'}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-2xl border px-4 py-3 font-mono text-[12px] transition-all"
+              style={{ borderColor: 'var(--border)', background: 'var(--panel)', color: 'var(--text-dim)' }}
+            >
+              {mode === 'inspect-structure' ? 'Close Preview' : 'Cancel'}
+            </button>
+            {mode !== 'inspect-structure' && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onConfirm}
+                className="rounded-2xl border px-4 py-3 font-mono text-[12px] transition-all disabled:opacity-40"
+                style={dangerLabel
+                  ? { borderColor: 'rgba(255,90,114,0.45)', background: 'rgba(255,90,114,0.12)', color: '#ffb3bd' }
+                  : { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}
+              >
+                {busy ? 'Working…' : confirmLabel}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

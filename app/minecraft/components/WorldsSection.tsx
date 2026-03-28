@@ -551,7 +551,7 @@ export default function WorldsSection({
   const [structureCategory, setStructureCategory] = useState('all')
   const [structureSourceFilter, setStructureSourceFilter] = useState<'all' | 'templates' | 'worldgen'>('all')
   const [selectedStructure, setSelectedStructure] = useState<StructureCatalogEntry | null>(null)
-  const [structureModalMode, setStructureModalMode] = useState<'place' | 'remove'>('place')
+  const [structureModalMode, setStructureModalMode] = useState<'inspect' | 'place' | 'remove'>('place')
   const [placementToRemove, setPlacementToRemove] = useState<PlacementEntry | null>(null)
   const [structureMode, setStructureMode] = useState<LocationMode>('player')
   const [structureWorld, setStructureWorld] = useState('')
@@ -1779,6 +1779,18 @@ export default function WorldsSection({
           <button
             type="button"
             onClick={() => {
+              setStructureModalMode('inspect')
+              setPlacementToRemove(null)
+              setSelectedStructure({ ...entry, summary: inferSummary(entry) })
+            }}
+            className="rounded-xl border px-3 py-2 text-[11px] font-mono"
+            style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}
+          >
+            Preview Structure
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               if (!canStructurePlace) return
               setStructureModalMode('place')
               setPlacementToRemove(null)
@@ -2884,6 +2896,42 @@ export default function WorldsSection({
           {collapseAllLabel}
         </button>
       </div>
+
+      {selectedStructure && structureModalMode === 'inspect' && (
+        <SpawnInspectModal
+          mode="inspect-structure"
+          structure={selectedStructure}
+          locationMode={structureMode}
+          onLocationModeChange={setStructureMode}
+          worlds={worldNames}
+          players={players}
+          playerWorlds={playerWorlds}
+          selectedPlayer={selectedPlayer}
+          onSelectedPlayerChange={onSelectedPlayerChange}
+          world={structureWorld}
+          onWorldChange={setStructureWorld}
+          x={structureX}
+          y={structureY}
+          z={structureZ}
+          onCoordChange={(axis, value) => {
+            if (axis === 'x') setStructureX(value)
+            if (axis === 'y') setStructureY(value)
+            if (axis === 'z') setStructureZ(value)
+            setStructurePlacementCheck(null)
+          }}
+          randomizeBusy={structureRandomizeBusy}
+          placementCheck={structurePlacementCheck}
+          onRandomize={canRandomizedPlacement ? () => void handleRandomizeStructureCoords() : undefined}
+          rotation={structureRotation}
+          onRotationChange={setStructureRotation}
+          includeAir={structureIncludeAir}
+          onIncludeAirChange={setStructureIncludeAir}
+          confirmLabel={`Preview ${selectedStructure.label}`}
+          busy={false}
+          onCancel={() => setSelectedStructure(null)}
+          onConfirm={() => {}}
+        />
+      )}
 
       {selectedStructure && structureModalMode === 'place' && (
         <SpawnInspectModal
