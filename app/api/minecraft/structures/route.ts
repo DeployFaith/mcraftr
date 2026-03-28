@@ -8,26 +8,7 @@ export const dynamic = 'force-dynamic'
 
 type StructureResponse = {
   ok: boolean
-  structures?: Array<{
-    id: string
-    label: string
-    category: string
-    sourceKind: string
-    placementKind: string
-    bridgeRef: string
-    resourceKey?: string | null
-    relativePath?: string | null
-    format?: string | null
-    sizeBytes?: number | null
-    updatedAt?: number | null
-    imageUrl?: string | null
-    artUrl?: string | null
-    iconId?: string | null
-    summary?: string | null
-    dimensions?: { width: number | null; height: number | null; length: number | null } | null
-    removable?: boolean
-    editable?: boolean
-  }>
+  structures?: StructureEntry[]
   scan?: {
     roots?: Array<{
       path: string
@@ -53,7 +34,28 @@ type StructureResponse = {
   capabilities?: string[]
 }
 
-function buildStructureArtUrl(structure: StructureResponse['structures'][number]) {
+type StructureEntry = {
+  id: string
+  label: string
+  category: string
+  sourceKind: string
+  placementKind: string
+  bridgeRef: string
+  resourceKey?: string | null
+  relativePath?: string | null
+  format?: string | null
+  sizeBytes?: number | null
+  updatedAt?: number | null
+  imageUrl?: string | null
+  artUrl?: string | null
+  iconId?: string | null
+  summary?: string | null
+  dimensions?: { width: number | null; height: number | null; length: number | null } | null
+  removable?: boolean
+  editable?: boolean
+}
+
+function buildStructureArtUrl(structure: StructureEntry) {
   const iconId = structure.iconId || structure.resourceKey || structure.bridgeRef || structure.id || structure.label
   return `/api/minecraft/art/structure?${new URLSearchParams({
     version: 'structure-icons',
