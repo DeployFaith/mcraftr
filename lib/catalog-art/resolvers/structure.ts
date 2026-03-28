@@ -44,7 +44,7 @@ export async function resolveStructureArtDescriptor(input: {
     reviewState: 'auto',
     dependencies: [
       { kind: 'preview', id: sourceId, hash: input.preview ? hashPreview(input.preview) : null },
-      { kind: 'renderer', id: classification.strategy, hash: 'v1' },
+      { kind: 'renderer', id: classification.strategy, hash: 'v2' },
     ],
     meta: {
       label: input.label,
