@@ -403,10 +403,10 @@ function entityArtworkClass(entry: EntityCatalogEntry) {
     case 'vehicle-icon':
     case 'display-tech':
     case 'spawn-egg':
-      return 'mx-auto h-56 w-full max-w-[16rem] rounded-[18px] border border-white/10 bg-[var(--bg2)] object-contain p-4'
+      return 'mx-auto h-32 w-full max-w-[9rem] rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] object-contain p-3'
     case 'living-portrait':
     default:
-      return 'mx-auto h-64 w-full max-w-[20rem] rounded-[18px] border border-white/10 bg-[var(--bg2)] object-contain p-3'
+      return 'mx-auto h-36 w-full max-w-[10rem] rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] object-contain p-3'
   }
 }
 
@@ -2828,13 +2828,16 @@ export default function WorldsSection({
                 key={entry.uuid}
                 title={
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       {entry.imageUrl && isCatalogArtworkEnabled('entity') && (
-                        <CatalogArtwork kind="entity" label={displayLiveEntityLabel(entry)} category={entry.category} sourceKind="live" imageUrl={entry.imageUrl} art={null} className="h-9 w-9 rounded-xl border border-[var(--border)] bg-black/10 p-1.5" />
+                        <CatalogArtwork kind="entity" label={displayLiveEntityLabel(entry)} category={entry.category} sourceKind="live" imageUrl={entry.imageUrl} art={null} className="h-8 w-8 shrink-0 rounded-xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-1 shadow-[0_8px_18px_rgba(0,0,0,0.14)]" />
                       )}
-                      <div className="text-[13px] font-mono text-[var(--text)]">{displayLiveEntityLabel(entry)}</div>
+                      <div className="min-w-0">
+                        <div className="truncate text-[13px] font-mono text-[var(--text)]">{displayLiveEntityLabel(entry)}</div>
+                        <div className="mt-0.5 text-[10px] font-mono tracking-[0.14em] text-[var(--text-dim)]">{entry.category}</div>
+                      </div>
                     </div>
-                    <div className="text-[10px] font-mono tracking-widest text-[var(--text-dim)]">{entry.world}</div>
+                    <div className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-mono tracking-[0.12em] text-[var(--text-dim)]">{entry.world}</div>
                   </div>
                 }
                 storageKey={`worlds:entities-live:${entry.uuid}`}
