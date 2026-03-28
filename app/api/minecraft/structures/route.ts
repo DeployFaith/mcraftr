@@ -53,18 +53,17 @@ type StructureResponse = {
   capabilities?: string[]
 }
 
-function makeAbsoluteBeaconUrl(value: string | null) {
-  if (!value) return null
-  if (value.startsWith('http://') || value.startsWith('https://')) return value
-
-  const base = process.env.NEXT_PUBLIC_BEACON_URL?.trim()
-  if (!base) return value
-
-  try {
-    return new URL(value, base).toString()
-  } catch {
-    return value
-  }
+function buildStructureArtUrl(structure: StructureResponse['structures'][number]) {
+  const iconId = structure.iconId || structure.resourceKey || structure.bridgeRef || structure.id || structure.label
+  return `/api/minecraft/art/structure?${new URLSearchParams({
+    version: 'structure-icons',
+    placementKind: structure.placementKind,
+    ...(structure.resourceKey ? { resourceKey: structure.resourceKey } : {}),
+    ...(structure.relativePath ? { relativePath: structure.relativePath } : {}),
+    ...(structure.format ? { format: structure.format } : {}),
+    ...(iconId ? { iconId } : {}),
+    label: structure.label,
+  }).toString()}`
 }
 
 export async function GET(req: NextRequest) {
@@ -84,9 +83,10 @@ export async function GET(req: NextRequest) {
   return Response.json({
     ok: true,
     structures: (sidecar.data.structures ?? []).map(structure => {
-      const resolvedArtUrl = makeAbsoluteBeaconUrl(structure.artUrl ?? structure.imageUrl ?? null)
+      const resolvedArtUrl = buildStructureArtUrl(structure)
       return {
         ...structure,
+        iconId: structure.iconId || structure.resourceKey || structure.bridgeRef || structure.id || structure.label,
         artUrl: resolvedArtUrl,
         imageUrl: resolvedArtUrl,
         art: null,
