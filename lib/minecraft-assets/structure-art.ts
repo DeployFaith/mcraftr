@@ -115,24 +115,50 @@ export function renderStructurePreviewSvg(label: string, preview: StructurePrevi
         const cropped = cropCells(cells)
         const rows = cropped.length
         const cols = Math.max(...cropped.map(row => row.length), 1)
-        const tileSize = Math.max(20, Math.min(36, Math.floor(176 / Math.max(rows, cols))))
-        const gridWidth = cols * tileSize
-        const gridHeight = rows * tileSize
-        const originX = Math.round((320 - gridWidth) / 2)
-        const originY = Math.round(34 + Math.max(0, (148 - gridHeight) / 2))
+        const tileHalfWidth = Math.max(12, Math.min(22, Math.floor(140 / Math.max(rows, cols))))
+        const tileHalfHeight = Math.max(7, Math.round(tileHalfWidth * 0.55))
+        const heightStep = Math.max(4, Math.round(tileHalfHeight * 0.9))
+        const baseGridWidth = (cols + rows) * tileHalfWidth
+        const baseGridHeight = (cols + rows) * tileHalfHeight
         const croppedHeights = heights
           ? cropped.map((row, rowIndex) => row.map((_, colIndex) => heights?.[rowIndex]?.[colIndex] ?? 0))
           : null
         const flatHeights = (croppedHeights ?? []).flat().filter(value => Number.isFinite(value) && value > 0) as number[]
         const minHeight = flatHeights.length > 0 ? Math.min(...flatHeights) : 0
         const maxHeight = flatHeights.length > 0 ? Math.max(...flatHeights) : 0
+        const projectedHeight = Math.max(0, maxHeight - minHeight) * heightStep
+        const originX = Math.round((320 - baseGridWidth) / 2) + (rows * tileHalfWidth)
+        const originY = Math.round(58 + Math.max(0, (110 - baseGridHeight) / 2) + projectedHeight)
         const tiles = cropped.flatMap((row, rowIndex) => row.map((blockId, colIndex) => {
           if (!blockId || blockId === 'air') return ''
           const texture = textureCache.get(blockId) ?? `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(placeholderTile(blockId.replace(/^minecraft:/, ''), rowIndex + colIndex))}`
-          const x = originX + (colIndex * tileSize)
-          const y = originY + (rowIndex * tileSize)
           const height = croppedHeights?.[rowIndex]?.[colIndex] ?? null
-          return `${renderCellTexture(texture, x, y, tileSize, blockId)}${renderHeightOverlay(height, minHeight, maxHeight, x, y, tileSize)}`
+          const relativeHeight = Math.max(0, (height ?? minHeight) - minHeight)
+          const centerX = originX + ((colIndex - rowIndex) * tileHalfWidth)
+          const centerY = originY + ((colIndex + rowIndex) * tileHalfHeight) - (relativeHeight * heightStep)
+          const left = centerX - tileHalfWidth
+          const right = centerX + tileHalfWidth
+          const top = centerY - tileHalfHeight
+          const bottom = centerY + tileHalfHeight
+          const wallBottom = bottom + Math.max(6, relativeHeight * heightStep)
+          const clipId = `iso-clip-${rowIndex}-${colIndex}-${Math.max(0, relativeHeight)}`
+          const topDiamond = `${centerX},${top} ${right},${centerY} ${centerX},${bottom} ${left},${centerY}`
+          const leftWall = `${left},${centerY} ${centerX},${bottom} ${centerX},${wallBottom} ${left},${wallBottom - tileHalfHeight}`
+          const rightWall = `${right},${centerY} ${centerX},${bottom} ${centerX},${wallBottom} ${right},${wallBottom - tileHalfHeight}`
+          const badgeY = top - 6
+          return `
+            <g transform="translate(0 0)">
+              <polygon points="${leftWall}" fill="rgba(0,0,0,0.24)" stroke="rgba(255,255,255,0.05)" />
+              <polygon points="${rightWall}" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.05)" />
+              <polygon points="${topDiamond}" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" />
+              <clipPath id="${clipId}"><polygon points="${topDiamond}" /></clipPath>
+              <image href="${texture}" x="${left}" y="${top}" width="${tileHalfWidth * 2}" height="${tileHalfHeight * 2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})" style="image-rendering: pixelated;" />
+              <polygon points="${topDiamond}" fill="rgba(0,255,200,${(0.05 + (relativeHeight / Math.max(1, maxHeight || 1)) * 0.14).toFixed(3)})" />
+              <rect x="${centerX - 11}" y="${badgeY}" width="22" height="10" rx="5" fill="rgba(8,12,18,0.72)" stroke="rgba(255,255,255,0.08)" />
+              <text x="${centerX}" y="${badgeY + 7}" text-anchor="middle" font-size="6" fill="${CATALOG_ART_THEME.accentSoft}" font-family="monospace">${height ?? 0}</text>
+              <title>${escapeXml(blockId)} · height ${height ?? 0}</title>
+            </g>
+          `
         })).join('')
         return {
           content: tiles,
@@ -166,7 +192,7 @@ export function renderStructurePreviewSvg(label: string, preview: StructurePrevi
       </defs>
       <rect width="320" height="220" rx="30" fill="url(#bg)" />
       <rect x="12" y="12" width="296" height="196" rx="24" fill="${CATALOG_ART_THEME.panelInsetFill}" stroke="${CATALOG_ART_THEME.panelInsetStroke}" />
-      <text x="28" y="28" font-size="10" fill="${CATALOG_ART_THEME.accent}" font-family="monospace">${gridScene ? 'TOP-DOWN PREVIEW' : 'BUILD MATERIALS'}</text>
+      <text x="28" y="28" font-size="10" fill="${CATALOG_ART_THEME.accent}" font-family="monospace">${gridScene ? 'ISOMETRIC PREVIEW' : 'BUILD MATERIALS'}</text>
       <text x="292" y="28" text-anchor="end" font-size="10" fill="${CATALOG_ART_THEME.textStrong}" font-family="monospace">${escapeXml(dimsLabel)}</text>
       ${gridScene?.reliefLevels ? `<text x="28" y="42" font-size="9" fill="${CATALOG_ART_THEME.text}" font-family="monospace">RELIEF ${gridScene.reliefLevels} LEVELS · HEIGHT ${gridScene.peakHeight}</text>` : ''}
       ${gridScene ? gridScene.content : tiles}
