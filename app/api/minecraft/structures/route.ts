@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getUserFeatureFlags } from '@/lib/rcon'
 import { requireServerCapability } from '@/lib/server-capability'
 import { callSidecarForRequest } from '@/lib/server-bridge'
+import { getSessionUserId } from '@/lib/rcon'
+import { getActiveServer } from '@/lib/users'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -62,6 +64,9 @@ export async function GET(req: NextRequest) {
   const capability = await requireServerCapability(req, 'full')
   if (!capability.ok) return capability.response
 
+  const userId = await getSessionUserId(req)
+  const minecraftVersion = userId ? getActiveServer(userId)?.minecraftVersion.resolved ?? null : null
+
   const sidecar = await callSidecarForRequest<StructureResponse>(req, '/structures')
   if (!sidecar.ok) {
     return Response.json({ ok: false, error: sidecar.error }, { status: sidecar.status ?? 502 })
@@ -71,8 +76,28 @@ export async function GET(req: NextRequest) {
     ok: true,
     structures: (sidecar.data.structures ?? []).map(structure => ({
       ...structure,
-      artUrl: structure.artUrl ?? structure.imageUrl ?? null,
-      imageUrl: structure.artUrl ?? structure.imageUrl ?? null,
+      artUrl: minecraftVersion
+        ? `/api/minecraft/art/structure?${new URLSearchParams({
+            version: minecraftVersion,
+            placementKind: structure.placementKind,
+            ...(structure.resourceKey ? { resourceKey: structure.resourceKey } : {}),
+            ...(structure.relativePath ? { relativePath: structure.relativePath } : {}),
+            ...(structure.format ? { format: structure.format } : {}),
+            ...(structure.iconId ? { iconId: structure.iconId } : {}),
+            label: structure.label,
+          }).toString()}`
+        : null,
+      imageUrl: minecraftVersion
+        ? `/api/minecraft/art/structure?${new URLSearchParams({
+            version: minecraftVersion,
+            placementKind: structure.placementKind,
+            ...(structure.resourceKey ? { resourceKey: structure.resourceKey } : {}),
+            ...(structure.relativePath ? { relativePath: structure.relativePath } : {}),
+            ...(structure.format ? { format: structure.format } : {}),
+            ...(structure.iconId ? { iconId: structure.iconId } : {}),
+            label: structure.label,
+          }).toString()}`
+        : null,
       art: null,
     })),
     scan: sidecar.data.scan ?? null,
