@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildStructureArtUrl, inferStructure3DAvailability, inferStructurePreviewAvailability } from '../../lib/catalog-art/structure-list'
+import { buildStructureArtUrl, inferStructure3DAvailability, inferStructurePreviewAvailability, isStructureCatalogPart, shouldIncludeStructureInDefaultCatalog } from '../../lib/catalog-art/structure-list'
 
 test('buildStructureArtUrl uses the active Minecraft version for structure art requests', () => {
   const url = buildStructureArtUrl({
@@ -105,5 +105,55 @@ test('inferStructurePreviewAvailability keeps sampled templates on the preview p
     id: 'native-template:ancient_city/city_center/walls/bottom_left_corner',
     label: 'Bottom Left Corner',
     category: 'Ancient City',
+  }), true)
+})
+
+test('isStructureCatalogPart flags raw fragmentary template pieces', () => {
+  assert.equal(isStructureCatalogPart({
+    placementKind: 'native-template',
+    resourceKey: 'ancient_city/city_center/walls/bottom_left_corner',
+    relativePath: null,
+    format: 'native',
+    iconId: null,
+    bridgeRef: 'ancient_city/city_center/walls/bottom_left_corner',
+    id: 'native-template:ancient_city/city_center/walls/bottom_left_corner',
+    label: 'Bottom Left Corner',
+    category: 'Ancient City',
+  }), true)
+  assert.equal(shouldIncludeStructureInDefaultCatalog({
+    placementKind: 'native-template',
+    resourceKey: 'ancient_city/city_center/walls/bottom_left_corner',
+    relativePath: null,
+    format: 'native',
+    iconId: null,
+    bridgeRef: 'ancient_city/city_center/walls/bottom_left_corner',
+    id: 'native-template:ancient_city/city_center/walls/bottom_left_corner',
+    label: 'Bottom Left Corner',
+    category: 'Ancient City',
+  }), false)
+})
+
+test('isStructureCatalogPart keeps full native templates visible by default', () => {
+  assert.equal(isStructureCatalogPart({
+    placementKind: 'native-template',
+    resourceKey: 'village/plains/houses/plains_small_house_1',
+    relativePath: null,
+    format: 'native',
+    iconId: null,
+    bridgeRef: 'village/plains/houses/plains_small_house_1',
+    id: 'native-template:village/plains/houses/plains_small_house_1',
+    label: 'Plains Small House 1',
+    category: 'Village',
+  }), false)
+  assert.equal(shouldIncludeStructureInDefaultCatalog({
+    placementKind: 'native-template',
+    resourceKey: 'village/plains/houses/plains_small_house_1',
+    relativePath: null,
+    format: 'native',
+    iconId: null,
+    bridgeRef: 'village/plains/houses/plains_small_house_1',
+    id: 'native-template:village/plains/houses/plains_small_house_1',
+    label: 'Plains Small House 1',
+    category: 'Village',
   }), true)
 })

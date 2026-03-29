@@ -555,6 +555,7 @@ export default function WorldsSection({
   const [structureSearch, setStructureSearch] = useState('')
   const [structureCategory, setStructureCategory] = useState('all')
   const [structureSourceFilter, setStructureSourceFilter] = useState<'all' | 'templates' | 'worldgen'>('all')
+  const [showStructureParts, setShowStructureParts] = useState(false)
   const [selectedStructure, setSelectedStructure] = useState<StructureCatalogEntry | null>(null)
   const [structureModalMode, setStructureModalMode] = useState<'inspect' | 'place' | 'remove'>('place')
   const [placementToRemove, setPlacementToRemove] = useState<PlacementEntry | null>(null)
@@ -736,7 +737,8 @@ export default function WorldsSection({
 
     if (canStructureCatalog) {
       try {
-        const res = await fetch('/api/minecraft/structures', { cache: 'no-store' })
+        const query = showStructureParts ? '?includeParts=1' : ''
+        const res = await fetch(`/api/minecraft/structures${query}`, { cache: 'no-store' })
         const data = await res.json()
         if (!data.ok) {
           setStructureLoadError(data.error || 'Failed to load structure catalog')
@@ -845,7 +847,7 @@ export default function WorldsSection({
 
     setError(nextErrors[0] ?? null)
     setLoading(false)
-  }, [canEntityCatalog, canEntityLiveTools, canSpawnTools, canStructureCatalog, canWorldInventory, resolveLiveEntityQuery, stackMode])
+  }, [canEntityCatalog, canEntityLiveTools, canSpawnTools, canStructureCatalog, canWorldInventory, resolveLiveEntityQuery, showStructureParts, stackMode])
 
   const requestStructureProviderInstall = useCallback((integrationId: string) => {
     const selected = structureProviderStatuses.find(entry => entry.id === integrationId)
@@ -2395,6 +2397,19 @@ export default function WorldsSection({
               </button>
             </div>
           </div>
+          <label className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[11px] font-mono text-[var(--text-dim)]">
+            <input
+              type="checkbox"
+              checked={showStructureParts}
+              onChange={event => setShowStructureParts(event.target.checked)}
+              className="h-4 w-4 rounded border-[var(--border)] bg-[var(--bg2)]"
+            />
+            <span>
+              {showStructureParts
+                ? 'Showing full structures plus raw template parts.'
+                : 'Showing full structures by default. Enable this to include raw template parts like corners, walls, and segments.'}
+            </span>
+          </label>
           <div className="grid gap-2 sm:grid-cols-3">
             {[
               { key: 'all', label: 'All Entries', count: structures.length, hint: 'Templates plus native worldgen structures' },

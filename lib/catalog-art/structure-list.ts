@@ -20,6 +20,73 @@ export type StructureListEntry = {
   has3d?: boolean
 }
 
+const STRUCTURE_PART_SEGMENTS = new Set([
+  'wall',
+  'walls',
+  'corner',
+  'corners',
+  'segment',
+  'segments',
+  'cap',
+  'caps',
+  'room',
+  'rooms',
+  'debris',
+  'decor',
+  'street',
+  'streets',
+  'road',
+  'roads',
+  'path',
+  'paths',
+  'hallway',
+  'hallways',
+  'corridor',
+  'corridors',
+])
+
+const STRUCTURE_PART_TOKENS = new Set([
+  'wall',
+  'corner',
+  'segment',
+  'cap',
+  'room',
+  'debris',
+  'decor',
+  'stairs',
+  'stair',
+  'ramp',
+  'entry',
+  'entrance',
+  'edge',
+  'slice',
+  'support',
+  'junction',
+  'intersection',
+])
+
+function structureResourceSegments(structure: StructureListEntry) {
+  return (structure.resourceKey ?? structure.relativePath ?? '')
+    .trim()
+    .toLowerCase()
+    .split('/')
+    .filter(Boolean)
+}
+
+export function isStructureCatalogPart(structure: StructureListEntry) {
+  if (structure.placementKind !== 'native-template') return false
+  const segments = structureResourceSegments(structure)
+  if (segments.length === 0) return false
+  const leaf = segments.at(-1) ?? ''
+  const leafTokens = leaf.split(/[_-]+/).filter(Boolean)
+  if (segments.slice(0, -1).some(segment => STRUCTURE_PART_SEGMENTS.has(segment))) return true
+  return leafTokens.some(token => STRUCTURE_PART_TOKENS.has(token))
+}
+
+export function shouldIncludeStructureInDefaultCatalog(structure: StructureListEntry) {
+  return !isStructureCatalogPart(structure)
+}
+
 function isShipwreckStructure(structure: StructureListEntry) {
   const resourceKey = structure.resourceKey?.trim().toLowerCase() ?? ''
   const category = structure.category?.trim().toLowerCase() ?? ''

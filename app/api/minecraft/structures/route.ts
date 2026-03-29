@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
-import { buildStructureArtUrl, inferStructure3DAvailability, inferStructurePreviewAvailability } from '@/lib/catalog-art/structure-list'
+import { buildStructureArtUrl, inferStructure3DAvailability, inferStructurePreviewAvailability, shouldIncludeStructureInDefaultCatalog } from '@/lib/catalog-art/structure-list'
 import { resolveStructureArtDescriptor } from '@/lib/catalog-art/resolvers/structure'
 import { buildCatalogArtPayload, getReviewedCatalogArtDescriptor } from '@/lib/catalog-art/service'
 import { DEFAULT_MINECRAFT_VERSION } from '@/lib/minecraft-version'
@@ -63,6 +63,7 @@ type StructureEntry = {
 }
 
 export async function GET(req: NextRequest) {
+  const includeParts = req.nextUrl.searchParams.get('includeParts') === '1'
   const features = await getUserFeatureFlags(req)
   if (!checkFeatureAccess(features, 'enable_structure_catalog')) {
     return Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 })
@@ -80,7 +81,11 @@ export async function GET(req: NextRequest) {
     return Response.json({ ok: false, error: sidecar.error }, { status: sidecar.status ?? 502 })
   }
 
-  const structures = await Promise.all((sidecar.data.structures ?? []).map(async structure => {
+  const sourceStructures = includeParts
+    ? (sidecar.data.structures ?? [])
+    : (sidecar.data.structures ?? []).filter(structure => shouldIncludeStructureInDefaultCatalog(structure))
+
+  const structures = await Promise.all(sourceStructures.map(async structure => {
     const resolvedArtUrl = buildStructureArtUrl(structure, minecraftVersion)
     const descriptor = await resolveStructureArtDescriptor({
       version: minecraftVersion || DEFAULT_MINECRAFT_VERSION,
