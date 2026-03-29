@@ -5,6 +5,7 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { AlertCircle } from 'lucide-react'
 import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Color, Group, Matrix4, Object3D } from 'three'
+import { shouldUseStructureVoxelPreview } from '@/lib/minecraft-preview-mode'
 
 export type MinecraftPreviewType = 'structure' | 'entity' | 'item'
 
@@ -341,8 +342,6 @@ export default function Minecraft3DPreview({
     </div>
   )
 
-  if (!allow3D || !prefer3D) return fallbackNode
-
   const renderVoxelOrPlaceholder = () => (
     <div className={`${containerClassName} ${canvasClassName}`.trim()}>
       {voxelAvailable
@@ -353,6 +352,9 @@ export default function Minecraft3DPreview({
       </div>
     </div>
   )
+
+  if (shouldUseStructureVoxelPreview(type, voxelData)) return renderVoxelOrPlaceholder()
+  if (!allow3D || !prefer3D) return fallbackNode
 
   const gltfFallback = renderVoxelOrPlaceholder()
 
