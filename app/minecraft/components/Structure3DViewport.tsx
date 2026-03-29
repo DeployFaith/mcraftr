@@ -13,6 +13,7 @@ import {
   type Structure3DPreview,
 } from '@/lib/catalog-art/structure-3d'
 import { resolveStructureBlockColor } from '@/lib/catalog-art/structure-block-color'
+import { resolveStructureBlockShape } from '@/lib/catalog-art/structure-block-shape'
 
 const INSTANCE_GEOMETRY = new BoxGeometry(1, 1, 1)
 const OBJECT_HELPER = new Object3D()
@@ -31,6 +32,7 @@ function VoxelGroup({
   center: [number, number, number]
 }) {
   const meshRef = useRef<InstancedMesh | null>(null)
+  const shape = useMemo(() => resolveStructureBlockShape(blockId), [blockId])
   const material = useMemo(() => {
     const base = new Color(fallbackColor(blockId))
     const shaded = base.clone().multiplyScalar(0.96)
@@ -52,7 +54,8 @@ function VoxelGroup({
 
     for (let index = 0; index < positions.length; index += 1) {
       const [x, y, z] = positions[index]
-      OBJECT_HELPER.position.set(x - center[0], y - center[1], z - center[2])
+      OBJECT_HELPER.position.set(x - center[0], y - center[1] + shape.yOffset, z - center[2])
+      OBJECT_HELPER.scale.set(shape.scale[0], shape.scale[1], shape.scale[2])
       OBJECT_HELPER.updateMatrix()
       mesh.setMatrixAt(index, OBJECT_HELPER.matrix)
       mesh.setColorAt(index, material.color)
@@ -60,7 +63,7 @@ function VoxelGroup({
 
     mesh.instanceMatrix.needsUpdate = true
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
-  }, [center, material.color, positions])
+  }, [center, material.color, positions, shape])
 
   return (
     <instancedMesh ref={meshRef} args={[INSTANCE_GEOMETRY, material, positions.length]} castShadow receiveShadow frustumCulled={false} />
