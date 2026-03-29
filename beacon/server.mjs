@@ -2,6 +2,7 @@ import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import { selectStructurePreviewVoxels } from './structure-preview.mjs'
 import { execFileSync } from 'node:child_process'
 import { gunzipSync } from 'node:zlib'
 import { URL } from 'node:url'
@@ -1079,9 +1080,9 @@ function buildStructure3DPreview(dimensions, positionedBlocks) {
   if (renderable.length === 0) return null
 
   const maxVoxels = 6000
-  const sampled = renderable.length > maxVoxels
-  const stride = sampled ? Math.ceil(renderable.length / maxVoxels) : 1
-  const voxels = renderable.filter((_, index) => index % stride === 0).slice(0, maxVoxels)
+  const selection = selectStructurePreviewVoxels(renderable, { width, height, length }, maxVoxels)
+  const voxels = selection.voxels
+  const sampled = selection.sampled
 
   return {
     voxels,

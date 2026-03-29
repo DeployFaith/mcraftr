@@ -12,63 +12,13 @@ import {
   groupVoxelsByBlockId,
   type Structure3DPreview,
 } from '@/lib/catalog-art/structure-3d'
-
-const BLOCK_COLORS: Record<string, string> = {
-  'minecraft:oak_planks': '#b88752',
-  'minecraft:spruce_planks': '#8e6a45',
-  'minecraft:birch_planks': '#d9c78e',
-  'minecraft:jungle_planks': '#ad7d4b',
-  'minecraft:acacia_planks': '#c27a55',
-  'minecraft:dark_oak_planks': '#6b4c33',
-  'minecraft:mangrove_planks': '#8f5346',
-  'minecraft:crimson_planks': '#8f3d55',
-  'minecraft:warped_planks': '#2f7f7d',
-  'minecraft:cobblestone': '#7b7f87',
-  'minecraft:stone': '#8b9098',
-  'minecraft:stone_bricks': '#8c9097',
-  'minecraft:mossy_stone_bricks': '#72836d',
-  'minecraft:cracked_stone_bricks': '#7b7f86',
-  'minecraft:deepslate_tiles': '#4a4b56',
-  'minecraft:deepslate_bricks': '#555661',
-  'minecraft:polished_deepslate': '#5e6068',
-  'minecraft:blackstone': '#414149',
-  'minecraft:polished_blackstone_bricks': '#4d434b',
-  'minecraft:gilded_blackstone': '#7a6131',
-  'minecraft:glass': '#8ee7e2',
-  'minecraft:glass_pane': '#8ee7e2',
-  'minecraft:white_stained_glass': '#d8f1ff',
-  'minecraft:gray_stained_glass': '#8aa4b0',
-  'minecraft:hay_block': '#d8b548',
-  'minecraft:prismarine': '#7cc8b3',
-  'minecraft:prismarine_bricks': '#6cb4a7',
-  'minecraft:dark_prismarine': '#3d7a6f',
-  'minecraft:sandstone': '#d7c08a',
-  'minecraft:cut_sandstone': '#d9c693',
-  'minecraft:smooth_sandstone': '#e0cb98',
-  'minecraft:red_sandstone': '#b76e4d',
-  'minecraft:obsidian': '#3a2f52',
-  'minecraft:crying_obsidian': '#5b49a4',
-  'minecraft:end_stone': '#d4d2a2',
-  'minecraft:end_stone_bricks': '#d4d2a2',
-  'minecraft:purpur_block': '#af7ebc',
-  'minecraft:quartz_block': '#e7e3de',
-  'minecraft:smooth_quartz': '#f0ece6',
-  'minecraft:ice': '#9bd8ff',
-  'minecraft:snow_block': '#f3f8ff',
-  'minecraft:packed_ice': '#74bff7',
-}
+import { resolveStructureBlockColor } from '@/lib/catalog-art/structure-block-color'
 
 const INSTANCE_GEOMETRY = new BoxGeometry(1, 1, 1)
 const OBJECT_HELPER = new Object3D()
 
 function fallbackColor(blockId: string) {
-  if (BLOCK_COLORS[blockId]) return BLOCK_COLORS[blockId]
-  let hash = 0
-  for (let index = 0; index < blockId.length; index += 1) {
-    hash = ((hash << 5) - hash) + blockId.charCodeAt(index)
-  }
-  const hue = Math.abs(hash) % 360
-  return `hsl(${hue} 28% 58%)`
+  return resolveStructureBlockColor(blockId)
 }
 
 function VoxelGroup({
