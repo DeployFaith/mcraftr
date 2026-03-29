@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
-import { buildStructureArtUrl } from '@/lib/catalog-art/structure-list'
+import { buildStructureArtUrl, inferStructure3DAvailability } from '@/lib/catalog-art/structure-list'
 import { requireServerCapability } from '@/lib/server-capability'
 import { callSidecarForRequest } from '@/lib/server-bridge'
 import { getActiveServer } from '@/lib/users'
@@ -56,16 +56,6 @@ type StructureEntry = {
   has3d?: boolean
   removable?: boolean
   editable?: boolean
-}
-
-function inferStructure3DAvailability(structure: StructureEntry) {
-  if (structure.has3d === true) return true
-  if (structure.placementKind === 'native-worldgen') return false
-  if (structure.placementKind === 'schematic' || structure.placementKind === 'native-template') return true
-  const width = structure.dimensions?.width ?? null
-  const height = structure.dimensions?.height ?? null
-  const length = structure.dimensions?.length ?? null
-  return Boolean(width && height && length)
 }
 
 export async function GET(req: NextRequest) {

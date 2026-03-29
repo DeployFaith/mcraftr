@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildStructureArtUrl } from '../../lib/catalog-art/structure-list'
+import { buildStructureArtUrl, inferStructure3DAvailability } from '../../lib/catalog-art/structure-list'
 
 test('buildStructureArtUrl uses the active Minecraft version for structure art requests', () => {
   const url = buildStructureArtUrl({
@@ -36,4 +36,32 @@ test('buildStructureArtUrl falls back to the default Minecraft version when none
   assert.equal(parsed.searchParams.get('version'), '1.21.11')
   assert.equal(parsed.searchParams.get('relativePath'), 'uploads/castle.schem')
   assert.equal(parsed.searchParams.get('format'), 'schem')
+})
+
+test('inferStructure3DAvailability keeps ancient city native templates 3d-ready', () => {
+  assert.equal(inferStructure3DAvailability({
+    placementKind: 'native-template',
+    resourceKey: 'ancient_city/city_center/walls/bottom_left_corner',
+    relativePath: null,
+    format: 'native',
+    iconId: null,
+    bridgeRef: 'ancient_city/city_center/walls/bottom_left_corner',
+    id: 'native-template:ancient_city/city_center/walls/bottom_left_corner',
+    label: 'Bottom Left Corner',
+    category: 'Ancient City',
+  }), true)
+})
+
+test('inferStructure3DAvailability excludes shipwreck templates from the 3d hint', () => {
+  assert.equal(inferStructure3DAvailability({
+    placementKind: 'native-template',
+    resourceKey: 'shipwreck/rightsideup_full',
+    relativePath: null,
+    format: 'native',
+    iconId: null,
+    bridgeRef: 'shipwreck/rightsideup_full',
+    id: 'native-template:shipwreck/rightsideup_full',
+    label: 'Rightsideup Full',
+    category: 'Shipwreck',
+  }), false)
 })
