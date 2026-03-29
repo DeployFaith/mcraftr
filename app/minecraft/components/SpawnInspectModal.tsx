@@ -202,6 +202,7 @@ export default function SpawnInspectModal({
   const [structureRenderMode, setStructureRenderMode] = useState<'preview' | '3d' | 'materials'>('preview')
   const [structurePreview, setStructurePreview] = useState<StructurePreviewDescriptor | null>(null)
   const [structurePreviewError, setStructurePreviewError] = useState<string | null>(null)
+  const [structure3dFailed, setStructure3dFailed] = useState(false)
   const selectedPlayerWorld = selectedPlayer ? playerWorlds[selectedPlayer] ?? null : null
   const worldPlayers = useMemo(
     () => players.filter(player => !world || playerWorlds[player] === world),
@@ -220,6 +221,7 @@ export default function SpawnInspectModal({
     setStructureRenderMode('preview')
     setStructurePreview(null)
     setStructurePreviewError(null)
+    setStructure3dFailed(false)
   }, [structure?.id])
 
   useEffect(() => {
@@ -228,6 +230,7 @@ export default function SpawnInspectModal({
     const loadPreview = async () => {
       try {
         setStructurePreviewError(null)
+        setStructure3dFailed(false)
         const response = await fetch(`/api/minecraft/structures/preview?${new URLSearchParams({
           placementKind: structure.placementKind ?? 'schematic',
           ...(structure.resourceKey ? { resourceKey: structure.resourceKey } : {}),
@@ -255,7 +258,8 @@ export default function SpawnInspectModal({
 
   const structureSupportsPreview = structure?.hasPreview !== false
   const resolvedStructure3DPreview = useMemo(() => getStructure3DPreview(structurePreview), [structurePreview])
-  const hasStructure3DPreview = Boolean(resolvedStructure3DPreview)
+  const hasStructure3DPreview = Boolean(resolvedStructure3DPreview) && !structure3dFailed
+  const effectiveStructureRenderMode = hasStructure3DPreview && structureRenderMode === 'preview' ? '3d' : structureRenderMode
 
   if (!target) return null
 
@@ -302,17 +306,17 @@ export default function SpawnInspectModal({
                 {structure && structureSupportsPreview && (
                   <div className="mb-3 flex flex-wrap gap-2">
                     {([
-                      ['preview', 'Preview'],
-                      ...(hasStructure3DPreview ? [['3d', '3D']] as const : []),
+                      ['preview', hasStructure3DPreview ? '3D' : 'Preview'],
                       ['materials', 'Materials'],
                     ] as const).map(([modeValue, modeLabel]) => {
+                      const active = effectiveStructureRenderMode === (modeValue === 'preview' && hasStructure3DPreview ? '3d' : modeValue)
                       return (
                         <button
                           key={modeValue}
                           type="button"
                           onClick={() => setStructureRenderMode(modeValue)}
                           className="rounded-full border px-3 py-1 text-[10px] font-mono tracking-[0.16em] transition-all"
-                          style={structureRenderMode === modeValue
+                          style={active
                             ? { borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }
                             : { borderColor: 'var(--border)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)' }}
                         >
@@ -322,11 +326,12 @@ export default function SpawnInspectModal({
                     })}
                   </div>
                 )}
-                {structure && structureRenderMode === '3d'
+                {structure && effectiveStructureRenderMode === '3d'
                   ? <Structure3DPreview
                       preview={structurePreview}
                       className="h-[260px] w-full rounded-[22px]"
                       onError={() => {
+                        setStructure3dFailed(true)
                         setStructurePreviewError('3D preview failed to render. Falling back to 2D preview.')
                         setStructureRenderMode('preview')
                       }}
