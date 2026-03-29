@@ -8,6 +8,7 @@ import PlayerPicker from './PlayerPicker'
 import SpawnInspectModal, { type EntityCatalogEntry, type LocationMode, type StructureCatalogEntry } from './SpawnInspectModal'
 import ConfirmModal, { type ConfirmModalProps } from './ConfirmModal'
 import CatalogArtwork, { isCatalogArtworkEnabled } from './CatalogArtwork'
+import Structure3DPreview from './Structure3DPreview'
 import EntityPresetEditorModal from './EntityPresetEditorModal'
 import CapabilityLockCard from './CapabilityLockCard'
 import IntegrationDependencyPrompt from './IntegrationDependencyPrompt'
@@ -17,6 +18,8 @@ import Toasts from './Toasts'
 import { useToast } from './useToast'
 import { playSound } from '@/app/components/soundfx'
 import type { CatalogArtPayload } from '@/lib/catalog-art/types'
+import { getStructure3DPreview } from '@/lib/catalog-art/structure-3d'
+import type { StructurePreviewDescriptor } from '@/lib/minecraft-assets/structure-art'
 import type { FeatureKey } from '@/lib/features'
 import type { PlacementCheckResult } from '@/lib/placement-randomize'
 import type { ServerStackMode } from '@/lib/server-stack'
@@ -555,6 +558,7 @@ export default function WorldsSection({
   const [selectedStructure, setSelectedStructure] = useState<StructureCatalogEntry | null>(null)
   const [structureModalMode, setStructureModalMode] = useState<'inspect' | 'place' | 'remove'>('place')
   const [placementToRemove, setPlacementToRemove] = useState<PlacementEntry | null>(null)
+  const [structurePreviewById, setStructurePreviewById] = useState<Record<string, StructurePreviewDescriptor | null>>({})
   const [structureMode, setStructureMode] = useState<LocationMode>('player')
   const [structureWorld, setStructureWorld] = useState('')
   const [structureX, setStructureX] = useState('')
@@ -1077,6 +1081,7 @@ export default function WorldsSection({
   const entityCategoryPageCount = Math.max(1, Math.ceil(groupedNativeEntities.length / WORLD_CATEGORY_PAGE_SIZE))
   const pagedStructureGroups = categoryPage(groupedStructures, clampPage(structureCategoryPage, structureCategoryPageCount), WORLD_CATEGORY_PAGE_SIZE)
   const pagedNativeEntityGroups = categoryPage(groupedNativeEntities, clampPage(entityCategoryPage, entityCategoryPageCount), WORLD_CATEGORY_PAGE_SIZE)
+  const visibleStructureEntries = useMemo(() => pagedStructureGroups.flatMap(([, entries]) => entries), [pagedStructureGroups])
   useEffect(() => {
     setStructureCategoryPage(current => clampPage(current, structureCategoryPageCount))
   }, [structureCategoryPageCount])
@@ -1084,6 +1089,32 @@ export default function WorldsSection({
   useEffect(() => {
     setEntityCategoryPage(current => clampPage(current, entityCategoryPageCount))
   }, [entityCategoryPageCount])
+
+  useEffect(() => {
+    const candidates = visibleStructureEntries.filter(entry => entry.hasPreview !== false && entry.has3d && !(entry.id in structurePreviewById))
+    if (candidates.length === 0) return
+    const controller = new AbortController()
+    const loadPreviews = async () => {
+      for (const entry of candidates) {
+        try {
+          const response = await fetch(`/api/minecraft/structures/preview?${new URLSearchParams({
+            placementKind: entry.placementKind ?? 'schematic',
+            ...(entry.resourceKey ? { resourceKey: entry.resourceKey } : {}),
+            ...(entry.relativePath ? { relativePath: entry.relativePath } : {}),
+            ...(entry.format ? { format: entry.format } : {}),
+          }).toString()}`, { signal: controller.signal, cache: 'no-store' })
+          const payload = await response.json().catch(() => null) as { ok?: boolean; preview?: StructurePreviewDescriptor | null } | null
+          const preview = response.ok && payload?.ok !== false ? (payload?.preview ?? null) : null
+          setStructurePreviewById(current => (entry.id in current ? current : { ...current, [entry.id]: preview }))
+        } catch (error) {
+          if ((error as Error).name === 'AbortError') return
+          setStructurePreviewById(current => (entry.id in current ? current : { ...current, [entry.id]: null }))
+        }
+      }
+    }
+    void loadPreviews()
+    return () => controller.abort()
+  }, [structurePreviewById, visibleStructureEntries])
 
   const postJson = useCallback(async (url: string, body: Record<string, unknown>) => {
     const res = await fetch(url, {
@@ -1725,6 +1756,8 @@ export default function WorldsSection({
   const renderStructureCatalogCard = (entry: StructureCatalogEntry) => {
     const palette = structureCardPalette(entry)
     const placementStatus = structurePlacementStatus(entry)
+    const structurePreview = structurePreviewById[entry.id] ?? null
+    const hasCard3DPreview = Boolean(getStructure3DPreview(structurePreview))
     const metaStats = [
       ['Category', entry.category],
       ['Format', entry.format ?? entry.placementKind ?? 'native'],
@@ -1749,7 +1782,7 @@ export default function WorldsSection({
           <div className="flex flex-wrap justify-end gap-2 text-[10px] font-mono tracking-widest">
             <span className="rounded-full border px-2 py-1" style={{ borderColor: palette.frame, background: palette.badge, color: palette.badgeText }}>{entry.sourceKind}</span>
             <span className="rounded-full border px-2 py-1" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{entry.placementKind}</span>
-            {entry.has3d && (
+            {hasCard3DPreview && (
               <span className="rounded-full border px-2 py-1" style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}>3D READY</span>
             )}
             <span title={placementStatus.hint} className="rounded-full border px-2 py-1" style={placementStatus.style}>{placementStatus.label}</span>
@@ -1758,16 +1791,18 @@ export default function WorldsSection({
 
         <div className="rounded-[24px] border p-2" style={{ borderColor: palette.frame, background: 'rgba(0,0,0,0.18)' }}>
           {isCatalogArtworkEnabled('structure') && (
-            <CatalogArtwork
-              kind="structure"
-              label={entry.label}
-              category={entry.category}
-              sourceKind={entry.sourceKind}
-              imageUrl={entry.imageUrl}
-              art={entry.art}
-              className={structureArtworkClass(entry)}
-              overlayNote={entry.hasPreview === false ? 'Reference art only · sampled preview unavailable' : null}
-            />
+            hasCard3DPreview
+              ? <Structure3DPreview preview={structurePreview} className={structureArtworkClass(entry)} />
+              : <CatalogArtwork
+                  kind="structure"
+                  label={entry.label}
+                  category={entry.category}
+                  sourceKind={entry.sourceKind}
+                  imageUrl={entry.imageUrl}
+                  art={entry.art}
+                  className={structureArtworkClass(entry)}
+                  overlayNote={entry.hasPreview === false ? 'Reference art only · sampled preview unavailable' : null}
+                />
           )}
           <div className={`${isCatalogArtworkEnabled('structure') ? 'mt-3 ' : ''}grid gap-2 sm:grid-cols-2 xl:grid-cols-4`}>
             {metaStats.map(([label, value]) => (
@@ -1794,7 +1829,9 @@ export default function WorldsSection({
             type="button"
             title={entry.hasPreview === false
               ? 'Open the structure details card. This entry does not currently expose a sampled preview render.'
-              : 'Open the structure preview card and inspect available preview modes.'}
+              : hasCard3DPreview
+                ? 'Open the structure preview card in 3D.'
+                : 'Open the structure preview card and inspect available preview modes.'}
             onClick={() => {
               setStructureModalMode('inspect')
               setPlacementToRemove(null)
@@ -1803,7 +1840,7 @@ export default function WorldsSection({
             className="rounded-xl border px-3 py-2 text-[11px] font-mono"
             style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}
           >
-            {entry.hasPreview === false ? 'View Structure Details' : 'Preview Structure'}
+            {entry.hasPreview === false ? 'View Structure Details' : hasCard3DPreview ? 'Preview in 3D' : 'Preview Structure'}
           </button>
           <button
             type="button"
