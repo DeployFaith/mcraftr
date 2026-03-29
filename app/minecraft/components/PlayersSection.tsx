@@ -9,6 +9,7 @@ import ConfirmModal from './ConfirmModal'
 import type { ConfirmModalProps } from './ConfirmModal'
 import type { FeatureKey } from '@/lib/features'
 import { CATALOG, hydrateCatalogWithArt } from '@/app/minecraft/items'
+import type { CatalogArtPayload } from '@/lib/catalog-art/types'
 import CollapsibleCard, { setCollapsibleGroupState } from './CollapsibleCard'
 
 // ── Utility Components ─────────────────────────────────────────────────────
@@ -779,8 +780,62 @@ function PlayerPanel({
   }, [player, runPlayerControl])
 
   const { hotbar, main, armor, offhand } = buildInventoryLayout(inventory)
+  const [inventoryItemArtById, setInventoryItemArtById] = useState<Record<string, { imageUrl: string | null; art: CatalogArtPayload | null }>>({})
   const inventoryItemLookup = useMemo(() => buildInventoryItemLookup(minecraftVersion), [minecraftVersion])
-  const selectedInventoryItemMeta = selectedSlot ? inventoryItemLookup.get(selectedSlot.id) ?? null : null
+  const resolvedInventoryItemLookup = useMemo(() => {
+    const next = new Map(inventoryItemLookup)
+    for (const [itemId, artMeta] of Object.entries(inventoryItemArtById)) {
+      const key = `minecraft:${itemId}`
+      const existing = next.get(key)
+      if (!existing) continue
+      next.set(key, {
+        ...existing,
+        imageUrl: artMeta.imageUrl,
+        art: artMeta.art,
+      })
+    }
+    return next
+  }, [inventoryItemLookup, inventoryItemArtById])
+  const selectedInventoryItemMeta = selectedSlot ? resolvedInventoryItemLookup.get(selectedSlot.id) ?? null : null
+
+  useEffect(() => {
+    setInventoryItemArtById({})
+  }, [minecraftVersion])
+
+  useEffect(() => {
+    if (!minecraftVersion || !selectedSlot?.id.startsWith('minecraft:')) return
+    const itemId = selectedSlot.id.replace(/^minecraft:/, '')
+    if (!itemId || inventoryItemArtById[itemId]) return
+    const controller = new AbortController()
+
+    const loadItemArt = async () => {
+      try {
+        const response = await fetch(`/api/minecraft/items/catalog-art?${new URLSearchParams({
+          version: minecraftVersion,
+          ids: itemId,
+        }).toString()}`, { cache: 'no-store', signal: controller.signal })
+        const payload = await response.json().catch(() => null) as { ok?: boolean; items?: Array<{ itemId?: string; imageUrl?: string | null; art?: CatalogArtPayload | null }> } | null
+        if (!response.ok || payload?.ok === false || !Array.isArray(payload?.items)) return
+        const items = payload.items
+        setInventoryItemArtById(current => {
+          const next = { ...current }
+          for (const entry of items) {
+            if (!entry || typeof entry.itemId !== 'string' || !entry.itemId) continue
+            next[entry.itemId] = {
+              imageUrl: typeof entry.imageUrl === 'string' ? entry.imageUrl : null,
+              art: entry.art && typeof entry.art === 'object' ? entry.art : null,
+            }
+          }
+          return next
+        })
+      } catch (error) {
+        if ((error as Error).name === 'AbortError') return
+      }
+    }
+
+    void loadItemArt()
+    return () => controller.abort()
+  }, [minecraftVersion, selectedSlot, inventoryItemArtById])
 
   const uuid = stats?.uuid ?? null
   // Bedrock players (Geyser) have offline UUIDs that don't resolve on Craftatar.

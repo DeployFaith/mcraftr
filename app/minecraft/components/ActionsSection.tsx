@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { KITS } from '@/lib/kits'
 import { CATALOG, hydrateCatalogWithArt, type CatalogItem } from '../items'
+import type { CatalogArtPayload } from '@/lib/catalog-art/types'
 import type { InvItem } from '../../api/minecraft/inventory/route'
 import { useToast } from './useToast'
 import Toasts from './Toasts'
@@ -198,7 +199,12 @@ function itemCardPalette(item: CatalogItem, categoryLabel: string) {
 export default function ActionsSection({ players, selectedPlayer: selectedPlayerProp, onSelectedPlayerChange, minecraftVersion, relayEnabled = true }: Props) {
   const { toasts, addToast } = useToast()
   const hydratedCatalog = useMemo(() => hydrateCatalogWithArt(minecraftVersion, CATALOG), [minecraftVersion])
+  const [itemArtById, setItemArtById] = useState<Record<string, { imageUrl: string | null; art: CatalogArtPayload | null }>>({})
   const [features, setFeatures] = useState<FeatureFlags | null>(null)
+
+  useEffect(() => {
+    setItemArtById({})
+  }, [minecraftVersion])
 
   useEffect(() => {
     fetch('/api/account/preferences')
@@ -443,13 +449,20 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
   const [builderIconUploading, setBuilderIconUploading] = useState(false)
   const kitsFeatureEnabled = features ? features.enable_kits : true
   const customKitsFeatureEnabled = features ? features.enable_custom_kits : true
+  const catalogWithResolvedArt = useMemo(() => hydratedCatalog.map(category => ({
+    ...category,
+    items: category.items.map(item => {
+      const resolved = itemArtById[item.id]
+      return resolved ? { ...item, imageUrl: resolved.imageUrl, art: resolved.art } : item
+    }),
+  })), [hydratedCatalog, itemArtById])
 
-  const allItems = useMemo(() => hydratedCatalog.flatMap(c => c.items), [hydratedCatalog])
+  const allItems = useMemo(() => catalogWithResolvedArt.flatMap(c => c.items), [catalogWithResolvedArt])
   const builtinKitMap = useMemo(() => new Map(KITS.map(kit => [kit.id, kit])), [])
   const customKitMap = useMemo(() => new Map(customKits.map(kit => [kit.id, kit])), [customKits])
   const selectedBuiltinKit = selectedKit ? builtinKitMap.get(selectedKit) ?? null : null
   const selectedCustomKit = !selectedBuiltinKit && selectedKit ? customKitMap.get(selectedKit) ?? null : null
-  const activeBuilderCat = hydratedCatalog.find(c => c.id === builderCatCatId) ?? hydratedCatalog[0]
+  const activeBuilderCat = catalogWithResolvedArt.find(c => c.id === builderCatCatId) ?? catalogWithResolvedArt[0]
   const builderFilteredItems = builderSearch.trim()
     ? allItems.filter(i => i.label.toLowerCase().includes(builderSearch.toLowerCase()) || i.id.toLowerCase().includes(builderSearch.toLowerCase()))
     : activeBuilderCat.items
@@ -681,13 +694,53 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
   const catalogHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const catalogLongPressItemRef = useRef<string | null>(null)
 
-  const activeCat  = hydratedCatalog.find(c => c.id === catCatId) ?? hydratedCatalog[0]
+  const activeCat  = catalogWithResolvedArt.find(c => c.id === catCatId) ?? catalogWithResolvedArt[0]
   const filtered   = catSearch.trim()
     ? allItems.filter(i => i.label.toLowerCase().includes(catSearch.toLowerCase()) || i.id.toLowerCase().includes(catSearch.toLowerCase()))
     : activeCat.items
   const totalPages = Math.ceil(filtered.length / CAT_PAGE_SIZE)
   const pageItems  = filtered.slice(catPage * CAT_PAGE_SIZE, (catPage + 1) * CAT_PAGE_SIZE)
   const selectedCategoryLabel = catSearch.trim() ? 'Search Results' : activeCat.label
+  const visibleItemArtIds = useMemo(() => Array.from(new Set([
+    ...pageItems.map(item => item.id),
+    ...(catSelected ? [catSelected.id] : []),
+  ])), [pageItems, catSelected])
+
+  useEffect(() => {
+    if (!minecraftVersion || visibleItemArtIds.length === 0) return
+    const missingIds = visibleItemArtIds.filter(itemId => !(itemId in itemArtById))
+    if (missingIds.length === 0) return
+    const controller = new AbortController()
+
+    const loadItemArt = async () => {
+      try {
+        const response = await fetch(`/api/minecraft/items/catalog-art?${new URLSearchParams({
+          version: minecraftVersion,
+          ids: missingIds.join(','),
+        }).toString()}`, { cache: 'no-store', signal: controller.signal })
+        const payload = await response.json().catch(() => null) as { ok?: boolean; items?: Array<{ itemId?: string; imageUrl?: string | null; art?: CatalogArtPayload | null }> } | null
+        if (!response.ok || payload?.ok === false || !Array.isArray(payload?.items)) return
+        const items = payload.items
+        setItemArtById(current => {
+          const next = { ...current }
+          for (const entry of items) {
+            if (!entry || typeof entry.itemId !== 'string' || !entry.itemId) continue
+            next[entry.itemId] = {
+              imageUrl: typeof entry.imageUrl === 'string' ? entry.imageUrl : null,
+              art: entry.art && typeof entry.art === 'object' ? entry.art : null,
+            }
+          }
+          return next
+        })
+      } catch (error) {
+        if ((error as Error).name === 'AbortError') return
+      }
+    }
+
+    void loadItemArt()
+    return () => controller.abort()
+  }, [minecraftVersion, visibleItemArtIds, itemArtById])
+
   const catBatchEntries = useMemo(() => Object.entries(catBatchSelection)
     .map(([itemId, qty]) => {
       const item = allItems.find(entry => entry.id === itemId)
@@ -1469,7 +1522,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                   <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 space-y-3">
                     <div className="text-[11px] font-mono tracking-widest text-[var(--text-dim)]">ADD ITEMS</div>
                     <div className="flex gap-1.5 flex-wrap">
-                      {hydratedCatalog.map(cat => (
+                      {catalogWithResolvedArt.map(cat => (
                         <button
                           key={cat.id}
                           onClick={() => {
@@ -1671,7 +1724,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
         {selectedPlayer && (
           <>
             <div className="flex gap-1.5 flex-wrap">
-              {hydratedCatalog.map(cat => (
+              {catalogWithResolvedArt.map(cat => (
                 <button key={cat.id} onClick={() => { setCatCatId(cat.id); setCatPage(0); setCatSearch(''); setCatSelected(null); setCatBatchSelection({}) }}
                   className={`px-2 py-1 rounded text-[13px] font-mono transition-all border ${
                     catCatId === cat.id
