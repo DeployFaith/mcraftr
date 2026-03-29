@@ -1146,8 +1146,9 @@ function worldgenRepresentativePrefixes(resourceKey) {
   return Array.from(new Set(prefixes.filter(Boolean)))
 }
 
-function worldgenRepresentativeKeywordScore(templateKey) {
+function worldgenRepresentativeKeywordScore(templateKey, resourceKey = '') {
   const lower = templateKey.toLowerCase()
+  const resource = resourceKey.toLowerCase()
   let score = 0
   if (lower.includes('/city_center/') || lower.includes('/town_centers/')) score += 90
   if (lower.endsWith('/meeting_point') || lower.includes('/meeting_point_')) score += 80
@@ -1157,6 +1158,29 @@ function worldgenRepresentativeKeywordScore(templateKey) {
   if (lower.endsWith('/full') || lower.includes('/full_')) score += 45
   if (lower.includes('/houses/')) score += 25
   if (lower.includes('/streets/') || lower.includes('/terminators/') || lower.includes('/decor/')) score -= 35
+
+  if (resource.includes('mansion') || resource.includes('woodland_mansion')) {
+    if (lower.includes('/entrance')) score += 140
+    if (lower.includes('/wall_flat') || lower.includes('/wall_window') || lower.includes('/roof')) score -= 90
+    if (lower.includes('/indoors/') || lower.includes('/outdoors/')) score -= 120
+    if (lower.match(/\/(1x1|1x2|2x2)(_.*)?$/)) score -= 140
+  }
+
+  if (resource.includes('monument') || resource.includes('ocean_monument')) {
+    if (lower.includes('/core_room') || lower.includes('/penthouse')) score += 80
+    if (lower.includes('/double_') || lower.includes('/simple_') || lower.includes('/wing_')) score -= 40
+  }
+
+  if (resource.includes('outpost') || resource.includes('pillager_outpost')) {
+    if (lower.includes('/base_plate') || lower.includes('/feature_') || lower.includes('/watchtower_overgrown')) score -= 80
+    if (lower.includes('/watchtower')) score += 90
+  }
+
+  if (resource.includes('village')) {
+    if (lower.includes('/houses/')) score += 40
+    if (lower.includes('/decor/') || lower.includes('/streets/') || lower.includes('/zombie/')) score -= 50
+  }
+
   return score
 }
 
@@ -1180,7 +1204,7 @@ function resolveWorldgenRepresentativeTemplate(resourceKey) {
   for (const templateKey of candidates) {
     const dimensions = readStructureTemplateSize(templateKey)
     const volume = dimensions ? (Number(dimensions.width) || 1) * (Number(dimensions.height) || 1) * (Number(dimensions.length) || 1) : 1
-    const score = worldgenRepresentativeKeywordScore(templateKey) + Math.log2(Math.max(2, volume))
+    const score = worldgenRepresentativeKeywordScore(templateKey, resourceKey) + Math.log2(Math.max(2, volume))
     if (score > bestScore) {
       bestScore = score
       bestKey = templateKey

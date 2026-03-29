@@ -157,3 +157,28 @@ test('isStructureCatalogPart keeps full native templates visible by default', ()
     category: 'Village',
   }), true)
 })
+
+test('isStructureCatalogPart hides obvious mansion room pieces by default', () => {
+  assert.equal(isStructureCatalogPart({
+    placementKind: 'native-template',
+    resourceKey: 'woodland_mansion/1x2_a3',
+    relativePath: null,
+    format: 'native',
+    iconId: null,
+    bridgeRef: 'woodland_mansion/1x2_a3',
+    id: 'native-template:woodland_mansion/1x2_a3',
+    label: '1x2 A3',
+    category: 'Woodland Mansion',
+  }), true)
+  assert.equal(shouldIncludeStructureInDefaultCatalog({
+    placementKind: 'native-template',
+    resourceKey: 'woodland_mansion/1x2_a3',
+    relativePath: null,
+    format: 'native',
+    iconId: null,
+    bridgeRef: 'woodland_mansion/1x2_a3',
+    id: 'native-template:woodland_mansion/1x2_a3',
+    label: '1x2 A3',
+    category: 'Woodland Mansion',
+  }), false)
+})
