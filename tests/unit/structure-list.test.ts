@@ -158,27 +158,27 @@ test('isStructureCatalogPart keeps full native templates visible by default', ()
   }), true)
 })
 
-test('isStructureCatalogPart hides obvious mansion room pieces by default', () => {
+test('isStructureCatalogPart does not globally hide mansion templates during stabilization', () => {
   assert.equal(isStructureCatalogPart({
     placementKind: 'native-template',
-    resourceKey: 'woodland_mansion/1x2_a3',
+    resourceKey: 'woodland_mansion/entrance',
     relativePath: null,
     format: 'native',
     iconId: null,
-    bridgeRef: 'woodland_mansion/1x2_a3',
-    id: 'native-template:woodland_mansion/1x2_a3',
-    label: '1x2 A3',
-    category: 'Woodland Mansion',
-  }), true)
-  assert.equal(shouldIncludeStructureInDefaultCatalog({
-    placementKind: 'native-template',
-    resourceKey: 'woodland_mansion/1x2_a3',
-    relativePath: null,
-    format: 'native',
-    iconId: null,
-    bridgeRef: 'woodland_mansion/1x2_a3',
-    id: 'native-template:woodland_mansion/1x2_a3',
-    label: '1x2 A3',
+    bridgeRef: 'woodland_mansion/entrance',
+    id: 'native-template:woodland_mansion/entrance',
+    label: 'Entrance',
     category: 'Woodland Mansion',
   }), false)
+  assert.equal(shouldIncludeStructureInDefaultCatalog({
+    placementKind: 'native-template',
+    resourceKey: 'woodland_mansion/entrance',
+    relativePath: null,
+    format: 'native',
+    iconId: null,
+    bridgeRef: 'woodland_mansion/entrance',
+    id: 'native-template:woodland_mansion/entrance',
+    label: 'Entrance',
+    category: 'Woodland Mansion',
+  }), true)
 })
