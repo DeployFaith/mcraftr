@@ -51,31 +51,6 @@ function placeholderTile(label: string, index: number) {
   `.trim()
 }
 
-function renderCellTexture(texture: string, x: number, y: number, size: number, key: string) {
-  return `
-    <g transform="translate(${x} ${y})">
-      <rect width="${size}" height="${size}" rx="${Math.max(3, Math.round(size * 0.18))}" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" />
-      <image href="${texture}" x="2" y="2" width="${size - 4}" height="${size - 4}" preserveAspectRatio="xMidYMid meet" style="image-rendering: pixelated;" />
-      <title>${escapeXml(key)}</title>
-    </g>
-  `
-}
-
-function renderHeightOverlay(height: number | null, minHeight: number, maxHeight: number, x: number, y: number, size: number) {
-  if (!height || maxHeight <= 0) return ''
-  const span = Math.max(1, maxHeight - minHeight)
-  const normalized = (height - minHeight) / span
-  const overlayOpacity = 0.08 + (normalized * 0.2)
-  const badgeOpacity = 0.55 + (normalized * 0.25)
-  return `
-    <g transform="translate(${x} ${y})">
-      <rect width="${size}" height="${size}" rx="${Math.max(3, Math.round(size * 0.18))}" fill="rgba(0,255,200,${overlayOpacity.toFixed(3)})" />
-      <rect x="${Math.max(2, size - 16)}" y="2" width="14" height="10" rx="4" fill="rgba(8,12,18,${badgeOpacity.toFixed(3)})" stroke="rgba(255,255,255,0.08)" />
-      <text x="${Math.max(9, size - 9)}" y="10" text-anchor="middle" font-size="6" fill="${CATALOG_ART_THEME.accentSoft}" font-family="monospace">${height}</text>
-    </g>
-  `
-}
-
 function cropCells(cells: string[][]) {
   let minRow = Infinity
   let maxRow = -1
@@ -131,53 +106,53 @@ export function renderStructurePreviewSvg(label: string, preview: StructurePrevi
         const cropped = cropCells(cells)
         const rows = cropped.length
         const cols = Math.max(...cropped.map(row => row.length), 1)
-        const tileHalfWidth = Math.max(12, Math.min(22, Math.floor(140 / Math.max(rows, cols))))
-        const tileHalfHeight = Math.max(7, Math.round(tileHalfWidth * 0.55))
-        const heightStep = Math.max(4, Math.round(tileHalfHeight * 0.9))
-        const baseGridWidth = (cols + rows) * tileHalfWidth
-        const baseGridHeight = (cols + rows) * tileHalfHeight
+        const tileSize = Math.max(16, Math.min(28, Math.floor(132 / Math.max(rows, cols))))
+        const gap = Math.max(2, Math.round(tileSize * 0.12))
+        const gridWidth = cols * tileSize + Math.max(0, cols - 1) * gap
+        const gridHeight = rows * tileSize + Math.max(0, rows - 1) * gap
         const croppedHeights = heights
           ? cropped.map((row, rowIndex) => row.map((_, colIndex) => heights?.[rowIndex]?.[colIndex] ?? 0))
           : null
         const flatHeights = (croppedHeights ?? []).flat().filter(value => Number.isFinite(value) && value > 0) as number[]
         const minHeight = flatHeights.length > 0 ? Math.min(...flatHeights) : 0
         const maxHeight = flatHeights.length > 0 ? Math.max(...flatHeights) : 0
-        const projectedHeight = Math.max(0, maxHeight - minHeight) * heightStep
-        const originX = Math.round((320 - baseGridWidth) / 2) + (rows * tileHalfWidth)
-        const originY = Math.round(58 + Math.max(0, (110 - baseGridHeight) / 2) + projectedHeight)
+        const originX = Math.round(24 + Math.max(0, (172 - gridWidth) / 2))
+        const originY = Math.round(52 + Math.max(0, (118 - gridHeight) / 2))
         const tiles = cropped.flatMap((row, rowIndex) => row.map((blockId, colIndex) => {
-          if (!blockId || blockId === 'air') return ''
+          const x = originX + colIndex * (tileSize + gap)
+          const y = originY + rowIndex * (tileSize + gap)
+          if (!blockId || blockId === 'air') {
+            return `<rect x="${x}" y="${y}" width="${tileSize}" height="${tileSize}" rx="${Math.max(4, Math.round(tileSize * 0.18))}" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.04)" />`
+          }
           const texture = textureCache.get(blockId) ?? `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(placeholderTile(blockId.replace(/^minecraft:/, ''), rowIndex + colIndex))}`
           const height = croppedHeights?.[rowIndex]?.[colIndex] ?? null
-          const relativeHeight = Math.max(0, (height ?? minHeight) - minHeight)
-          const centerX = originX + ((colIndex - rowIndex) * tileHalfWidth)
-          const centerY = originY + ((colIndex + rowIndex) * tileHalfHeight) - (relativeHeight * heightStep)
-          const left = centerX - tileHalfWidth
-          const right = centerX + tileHalfWidth
-          const top = centerY - tileHalfHeight
-          const bottom = centerY + tileHalfHeight
-          const wallBottom = bottom + Math.max(6, relativeHeight * heightStep)
-          const clipId = `iso-clip-${rowIndex}-${colIndex}-${Math.max(0, relativeHeight)}`
-          const topDiamond = `${centerX},${top} ${right},${centerY} ${centerX},${bottom} ${left},${centerY}`
-          const leftWall = `${left},${centerY} ${centerX},${bottom} ${centerX},${wallBottom} ${left},${wallBottom - tileHalfHeight}`
-          const rightWall = `${right},${centerY} ${centerX},${bottom} ${centerX},${wallBottom} ${right},${wallBottom - tileHalfHeight}`
-          const badgeY = top - 6
+          const normalized = maxHeight > minHeight && height ? (height - minHeight) / Math.max(1, maxHeight - minHeight) : 0
+          const overlayOpacity = (0.06 + normalized * 0.18).toFixed(3)
           return `
-            <g transform="translate(0 0)">
-              <polygon points="${leftWall}" fill="rgba(0,0,0,0.24)" stroke="rgba(255,255,255,0.05)" />
-              <polygon points="${rightWall}" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.05)" />
-              <polygon points="${topDiamond}" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" />
-              <clipPath id="${clipId}"><polygon points="${topDiamond}" /></clipPath>
-              <image href="${texture}" x="${left}" y="${top}" width="${tileHalfWidth * 2}" height="${tileHalfHeight * 2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})" style="image-rendering: pixelated;" />
-              <polygon points="${topDiamond}" fill="rgba(0,255,200,${(0.05 + (relativeHeight / Math.max(1, maxHeight || 1)) * 0.14).toFixed(3)})" />
-              <rect x="${centerX - 11}" y="${badgeY}" width="22" height="10" rx="5" fill="rgba(8,12,18,0.72)" stroke="rgba(255,255,255,0.08)" />
-              <text x="${centerX}" y="${badgeY + 7}" text-anchor="middle" font-size="6" fill="${CATALOG_ART_THEME.accentSoft}" font-family="monospace">${height ?? 0}</text>
-              <title>${escapeXml(blockId)} · height ${height ?? 0}</title>
+            <g transform="translate(${x} ${y})">
+              <rect width="${tileSize}" height="${tileSize}" rx="${Math.max(4, Math.round(tileSize * 0.18))}" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" />
+              <image href="${texture}" x="2" y="2" width="${tileSize - 4}" height="${tileSize - 4}" preserveAspectRatio="xMidYMid slice" style="image-rendering: pixelated;" />
+              <rect width="${tileSize}" height="${tileSize}" rx="${Math.max(4, Math.round(tileSize * 0.18))}" fill="rgba(0,255,200,${overlayOpacity})" />
+              ${height ? `<rect x="${Math.max(2, tileSize - 14)}" y="2" width="12" height="9" rx="4" fill="rgba(8,12,18,0.72)" stroke="rgba(255,255,255,0.08)" /><text x="${Math.max(8, tileSize - 8)}" y="9" text-anchor="middle" font-size="6" fill="${CATALOG_ART_THEME.accentSoft}" font-family="monospace">${height}</text>` : ''}
+              <title>${escapeXml(blockId)}${height ? ` · height ${height}` : ''}</title>
             </g>
           `
         })).join('')
+        const legend = swatches.slice(0, 3).map((swatch, index) => {
+          const x = 212
+          const y = 62 + index * 36
+          return `
+            <g transform="translate(${x} ${y})">
+              <rect width="82" height="28" rx="12" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.08)" />
+              <rect x="6" y="6" width="16" height="16" rx="6" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.08)" />
+              <image href="${swatch.texture}" x="8" y="8" width="12" height="12" preserveAspectRatio="xMidYMid meet" style="image-rendering: pixelated;" />
+              <text x="28" y="17" font-size="7" fill="${CATALOG_ART_THEME.textStrong}" font-family="monospace">${escapeXml(swatch.blockId.replace(/^minecraft:/, '').slice(0, 14))}</text>
+            </g>
+          `
+        }).join('')
         return {
           content: tiles,
+          legend,
           reliefLevels: flatHeights.length > 0 ? (maxHeight - minHeight + 1) : null,
           peakHeight: maxHeight > 0 ? maxHeight : null,
         }
@@ -208,10 +183,10 @@ export function renderStructurePreviewSvg(label: string, preview: StructurePrevi
       </defs>
       <rect width="320" height="220" rx="30" fill="url(#bg)" />
       <rect x="12" y="12" width="296" height="196" rx="24" fill="${CATALOG_ART_THEME.panelInsetFill}" stroke="${CATALOG_ART_THEME.panelInsetStroke}" />
-      <text x="28" y="28" font-size="10" fill="${CATALOG_ART_THEME.accent}" font-family="monospace">${gridScene ? 'ISOMETRIC PREVIEW' : 'BUILD MATERIALS'}</text>
+      <text x="28" y="28" font-size="10" fill="${CATALOG_ART_THEME.accent}" font-family="monospace">${gridScene ? 'STRUCTURE LAYOUT' : 'BUILD MATERIALS'}</text>
       <text x="292" y="28" text-anchor="end" font-size="10" fill="${CATALOG_ART_THEME.textStrong}" font-family="monospace">${escapeXml(dimsLabel)}</text>
       ${gridScene?.reliefLevels ? `<text x="28" y="42" font-size="9" fill="${CATALOG_ART_THEME.text}" font-family="monospace">RELIEF ${gridScene.reliefLevels} LEVELS · HEIGHT ${gridScene.peakHeight}</text>` : ''}
-      ${gridScene ? gridScene.content : tiles}
+      ${gridScene ? `<rect x="22" y="50" width="178" height="124" rx="18" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.08)" />${gridScene.content}${gridScene.legend}` : tiles}
       <text x="160" y="204" text-anchor="middle" font-size="11" fill="${CATALOG_ART_THEME.text}" font-family="monospace">${escapeXml(label)}</text>
     </svg>
   `.trim()
