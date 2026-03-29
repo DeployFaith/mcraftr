@@ -1758,7 +1758,16 @@ export default function WorldsSection({
 
         <div className="rounded-[24px] border p-2" style={{ borderColor: palette.frame, background: 'rgba(0,0,0,0.18)' }}>
           {isCatalogArtworkEnabled('structure') && (
-            <CatalogArtwork kind="structure" label={entry.label} category={entry.category} sourceKind={entry.sourceKind} imageUrl={entry.imageUrl} art={entry.art} className={structureArtworkClass(entry)} />
+            <CatalogArtwork
+              kind="structure"
+              label={entry.label}
+              category={entry.category}
+              sourceKind={entry.sourceKind}
+              imageUrl={entry.imageUrl}
+              art={entry.art}
+              className={structureArtworkClass(entry)}
+              overlayNote={entry.hasPreview === false ? 'Reference art only · sampled preview unavailable' : null}
+            />
           )}
           <div className={`${isCatalogArtworkEnabled('structure') ? 'mt-3 ' : ''}grid gap-2 sm:grid-cols-2 xl:grid-cols-4`}>
             {metaStats.map(([label, value]) => (

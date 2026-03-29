@@ -359,6 +359,7 @@ export default function SpawnInspectModal({
                       art={target.art}
                       structureArtView={structureRenderMode === 'materials' ? 'materials' : 'preview'}
                       hideStructureViewToggle={Boolean(structure)}
+                      overlayNote={structure && !structureSupportsPreview ? 'Reference art only · sampled preview unavailable' : null}
                       className={structure
                         ? 'h-[260px] w-full rounded-[22px] border bg-[var(--bg2)] object-contain p-3'
                         : 'mx-auto h-[260px] w-full max-w-[22rem] rounded-[22px] border bg-[var(--bg2)] object-contain p-3'}

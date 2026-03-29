@@ -15,6 +15,7 @@ type Props = {
   structureArtView?: StructureArtView
   onStructureArtViewChange?: (view: StructureArtView) => void
   hideStructureViewToggle?: boolean
+  overlayNote?: string | null
 }
 
 export const CATALOG_ARTWORK_ENABLED: Record<Props['kind'], boolean> = {
@@ -38,12 +39,13 @@ export default function CatalogArtwork({
   structureArtView,
   onStructureArtViewChange,
   hideStructureViewToggle = false,
+  overlayNote = null,
 }: Props) {
   const placeholderMeta = [category, sourceKind].filter(Boolean).join(' · ') || `${kind} art unavailable`
-  return <ArtworkImage key={`${art?.url ?? imageUrl ?? 'missing'}:${label}`} src={art?.url ?? imageUrl ?? null} label={label} className={className} artClass={art?.class ?? kind} artStrategy={art?.strategy ?? 'missing-real-art'} placeholderMeta={placeholderMeta} kind={kind} structureArtView={structureArtView} onStructureArtViewChange={onStructureArtViewChange} hideStructureViewToggle={hideStructureViewToggle} />
+  return <ArtworkImage key={`${art?.url ?? imageUrl ?? 'missing'}:${label}`} src={art?.url ?? imageUrl ?? null} label={label} className={className} artClass={art?.class ?? kind} artStrategy={art?.strategy ?? 'missing-real-art'} placeholderMeta={placeholderMeta} kind={kind} structureArtView={structureArtView} onStructureArtViewChange={onStructureArtViewChange} hideStructureViewToggle={hideStructureViewToggle} overlayNote={overlayNote} />
 }
 
-function ArtworkImage({ src, label, className, artClass, artStrategy, placeholderMeta, kind, structureArtView: controlledStructureArtView, onStructureArtViewChange, hideStructureViewToggle }: { src: string | null; label: string; className: string; artClass: string; artStrategy: string; placeholderMeta: string; kind: Props['kind']; structureArtView?: StructureArtView; onStructureArtViewChange?: (view: StructureArtView) => void; hideStructureViewToggle: boolean }) {
+function ArtworkImage({ src, label, className, artClass, artStrategy, placeholderMeta, kind, structureArtView: controlledStructureArtView, onStructureArtViewChange, hideStructureViewToggle, overlayNote }: { src: string | null; label: string; className: string; artClass: string; artStrategy: string; placeholderMeta: string; kind: Props['kind']; structureArtView?: StructureArtView; onStructureArtViewChange?: (view: StructureArtView) => void; hideStructureViewToggle: boolean; overlayNote?: string | null }) {
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
   const [uncontrolledStructureArtView, setStructureArtView] = useState<StructureArtView>('preview')
@@ -99,6 +101,11 @@ function ArtworkImage({ src, label, className, artClass, artStrategy, placeholde
       )}
       {!loaded && !showPlaceholder && (
         <div className="absolute inset-0 animate-pulse bg-[linear-gradient(120deg,rgba(255,255,255,0.04),rgba(255,255,255,0.12),rgba(255,255,255,0.04))]" />
+      )}
+      {overlayNote && !showPlaceholder && (
+        <div className="absolute bottom-3 left-3 right-3 z-10 rounded-2xl border px-3 py-2 text-left text-[10px] font-mono tracking-[0.12em] backdrop-blur-sm" style={{ borderColor: 'rgba(255,255,255,0.12)', background: 'rgba(8,12,18,0.78)', color: 'var(--text-dim)' }}>
+          {overlayNote}
+        </div>
       )}
       {showPlaceholder ? (
         <div className="flex h-full w-full items-center justify-center rounded-[inherit] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] px-4 text-center">
