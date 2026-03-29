@@ -1,4 +1,3 @@
-import { buildCatalogArtPayload } from '@/lib/catalog-art/payload'
 import type { CatalogArtPayload } from '@/lib/catalog-art/types'
 
 // Minecraft 1.21 item catalog
@@ -1019,18 +1018,10 @@ export function hydrateCatalogWithArt(version: string | null | undefined, catalo
 
   return catalog.map(category => ({
     ...category,
-    items: category.items.map(item => {
-      const imageUrl = `/api/minecraft/art/item/${encodeURIComponent(version)}/${encodeURIComponent(item.id)}`
-      const artClass = item.id.includes('potion') || item.id.endsWith('_arrow') ? 'layered-icon' : item.id.includes('block') ? 'block-face' : 'flat-icon'
-      return {
-        ...item,
-        imageUrl,
-        art: buildCatalogArtPayload({
-          url: imageUrl,
-          artClass,
-          strategy: 'item-layer-stack',
-        }),
-      }
-    }),
+    items: category.items.map(item => ({
+      ...item,
+      imageUrl: `/api/minecraft/art/item/${encodeURIComponent(version)}/${encodeURIComponent(item.id)}`,
+      art: null,
+    })),
   }))
 }

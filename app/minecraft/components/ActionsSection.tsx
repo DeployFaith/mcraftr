@@ -1834,7 +1834,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                           </div>
                           <div className="flex flex-wrap justify-end gap-2 text-[10px] font-mono tracking-widest">
                             <span className="rounded-full border px-2 py-1" style={{ borderColor: itemCardPalette(catSelected, selectedCategoryLabel).frame, background: itemCardPalette(catSelected, selectedCategoryLabel).badge, color: itemCardPalette(catSelected, selectedCategoryLabel).badgeText }}>{selectedCategoryLabel}</span>
-                            <span className="rounded-full border border-[var(--border)] px-2 py-1 text-[var(--text-dim)]">{minecraftVersion || 'fallback version'}</span>
+                            <span className="rounded-full border border-[var(--border)] px-2 py-1 text-[var(--text-dim)]">{minecraftVersion || 'version unresolved'}</span>
                           </div>
                         </div>
                         <div className="rounded-[24px] border p-2" style={{ borderColor: itemCardPalette(catSelected, selectedCategoryLabel).frame, background: 'rgba(0,0,0,0.18)' }}>
