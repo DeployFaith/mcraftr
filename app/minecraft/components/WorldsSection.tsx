@@ -232,6 +232,7 @@ function normalizeStructureEntries(raw: unknown): StructureCatalogEntry[] {
             length: typeof (row.dimensions as Record<string, unknown>).length === 'number' ? (row.dimensions as Record<string, number>).length : null,
           }
         : null,
+      has3d: row.has3d === true,
       removable: row.removable !== false,
       editable: row.editable === true,
     })
@@ -1747,6 +1748,9 @@ export default function WorldsSection({
           <div className="flex flex-wrap justify-end gap-2 text-[10px] font-mono tracking-widest">
             <span className="rounded-full border px-2 py-1" style={{ borderColor: palette.frame, background: palette.badge, color: palette.badgeText }}>{entry.sourceKind}</span>
             <span className="rounded-full border px-2 py-1" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{entry.placementKind}</span>
+            {entry.has3d && (
+              <span className="rounded-full border px-2 py-1" style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}>3D READY</span>
+            )}
             <span title={placementStatus.hint} className="rounded-full border px-2 py-1" style={placementStatus.style}>{placementStatus.label}</span>
           </div>
         </div>

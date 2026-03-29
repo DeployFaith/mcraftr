@@ -34,6 +34,7 @@ export type StructureCatalogEntry = {
   sizeBytes?: number | null
   updatedAt?: number | null
   dimensions?: { width: number | null; height: number | null; length: number | null } | null
+  has3d?: boolean
   removable?: boolean
   editable?: boolean
 }

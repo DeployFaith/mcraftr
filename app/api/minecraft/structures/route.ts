@@ -53,8 +53,19 @@ type StructureEntry = {
   iconId?: string | null
   summary?: string | null
   dimensions?: { width: number | null; height: number | null; length: number | null } | null
+  has3d?: boolean
   removable?: boolean
   editable?: boolean
+}
+
+function inferStructure3DAvailability(structure: StructureEntry) {
+  if (structure.has3d === true) return true
+  if (structure.placementKind === 'native-worldgen') return false
+  if (structure.placementKind === 'schematic' || structure.placementKind === 'native-template') return true
+  const width = structure.dimensions?.width ?? null
+  const height = structure.dimensions?.height ?? null
+  const length = structure.dimensions?.length ?? null
+  return Boolean(width && height && length)
 }
 
 export async function GET(req: NextRequest) {
@@ -81,6 +92,7 @@ export async function GET(req: NextRequest) {
       const resolvedArtUrl = buildStructureArtUrl(structure, minecraftVersion)
       return {
         ...structure,
+        has3d: inferStructure3DAvailability(structure),
         iconId: structure.iconId || structure.resourceKey || structure.bridgeRef || structure.id || structure.label,
         artUrl: resolvedArtUrl,
         imageUrl: resolvedArtUrl,
