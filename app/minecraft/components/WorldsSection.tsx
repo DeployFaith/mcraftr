@@ -1777,13 +1777,13 @@ export default function WorldsSection({
         }}
       >
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-[10px] font-mono tracking-[0.35em]" style={{ color: palette.badgeText }}>BUILD CARD</div>
-            <div className="mt-1 text-[18px] font-mono text-[var(--text)]">{entry.label}</div>
+          <div className="min-w-0">
+            <div className="text-[18px] font-mono leading-tight text-[var(--text)]">{entry.label}</div>
+            <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.18em]" style={{ color: 'var(--text-dim)' }}>
+              {entry.category} · {entry.sourceKind} · {entry.placementKind}
+            </div>
           </div>
           <div className="flex flex-wrap justify-end gap-2 text-[10px] font-mono tracking-widest">
-            <span className="rounded-full border px-2 py-1" style={{ borderColor: palette.frame, background: palette.badge, color: palette.badgeText }}>{entry.sourceKind}</span>
-            <span className="rounded-full border px-2 py-1" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{entry.placementKind}</span>
             {hasCard3DPreview && (
               <span className="rounded-full border px-2 py-1" style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}>3D READY</span>
             )}
@@ -1801,9 +1801,10 @@ export default function WorldsSection({
                   category={entry.category}
                   sourceKind={entry.sourceKind}
                   imageUrl={entry.imageUrl}
-                  art={entry.art}
-                  className={structureArtworkClass(entry)}
-                  overlayNote={entry.hasPreview === false ? 'Reference art only · sampled preview unavailable' : null}
+                  art={entry.hasPreview === false || !entry.art ? entry.art : { ...entry.art, strategy: 'structure-material-board', class: 'structure-materials' }}
+                  structureArtView={entry.hasPreview === false ? 'preview' : 'materials'}
+                  className={structureArtworkClass(entry.hasPreview === false || !entry.art ? entry : { ...entry, art: { ...entry.art, class: 'structure-materials', strategy: 'structure-material-board' } })}
+                  overlayNote={entry.hasPreview === false ? 'Reference art only · sampled preview unavailable' : '3D unavailable · showing materials-first structure summary'}
                 />
           )}
           <div className={`${isCatalogArtworkEnabled('structure') ? 'mt-3 ' : ''}grid gap-2 sm:grid-cols-2 xl:grid-cols-4`}>
@@ -1832,8 +1833,8 @@ export default function WorldsSection({
             title={entry.hasPreview === false
               ? 'Open the structure details card. This entry does not currently expose a sampled preview render.'
               : hasCard3DPreview
-                ? 'Open the structure preview card in 3D.'
-                : 'Open the structure preview card and inspect available preview modes.'}
+                ? 'Open the structure in 3D.'
+                : 'Open the structure and inspect the best available preview.'}
             onClick={() => {
               setStructureModalMode('inspect')
               setPlacementToRemove(null)
@@ -1842,7 +1843,7 @@ export default function WorldsSection({
             className="rounded-xl border px-3 py-2 text-[11px] font-mono"
             style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}
           >
-            {entry.hasPreview === false ? 'View Structure Details' : hasCard3DPreview ? 'Preview in 3D' : 'Preview Structure'}
+            Open Structure
           </button>
           <button
             type="button"
