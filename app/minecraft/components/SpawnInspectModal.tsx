@@ -259,6 +259,7 @@ export default function SpawnInspectModal({
   }, [structure])
 
   if (!target) return null
+  const structureSupportsPreview = structure?.hasPreview !== false
   const resolvedStructure3DPreview = getStructure3DPreview(structurePreview)
   const hasStructure3DPreview = Boolean(resolvedStructure3DPreview)
   const structureVoxelData = useMemo(() => resolvedStructure3DPreview ? {
@@ -292,7 +293,11 @@ export default function SpawnInspectModal({
       >
         <div className="flex items-start justify-between gap-3 border-b px-5 py-4 sm:px-6" style={{ borderColor: 'var(--border)' }}>
           <div className="font-mono text-[12px] tracking-[0.16em]" style={{ color: 'var(--text-dim)' }}>
-            {mode === 'remove-structure' ? 'REMOVE TARGET' : mode === 'inspect-structure' ? 'STRUCTURE PREVIEW' : 'PLACEMENT TARGET'}
+            {mode === 'remove-structure'
+              ? 'REMOVE TARGET'
+              : mode === 'inspect-structure'
+                ? (structure && !structureSupportsPreview ? 'STRUCTURE DETAILS' : 'STRUCTURE PREVIEW')
+                : 'PLACEMENT TARGET'}
           </div>
           <button
             type="button"
@@ -310,7 +315,7 @@ export default function SpawnInspectModal({
           <div className={`p-5 ${isCatalogArtworkEnabled(structure ? 'structure' : 'entity') ? 'border-b md:border-b-0 md:border-r' : ''}`} style={{ borderColor: 'var(--border)' }}>
             {isCatalogArtworkEnabled(structure ? 'structure' : 'entity') && (
               <>
-                {structure && (
+                {structure && structureSupportsPreview && (
                   <div className="mb-3 flex flex-wrap gap-2">
                     {([
                       ['preview', 'Preview'],
@@ -358,6 +363,11 @@ export default function SpawnInspectModal({
                         ? 'h-[260px] w-full rounded-[22px] border bg-[var(--bg2)] object-contain p-3'
                         : 'mx-auto h-[260px] w-full max-w-[22rem] rounded-[22px] border bg-[var(--bg2)] object-contain p-3'}
                     />}
+                {structure && !structureSupportsPreview && (
+                  <div className="mt-3 rounded-2xl border px-4 py-3 text-[10px] font-mono tracking-[0.12em]" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)' }}>
+                    This entry currently exposes reference art and metadata only. A sampled preview render is not available yet.
+                  </div>
+                )}
                 {structure && structureRenderMode === '3d' && !hasStructure3DPreview && structurePreviewError && (
                   <div className="mt-2 text-[10px] font-mono text-[var(--text-dim)]">{structurePreviewError}</div>
                 )}
