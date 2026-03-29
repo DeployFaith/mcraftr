@@ -2,6 +2,21 @@ function blockKey(x, y, z) {
   return `${x},${y},${z}`
 }
 
+const LOW_VALUE_FILLER_PATTERNS = [
+  /stone/i,
+  /cobblestone/i,
+  /deepslate/i,
+  /blackstone/i,
+  /netherrack/i,
+  /dirt/i,
+  /sand/i,
+  /terracotta/i,
+  /tuff/i,
+  /gravel/i,
+  /mud/i,
+  /basalt/i,
+]
+
 function countExposedFaces(voxelMap, voxel) {
   let exposedFaces = 0
   const neighbors = [
@@ -18,6 +33,10 @@ function countExposedFaces(voxelMap, voxel) {
   return exposedFaces
 }
 
+function isLowValueFillerBlock(blockId) {
+  return LOW_VALUE_FILLER_PATTERNS.some(pattern => pattern.test(blockId))
+}
+
 function buildSurfaceScore(voxelMap, voxel, bounds) {
   const exposedFaces = countExposedFaces(voxelMap, voxel)
   const edgeDistance = Math.min(
@@ -29,7 +48,8 @@ function buildSurfaceScore(voxelMap, voxel, bounds) {
   const perimeterBonus = edgeDistance === 0 ? 3 : edgeDistance === 1 ? 1.5 : 0
   const topBonus = bounds.height > 1 ? voxel.y / bounds.height : 0
   const cornerBonus = (voxel.x === 0 || voxel.x === bounds.width - 1) && (voxel.z === 0 || voxel.z === bounds.length - 1) ? 1.5 : 0
-  return exposedFaces * 10 + perimeterBonus + topBonus + cornerBonus
+  const fillerPenalty = isLowValueFillerBlock(voxel.blockId) ? 2 : 0
+  return exposedFaces * 10 + perimeterBonus + topBonus + cornerBonus - fillerPenalty
 }
 
 function compareByScore(left, right) {
@@ -53,13 +73,20 @@ export function selectStructurePreviewVoxels(renderable, bounds, maxVoxels = 600
     .filter(entry => entry.score >= 10)
     .sort(compareByScore)
 
-  const hidden = scored
-    .filter(entry => entry.score < 10)
+  const hiddenUseful = scored
+    .filter(entry => entry.score < 10 && !isLowValueFillerBlock(entry.voxel.blockId))
+    .sort(compareByScore)
+
+  const hiddenFiller = scored
+    .filter(entry => entry.score < 10 && isLowValueFillerBlock(entry.voxel.blockId))
     .sort(compareByScore)
 
   const chosen = surface.slice(0, maxVoxels)
-  if (chosen.length < maxVoxels && hidden.length > 0) {
-    chosen.push(...hidden.slice(0, maxVoxels - chosen.length))
+  if (chosen.length < maxVoxels && hiddenUseful.length > 0) {
+    chosen.push(...hiddenUseful.slice(0, maxVoxels - chosen.length))
+  }
+  if (chosen.length < maxVoxels && hiddenFiller.length > 0) {
+    chosen.push(...hiddenFiller.slice(0, maxVoxels - chosen.length))
   }
 
   return {

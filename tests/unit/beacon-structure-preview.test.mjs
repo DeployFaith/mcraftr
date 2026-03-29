@@ -18,6 +18,18 @@ test('selectStructurePreviewVoxels prefers exposed shell voxels over buried inte
   assert.equal(selection.voxels.some(voxel => voxel.x === 1 && voxel.y === 1 && voxel.z === 1), false)
 })
 
+test('selectStructurePreviewVoxels deprioritizes buried filler blocks behind hidden useful blocks', () => {
+  const voxels = [
+    { x: 0, y: 0, z: 0, blockId: 'minecraft:stone_bricks' },
+    { x: 1, y: 0, z: 0, blockId: 'minecraft:stone_bricks' },
+    { x: 2, y: 0, z: 0, blockId: 'minecraft:stone_bricks' },
+    { x: 1, y: 1, z: 0, blockId: 'minecraft:sea_lantern' },
+  ]
+
+  const selection = selectStructurePreviewVoxels(voxels, { width: 3, height: 2, length: 1 }, 3)
+  assert.equal(selection.voxels.some(voxel => voxel.blockId === 'minecraft:sea_lantern'), true)
+})
+
 test('selectStructurePreviewVoxels keeps all voxels when under budget', () => {
   const voxels = [
     { x: 0, y: 0, z: 0, blockId: 'minecraft:oak_planks' },

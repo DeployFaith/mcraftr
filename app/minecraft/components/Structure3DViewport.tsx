@@ -33,12 +33,15 @@ function VoxelGroup({
   const meshRef = useRef<InstancedMesh | null>(null)
   const material = useMemo(() => {
     const base = new Color(fallbackColor(blockId))
-    const shaded = base.clone().multiplyScalar(0.94)
+    const shaded = base.clone().multiplyScalar(0.96)
+    const emissiveIntensity = /lantern|glowstone|sea_lantern|shroomlight|bulb/i.test(blockId) ? 0.16 : 0.08
+    const metalness = /copper|iron|gold|diamond/i.test(blockId) ? 0.08 : 0.03
+    const roughness = /glass|ice/i.test(blockId) ? 0.5 : 0.78
     return new MeshStandardMaterial({
       color: shaded,
-      roughness: 0.82,
-      metalness: 0.04,
-      emissive: base.clone().multiplyScalar(0.06),
+      roughness,
+      metalness,
+      emissive: base.clone().multiplyScalar(emissiveIntensity),
       vertexColors: true,
     })
   }, [blockId])
@@ -130,12 +133,13 @@ export default function Structure3DViewport({
         far: 300,
       }}
     >
-      <color attach="background" args={['#151a22']} />
-      <ambientLight intensity={1.15} />
-      <hemisphereLight args={['#f1fff8', '#1f2c33', 1.05]} />
-      <directionalLight castShadow position={[12, 22, 10]} intensity={2.2} shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
-      <directionalLight position={[-10, 14, -8]} intensity={1.25} />
-      <pointLight position={[0, Math.max(extents.size[1] * 1.4, 10), 0]} intensity={0.6} />
+      <color attach="background" args={['#131922']} />
+      <fog attach="fog" args={['#131922', Math.max(20, gridSize * 0.9), Math.max(42, gridSize * 2.2)]} />
+      <ambientLight intensity={1.28} />
+      <hemisphereLight args={['#f6fff9', '#203038', 1.2]} />
+      <directionalLight castShadow position={[12, 22, 10]} intensity={2.45} shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
+      <directionalLight position={[-10, 14, -8]} intensity={1.4} />
+      <pointLight position={[0, Math.max(extents.size[1] * 1.4, 10), 0]} intensity={0.8} color="#d8f8ff" />
 
       <group>
         {groups.map(group => (
