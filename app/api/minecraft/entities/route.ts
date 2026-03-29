@@ -5,6 +5,8 @@ import { callSidecarForRequest, runBridgeJson } from '@/lib/server-bridge'
 import { FALLBACK_ENTITY_CATALOG } from '@/lib/entity-catalog'
 import { getSessionUserId } from '@/lib/rcon'
 import { getActiveServer } from '@/lib/users'
+import { resolveEntityArtDescriptor } from '@/lib/catalog-art/resolvers/entity'
+import { buildCatalogArtPayload, getReviewedCatalogArtDescriptor } from '@/lib/catalog-art/service'
 import { hasEntityIcon, normalizeEntityIconId } from '@/lib/minecraft-assets/entity-icons'
 
 export const runtime = 'nodejs'
@@ -251,6 +253,13 @@ export async function GET(req: NextRequest) {
           ? `/api/minecraft/art/entity/${encodeURIComponent(artVersion)}/${encodeURIComponent(entry.entityId)}`
           : null)
         const hasRealArt = entry.entityId ? await hasEntityIcon(entry.entityId) : false
+        const reviewedDescriptor = entry.entityId && hasRealArt
+          ? await getReviewedCatalogArtDescriptor(await resolveEntityArtDescriptor({
+              version: artVersion,
+              entityId: entry.entityId,
+              label: entry.label,
+            }))
+          : null
         return {
           ...entry,
           iconId: entry.entityId ? normalizeEntityIconId(entry.entityId) : null,
@@ -258,7 +267,7 @@ export async function GET(req: NextRequest) {
           hasRealArt,
           artUrl: hasRealArt ? candidateUrl : null,
           imageUrl: hasRealArt ? candidateUrl : null,
-          art: null,
+          art: reviewedDescriptor ? buildCatalogArtPayload(reviewedDescriptor, candidateUrl) : null,
         }
       })))
       .sort((a, b) => a.label.localeCompare(b.label)),

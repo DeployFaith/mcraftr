@@ -1,6 +1,9 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
 import { buildStructureArtUrl, inferStructure3DAvailability, inferStructurePreviewAvailability } from '@/lib/catalog-art/structure-list'
+import { resolveStructureArtDescriptor } from '@/lib/catalog-art/resolvers/structure'
+import { buildCatalogArtPayload, getReviewedCatalogArtDescriptor } from '@/lib/catalog-art/service'
+import { DEFAULT_MINECRAFT_VERSION } from '@/lib/minecraft-version'
 import { requireServerCapability } from '@/lib/server-capability'
 import { callSidecarForRequest } from '@/lib/server-bridge'
 import { getActiveServer } from '@/lib/users'
@@ -77,20 +80,32 @@ export async function GET(req: NextRequest) {
     return Response.json({ ok: false, error: sidecar.error }, { status: sidecar.status ?? 502 })
   }
 
+  const structures = await Promise.all((sidecar.data.structures ?? []).map(async structure => {
+    const resolvedArtUrl = buildStructureArtUrl(structure, minecraftVersion)
+    const descriptor = await resolveStructureArtDescriptor({
+      version: minecraftVersion || DEFAULT_MINECRAFT_VERSION,
+      label: structure.label,
+      placementKind: structure.placementKind,
+      resourceKey: structure.resourceKey ?? null,
+      relativePath: structure.relativePath ?? null,
+      format: structure.format ?? null,
+      preview: null,
+    })
+    const reviewed = await getReviewedCatalogArtDescriptor(descriptor)
+    return {
+      ...structure,
+      hasPreview: inferStructurePreviewAvailability(structure),
+      has3d: inferStructure3DAvailability(structure),
+      iconId: structure.iconId || structure.resourceKey || structure.bridgeRef || structure.id || structure.label,
+      artUrl: resolvedArtUrl,
+      imageUrl: resolvedArtUrl,
+      art: buildCatalogArtPayload(reviewed, resolvedArtUrl),
+    }
+  }))
+
   return Response.json({
     ok: true,
-    structures: (sidecar.data.structures ?? []).map(structure => {
-      const resolvedArtUrl = buildStructureArtUrl(structure, minecraftVersion)
-      return {
-        ...structure,
-        hasPreview: inferStructurePreviewAvailability(structure),
-        has3d: inferStructure3DAvailability(structure),
-        iconId: structure.iconId || structure.resourceKey || structure.bridgeRef || structure.id || structure.label,
-        artUrl: resolvedArtUrl,
-        imageUrl: resolvedArtUrl,
-        art: null,
-      }
-    }),
+    structures,
     scan: sidecar.data.scan ?? null,
     sidecar: { ok: true, capabilities: sidecar.data.capabilities ?? [] },
   })
