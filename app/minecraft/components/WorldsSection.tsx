@@ -233,6 +233,7 @@ function normalizeStructureEntries(raw: unknown): StructureCatalogEntry[] {
           }
         : null,
       has3d: row.has3d === true,
+      hasPreview: row.hasPreview !== false,
       removable: row.removable !== false,
       editable: row.editable === true,
     })
@@ -1782,7 +1783,9 @@ export default function WorldsSection({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            title='Open the structure preview card and inspect available preview modes.'
+            title={entry.hasPreview === false
+              ? 'Open the structure details card. This entry does not currently expose a sampled preview render.'
+              : 'Open the structure preview card and inspect available preview modes.'}
             onClick={() => {
               setStructureModalMode('inspect')
               setPlacementToRemove(null)
@@ -1791,7 +1794,7 @@ export default function WorldsSection({
             className="rounded-xl border px-3 py-2 text-[11px] font-mono"
             style={{ borderColor: 'var(--accent-mid)', background: 'var(--accent-dim)', color: 'var(--accent)' }}
           >
-            Preview Structure
+            {entry.hasPreview === false ? 'View Structure Details' : 'Preview Structure'}
           </button>
           <button
             type="button"

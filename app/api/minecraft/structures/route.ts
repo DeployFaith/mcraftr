@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { checkFeatureAccess, getSessionUserId, getUserFeatureFlags } from '@/lib/rcon'
-import { buildStructureArtUrl, inferStructure3DAvailability } from '@/lib/catalog-art/structure-list'
+import { buildStructureArtUrl, inferStructure3DAvailability, inferStructurePreviewAvailability } from '@/lib/catalog-art/structure-list'
 import { requireServerCapability } from '@/lib/server-capability'
 import { callSidecarForRequest } from '@/lib/server-bridge'
 import { getActiveServer } from '@/lib/users'
@@ -54,6 +54,7 @@ type StructureEntry = {
   summary?: string | null
   dimensions?: { width: number | null; height: number | null; length: number | null } | null
   has3d?: boolean
+  hasPreview?: boolean
   removable?: boolean
   editable?: boolean
 }
@@ -82,6 +83,7 @@ export async function GET(req: NextRequest) {
       const resolvedArtUrl = buildStructureArtUrl(structure, minecraftVersion)
       return {
         ...structure,
+        hasPreview: inferStructurePreviewAvailability(structure),
         has3d: inferStructure3DAvailability(structure),
         iconId: structure.iconId || structure.resourceKey || structure.bridgeRef || structure.id || structure.label,
         artUrl: resolvedArtUrl,

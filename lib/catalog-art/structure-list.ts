@@ -20,17 +20,26 @@ export type StructureListEntry = {
   has3d?: boolean
 }
 
-export function inferStructure3DAvailability(structure: StructureListEntry) {
-  if (structure.has3d === true) return true
-  if (structure.placementKind === 'native-worldgen') return false
+function isShipwreckStructure(structure: StructureListEntry) {
   const resourceKey = structure.resourceKey?.trim().toLowerCase() ?? ''
   const category = structure.category?.trim().toLowerCase() ?? ''
-  if (resourceKey.startsWith('shipwreck/') || category === 'shipwreck') return false
+  return resourceKey.startsWith('shipwreck/') || category === 'shipwreck'
+}
+
+export function inferStructurePreviewAvailability(structure: StructureListEntry) {
+  if (structure.placementKind === 'native-worldgen') return false
+  if (isShipwreckStructure(structure)) return false
   if (structure.placementKind === 'schematic' || structure.placementKind === 'native-template') return true
   const width = structure.dimensions?.width ?? null
   const height = structure.dimensions?.height ?? null
   const length = structure.dimensions?.length ?? null
   return Boolean(width && height && length)
+}
+
+export function inferStructure3DAvailability(structure: StructureListEntry) {
+  if (structure.has3d === true) return true
+  if (!inferStructurePreviewAvailability(structure)) return false
+  return true
 }
 
 export function buildStructureArtUrl(structure: StructureListEntry, minecraftVersion?: string | null, artView?: StructureArtView | null) {

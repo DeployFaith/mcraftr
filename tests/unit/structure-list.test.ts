@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildStructureArtUrl, inferStructure3DAvailability } from '../../lib/catalog-art/structure-list'
+import { buildStructureArtUrl, inferStructure3DAvailability, inferStructurePreviewAvailability } from '../../lib/catalog-art/structure-list'
 
 test('buildStructureArtUrl uses the active Minecraft version for structure art requests', () => {
   const url = buildStructureArtUrl({
@@ -64,4 +64,32 @@ test('inferStructure3DAvailability excludes shipwreck templates from the 3d hint
     label: 'Rightsideup Full',
     category: 'Shipwreck',
   }), false)
+})
+
+test('inferStructurePreviewAvailability excludes native-worldgen umbrella entries from preview CTA language', () => {
+  assert.equal(inferStructurePreviewAvailability({
+    placementKind: 'native-worldgen',
+    resourceKey: 'ancient_city',
+    relativePath: null,
+    format: 'native',
+    iconId: null,
+    bridgeRef: 'ancient_city',
+    id: 'native-worldgen:ancient_city',
+    label: 'Ancient City',
+    category: 'Ancient City',
+  }), false)
+})
+
+test('inferStructurePreviewAvailability keeps sampled templates on the preview path', () => {
+  assert.equal(inferStructurePreviewAvailability({
+    placementKind: 'native-template',
+    resourceKey: 'ancient_city/city_center/walls/bottom_left_corner',
+    relativePath: null,
+    format: 'native',
+    iconId: null,
+    bridgeRef: 'ancient_city/city_center/walls/bottom_left_corner',
+    id: 'native-template:ancient_city/city_center/walls/bottom_left_corner',
+    label: 'Bottom Left Corner',
+    category: 'Ancient City',
+  }), true)
 })
