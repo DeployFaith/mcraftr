@@ -52,6 +52,20 @@ test('inferStructure3DAvailability keeps ancient city native templates 3d-ready'
   }), true)
 })
 
+test('inferStructure3DAvailability keeps native-worldgen umbrella entries eligible for representative 3d previews', () => {
+  assert.equal(inferStructure3DAvailability({
+    placementKind: 'native-worldgen',
+    resourceKey: 'igloo',
+    relativePath: null,
+    format: 'native',
+    iconId: null,
+    bridgeRef: 'igloo',
+    id: 'native-worldgen:igloo',
+    label: 'Igloo',
+    category: 'Igloo',
+  }), true)
+})
+
 test('inferStructure3DAvailability excludes shipwreck templates from the 3d hint', () => {
   assert.equal(inferStructure3DAvailability({
     placementKind: 'native-template',
@@ -66,7 +80,7 @@ test('inferStructure3DAvailability excludes shipwreck templates from the 3d hint
   }), false)
 })
 
-test('inferStructurePreviewAvailability excludes native-worldgen umbrella entries from preview CTA language', () => {
+test('inferStructurePreviewAvailability keeps native-worldgen umbrella entries on the preview path when representative previews are available', () => {
   assert.equal(inferStructurePreviewAvailability({
     placementKind: 'native-worldgen',
     resourceKey: 'ancient_city',
@@ -77,7 +91,7 @@ test('inferStructurePreviewAvailability excludes native-worldgen umbrella entrie
     id: 'native-worldgen:ancient_city',
     label: 'Ancient City',
     category: 'Ancient City',
-  }), false)
+  }), true)
 })
 
 test('inferStructurePreviewAvailability keeps sampled templates on the preview path', () => {

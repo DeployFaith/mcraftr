@@ -27,9 +27,8 @@ function isShipwreckStructure(structure: StructureListEntry) {
 }
 
 export function inferStructurePreviewAvailability(structure: StructureListEntry) {
-  if (structure.placementKind === 'native-worldgen') return false
   if (isShipwreckStructure(structure)) return false
-  if (structure.placementKind === 'schematic' || structure.placementKind === 'native-template') return true
+  if (structure.placementKind === 'schematic' || structure.placementKind === 'native-template' || structure.placementKind === 'native-worldgen') return true
   const width = structure.dimensions?.width ?? null
   const height = structure.dimensions?.height ?? null
   const length = structure.dimensions?.length ?? null

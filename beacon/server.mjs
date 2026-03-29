@@ -83,6 +83,7 @@ let nativeStructureCache = {
   jarPath: '',
   templates: [],
   worldgen: [],
+  representativeTemplates: {},
 }
 
 function sendJson(res, status, payload) {
@@ -899,7 +900,7 @@ function buildNativeStructureCatalog() {
   try {
     const bundled = ensureBundledServerJar()
     if (!bundled) {
-      return { templates: [], worldgen: [], jarPath: '', diagnostics: diagnoseNativeStructureCatalog() }
+      return { templates: [], worldgen: [], jarPath: '', representativeTemplates: {}, diagnostics: diagnoseNativeStructureCatalog() }
     }
     if (nativeStructureCache.key === bundled.key && nativeStructureCache.jarPath === bundled.jarPath) {
       return { ...nativeStructureCache, diagnostics: diagnoseNativeStructureCatalog() }
@@ -966,6 +967,7 @@ function buildNativeStructureCatalog() {
       jarPath: bundled.jarPath,
       templates,
       worldgen,
+      representativeTemplates: {},
     }
     return { ...nativeStructureCache, diagnostics: diagnoseNativeStructureCatalog() }
   } catch (error) {
@@ -973,6 +975,7 @@ function buildNativeStructureCatalog() {
       templates: [],
       worldgen: [],
       jarPath: '',
+      representativeTemplates: {},
       diagnostics: {
         cacheDir: path.join(WORLDS_DIR, 'cache'),
         cacheDirExists: isDirectory(path.join(WORLDS_DIR, 'cache')),
@@ -1128,6 +1131,84 @@ function worldgenPreviewBlocks(resourceKey) {
   if (lower.includes('mineshaft')) return ['oak_planks', 'oak_log', 'rail']
   if (lower.includes('end_city')) return ['purpur_block', 'end_stone_bricks', 'end_rod']
   return ['stone_bricks', 'oak_planks', 'lantern']
+}
+
+function worldgenRepresentativePrefixes(resourceKey) {
+  const lower = resourceKey.toLowerCase()
+  const prefixes = [resourceKey]
+  if (lower.includes('bastion')) prefixes.push('bastion')
+  if (lower.includes('mansion')) prefixes.push('woodland_mansion')
+  if (lower.includes('monument')) prefixes.push('ocean_monument')
+  if (lower.includes('outpost')) prefixes.push('pillager_outpost')
+  if (lower.includes('igloo')) prefixes.push('igloo')
+  if (lower.includes('village')) prefixes.push('village')
+  return Array.from(new Set(prefixes.filter(Boolean)))
+}
+
+function worldgenRepresentativeKeywordScore(templateKey) {
+  const lower = templateKey.toLowerCase()
+  let score = 0
+  if (lower.includes('/city_center/') || lower.includes('/town_centers/')) score += 90
+  if (lower.endsWith('/meeting_point') || lower.includes('/meeting_point_')) score += 80
+  if (lower.endsWith('/portal_room') || lower.includes('/portal_room/')) score += 80
+  if (lower.endsWith('/main') || lower.includes('/main/')) score += 60
+  if (lower.endsWith('/center') || lower.includes('/center/')) score += 50
+  if (lower.endsWith('/full') || lower.includes('/full_')) score += 45
+  if (lower.includes('/houses/')) score += 25
+  if (lower.includes('/streets/') || lower.includes('/terminators/') || lower.includes('/decor/')) score -= 35
+  return score
+}
+
+function resolveWorldgenRepresentativeTemplate(resourceKey) {
+  const native = buildNativeStructureCatalog()
+  const cached = native.representativeTemplates?.[resourceKey]
+  if (cached !== undefined) return cached || null
+
+  const prefixes = worldgenRepresentativePrefixes(resourceKey)
+  const candidates = native.templates
+    .map(entry => entry.resourceKey)
+    .filter(templateKey => typeof templateKey === 'string' && prefixes.some(prefix => templateKey === prefix || templateKey.startsWith(`${prefix}/`)))
+
+  if (candidates.length === 0) {
+    native.representativeTemplates[resourceKey] = null
+    return null
+  }
+
+  let bestKey = null
+  let bestScore = Number.NEGATIVE_INFINITY
+  for (const templateKey of candidates) {
+    const dimensions = readStructureTemplateSize(templateKey)
+    const volume = dimensions ? (Number(dimensions.width) || 1) * (Number(dimensions.height) || 1) * (Number(dimensions.length) || 1) : 1
+    const score = worldgenRepresentativeKeywordScore(templateKey) + Math.log2(Math.max(2, volume))
+    if (score > bestScore) {
+      bestScore = score
+      bestKey = templateKey
+    }
+  }
+
+  native.representativeTemplates[resourceKey] = bestKey || null
+  return bestKey || null
+}
+
+async function readNativeWorldgenStructurePreview(resourceKey) {
+  const representativeKey = resolveWorldgenRepresentativeTemplate(resourceKey)
+  if (representativeKey) {
+    const preview = await readNativeStructurePreview(representativeKey)
+    return {
+      ...preview,
+      representativeTemplate: representativeKey,
+      representative: true,
+    }
+  }
+  const blocks = worldgenPreviewBlocks(resourceKey)
+  return {
+    blocks,
+    dimensions: null,
+    cells: makePatternGrid(blocks, 8),
+    preview3d: null,
+    representativeTemplate: null,
+    representative: false,
+  }
 }
 
 function worldgenPreview(resourceKey) {
@@ -1740,10 +1821,7 @@ const server = http.createServer(async (req, res) => {
       if (placementKind === 'native-template' && resourceKey) {
         preview = await readNativeStructurePreview(resourceKey)
       } else if (placementKind === 'native-worldgen' && resourceKey) {
-        preview = {
-          blocks: worldgenPreviewBlocks(resourceKey),
-          dimensions: null,
-        }
+        preview = await readNativeWorldgenStructurePreview(resourceKey)
       } else if (relativePath) {
         preview = await readFileStructurePreview(req, relativePath, format)
       }
