@@ -1763,7 +1763,6 @@ export default function WorldsSection({
     const placementStatus = structurePlacementStatus(entry)
     const structurePreview = structurePreviewById[entry.id] ?? null
     const hasCard3DPreview = canExperimentalStructureArt && Boolean(getStructure3DPreview(structurePreview))
-    const showStructureArtwork = canExperimentalStructureArt && isCatalogArtworkEnabled('structure')
     const metaStats = [
       ['Category', entry.category],
       ['Format', entry.format ?? entry.placementKind ?? 'native'],
@@ -1796,40 +1795,42 @@ export default function WorldsSection({
         </div>
 
         <div className="rounded-[24px] border p-2" style={{ borderColor: palette.frame, background: 'rgba(0,0,0,0.18)' }}>
-          {showStructureArtwork && (
-            hasCard3DPreview
-              ? <Structure3DPreview preview={structurePreview} className={structureArtworkClass(entry)} />
-              : <CatalogArtwork
-                  kind="structure"
-                  enabled={canExperimentalStructureArt}
-                  label={entry.label}
-                  category={entry.category}
-                  sourceKind={entry.sourceKind}
-                  imageUrl={entry.imageUrl}
-                  art={entry.hasPreview === false || !entry.art ? entry.art : { ...entry.art, strategy: 'structure-material-board', class: 'structure-materials' }}
-                  structureArtView={entry.hasPreview === false ? 'preview' : 'materials'}
-                  className={structureArtworkClass(entry.hasPreview === false || !entry.art ? entry : { ...entry, art: { ...entry.art, class: 'structure-materials', strategy: 'structure-material-board' } })}
-                  overlayNote={entry.hasPreview === false ? 'Reference art only · sampled preview unavailable' : '3D unavailable · showing materials-first structure summary'}
-                />
-          )}
-          <div className={`${showStructureArtwork ? 'mt-3 ' : ''}grid gap-2 sm:grid-cols-2 xl:grid-cols-4`}>
-            {metaStats.map(([label, value]) => (
-              <div key={label} className="rounded-2xl border px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
-                <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">{label}</div>
-                <div className="mt-1 text-[12px] font-mono text-[var(--text)]">{value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {entry.summary && (
-          <div className="rounded-[22px] border px-4 py-3 text-[12px] font-mono" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>
-            {entry.summary}
-          </div>
+        {isCatalogArtworkEnabled('structure') && (
+          hasCard3DPreview
+            ? <Structure3DPreview preview={structurePreview} className={structureArtworkClass(entry)} />
+            : <CatalogArtwork
+                kind="structure"
+                label={entry.label}
+                category={entry.category}
+                sourceKind={entry.sourceKind}
+                imageUrl={entry.imageUrl}
+                art={entry.hasPreview === false || !entry.art ? entry.art : { ...entry.art, strategy: 'structure-material-board', class: 'structure-materials' }}
+                structureArtView={entry.hasPreview === false ? 'preview' : 'materials'}
+                className={structureArtworkClass(entry.hasPreview === false || !entry.art ? entry : { ...entry, art: { ...entry.art, class: 'structure-materials', strategy: 'structure-material-board' } })}
+                overlayNote={entry.hasPreview === false ? 'Reference art only · sampled preview unavailable' : '3D unavailable · showing materials-first structure summary'}
+              />
         )}
 
-        <div className="rounded-[22px] border px-4 py-3 text-[11px] font-mono" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>
-          <span className="text-[var(--text)]">Placement status:</span> {placementStatus.hint}
+          <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start">
+            <div className="min-w-0 space-y-2">
+              {entry.summary && (
+                <div className="text-[12px] font-mono leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+                  {entry.summary}
+                </div>
+              )}
+              <div className="text-[11px] font-mono" style={{ color: 'var(--text-dim)' }}>
+                <span className="text-[var(--text)]">Placement status:</span> {placementStatus.hint}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {metaStats.map(([label, value]) => (
+                <div key={label} className="px-1 py-1">
+                  <div className="text-[9px] font-mono tracking-[0.24em] uppercase text-[var(--text-dim)]">{label}</div>
+                  <div className="mt-1 text-[12px] font-mono text-[var(--text)]">{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
