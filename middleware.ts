@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { NextResponse } from 'next/server'
+import { isPlaywrightAuthBypassEnabled } from '@/lib/playwright-local'
 
 export default auth((req) => {
   const { nextUrl } = req
@@ -14,6 +15,10 @@ export default auth((req) => {
   // Allow public routes through unconditionally
   const publicPaths = ['/login', '/register', '/api/auth', '/']
   if (publicPaths.some(p => nextUrl.pathname.startsWith(p))) {
+    return NextResponse.next()
+  }
+
+  if (isPlaywrightAuthBypassEnabled()) {
     return NextResponse.next()
   }
 

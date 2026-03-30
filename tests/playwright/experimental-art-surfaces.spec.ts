@@ -27,6 +27,13 @@ test.describe('experimental art surfaces', () => {
 async function assertActionsSurface(page: Page, experimentalArtEnabled: boolean) {
   await page.goto('/minecraft?tab=actions', { waitUntil: 'domcontentloaded' })
   await settle(page)
+
+  const alexButton = page.getByRole('button', { name: /^Alex$/ }).first()
+  if (await alexButton.isVisible().catch(() => false)) {
+    await alexButton.click()
+    await settle(page)
+  }
+
   await expandCollapsibleCard(page, 'ITEM CATALOG')
 
   await page.getByText('Diamond Sword', { exact: true }).first().click()

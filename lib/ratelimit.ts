@@ -19,6 +19,7 @@ async function getRedisClient() {
   const { default: Redis } = await import('ioredis')
   const url = process.env.REDIS_URL || 'redis://localhost:6379'
   _redisClient = new Redis(url, { enableOfflineQueue: false, lazyConnect: true })
+  _redisClient.on('error', () => {})
   try {
     await _redisClient.connect()
   } catch {

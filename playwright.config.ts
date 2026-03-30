@@ -103,6 +103,8 @@ function buildSharedEnv({
           DATA_DIR: process.env.DATA_DIR ?? PLAYWRIGHT_DATA_DIR,
           ALLOW_REGISTRATION: process.env.ALLOW_REGISTRATION ?? 'true',
           MCRAFTR_ALLOW_PRIVATE_RCON_HOSTS: process.env.MCRAFTR_ALLOW_PRIVATE_RCON_HOSTS ?? 'true',
+          MCRAFTR_DISABLE_RATE_LIMITING: process.env.MCRAFTR_DISABLE_RATE_LIMITING ?? 'true',
+          MCRAFTR_PLAYWRIGHT_BYPASS_AUTH: process.env.MCRAFTR_PLAYWRIGHT_BYPASS_AUTH ?? 'true',
           REDIS_URL: process.env.REDIS_URL ?? 'redis://127.0.0.1:63999',
         }
       : {}),

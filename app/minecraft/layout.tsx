@@ -5,11 +5,13 @@ import BrandLockup from '@/app/components/BrandLockup'
 import { getUserById } from '@/lib/users'
 import HeaderControls from './components/HeaderControls'
 import MobileNavHeaderButton from './components/MobileNavHeaderButton'
+import { isPlaywrightAuthBypassEnabled } from '@/lib/playwright-local'
 
 export default async function MinecraftLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth()
-  if (!session?.user) redirect('/login')
-  if (!session.user.id || !getUserById(session.user.id)) redirect('/login')
+  const authBypassEnabled = isPlaywrightAuthBypassEnabled()
+  const session = authBypassEnabled ? null : await auth()
+  if (!authBypassEnabled && !session?.user) redirect('/login')
+  if (!authBypassEnabled && (!session?.user?.id || !getUserById(session.user.id))) redirect('/login')
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)' }}>

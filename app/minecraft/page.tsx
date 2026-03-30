@@ -2,6 +2,7 @@ import { nodeAuth } from '@/auth.node'
 import { redirect } from 'next/navigation'
 import MinecraftClientPage, { type TabId } from './MinecraftClientPage'
 import { getActiveServer, getUserById } from '@/lib/users'
+import { isPlaywrightAuthBypassEnabled } from '@/lib/playwright-local'
 
 const VALID_TABS: TabId[] = ['dashboard', 'players', 'actions', 'worlds', 'terminal', 'admin', 'chat', 'settings']
 
@@ -18,16 +19,17 @@ export default async function MinecraftPage({
 }: {
   searchParams: Promise<{ tab?: string | string[] }>
 }) {
-  const session = await nodeAuth()
-  if (!session?.user?.id || !getUserById(session.user.id)) {
+  const authBypassEnabled = isPlaywrightAuthBypassEnabled()
+  const session = authBypassEnabled ? null : await nodeAuth()
+  if (!authBypassEnabled && (!session?.user?.id || !getUserById(session.user.id))) {
     redirect('/login')
   }
-  const canAccessAdminPanels = session?.role === 'admin'
-  const stackMode = session?.user?.id ? (getActiveServer(session.user.id)?.stackMode ?? 'quick') : 'quick'
+  const canAccessAdminPanels = authBypassEnabled ? true : session?.role === 'admin'
+  const stackMode = authBypassEnabled ? 'full' : (session?.user?.id ? (getActiveServer(session.user.id)?.stackMode ?? 'quick') : 'quick')
 
   const params = await searchParams
   const tabParam = Array.isArray(params.tab) ? params.tab[0] : params.tab
   const initialTab = normalizeTab(tabParam, canAccessAdminPanels)
 
-  return <MinecraftClientPage initialTab={initialTab} initialRole={session?.role} initialStackMode={stackMode} />
+  return <MinecraftClientPage initialTab={initialTab} initialRole={authBypassEnabled ? 'admin' : session?.role} initialStackMode={stackMode} />
 }

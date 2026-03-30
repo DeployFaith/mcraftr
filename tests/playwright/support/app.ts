@@ -10,6 +10,12 @@ export async function settle(page: Page, timeout = 400) {
 }
 
 export async function login(page: Page, email = adminEmail, password = adminPassword) {
+  if (process.env.PLAYWRIGHT_LOCAL === 'true' && process.env.MCRAFTR_PLAYWRIGHT_BYPASS_AUTH === 'true') {
+    await page.goto('/minecraft?tab=dashboard', { waitUntil: 'domcontentloaded' })
+    await settle(page)
+    return
+  }
+
   if (process.env.PLAYWRIGHT_LOCAL === 'true' && email === adminEmail && password === adminPassword) {
     await ensureAdminAccount(page)
   }
@@ -33,6 +39,7 @@ export async function ensureAdminAccount(page: Page) {
 }
 
 export async function ensureConnectedServer(page: Page, options?: { mode?: ServerMode; label?: string }) {
+  if (process.env.PLAYWRIGHT_LOCAL === 'true' && process.env.MCRAFTR_PLAYWRIGHT_BYPASS_AUTH === 'true') return
   if (!page.url().includes('/connect')) return
 
   await createServerOnConnect(page, {
@@ -79,8 +86,12 @@ export async function openTab(page: Page, label: string) {
 
 export async function expandCollapsibleCard(page: Page, title: string) {
   const button = page.getByRole('button', { name: new RegExp(title, 'i') }).first()
-  if ((await button.getAttribute('aria-expanded')) === 'false') {
-    await button.click()
+  await expect(button).toBeVisible()
+  await button.scrollIntoViewIfNeeded().catch(() => {})
+  const expanded = await button.getAttribute('aria-expanded').catch(() => null)
+  if (expanded !== 'true') {
+    await button.click({ force: true })
+    await settle(page)
   }
 }
 
