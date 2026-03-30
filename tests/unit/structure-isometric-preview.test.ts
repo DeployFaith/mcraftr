@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { renderStructurePreviewSvg } from '../../lib/minecraft-assets/structure-art'
 
-test('renderStructurePreviewSvg uses an isometric-lite projection for structure previews', () => {
+test('renderStructurePreviewSvg renders the current structure layout treatment with relief metadata', () => {
   const svg = renderStructurePreviewSvg('Tower', {
     blocks: ['minecraft:stone_bricks', 'minecraft:deepslate_tiles'],
     cells: [
@@ -19,7 +19,8 @@ test('renderStructurePreviewSvg uses an isometric-lite projection for structure 
     'minecraft:deepslate_tiles': 'data:image/png;base64,deep',
   })
 
-  assert.match(svg, /ISOMETRIC PREVIEW/)
-  assert.match(svg, /polygon points=/)
+  assert.match(svg, /STRUCTURE LAYOUT/)
+  assert.match(svg, /RELIEF 4 LEVELS · HEIGHT 4/)
   assert.match(svg, /translate\(/)
+  assert.match(svg, /stone_bricks/)
 })

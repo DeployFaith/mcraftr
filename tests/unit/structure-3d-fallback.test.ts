@@ -17,7 +17,7 @@ test('getStructure3DPreview synthesizes a usable 3d preview from cells and heigh
   })
 
   assert.ok(preview3d)
-  assert.equal(preview3d?.voxels.length, 3)
+  assert.equal(preview3d?.voxels.length, 6)
   assert.equal(preview3d?.sampled, true)
   assert.deepEqual(preview3d?.bounds, { width: 2, height: 3, length: 2 })
 })

@@ -25,8 +25,10 @@ test('getStructure3DPreview returns the 3d payload when present', () => {
 test('groupVoxelsByBlockId groups voxel positions by block id', () => {
   const grouped = groupVoxelsByBlockId(preview.preview3d!)
   assert.equal(grouped.length, 2)
-  assert.equal(grouped[0].blockId, 'minecraft:glass')
-  assert.equal(grouped[1].positions.length, 2)
+
+  const byBlockId = Object.fromEntries(grouped.map(group => [group.blockId, group.positions]))
+  assert.deepEqual(byBlockId['minecraft:stone_bricks'], [[0, 0, 0], [1, 0, 0]])
+  assert.deepEqual(byBlockId['minecraft:glass'], [[1, 1, 1]])
 })
 
 test('3d preview helpers compute camera target, distance, and meta summary', () => {
