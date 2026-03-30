@@ -36,7 +36,11 @@ async function assertActionsSurface(page: Page, experimentalArtEnabled: boolean)
 
   await expandCollapsibleCard(page, 'ITEM CATALOG')
 
-  await page.getByText('Diamond Sword', { exact: true }).first().click()
+  const itemSearch = page.getByPlaceholder('Search').last()
+  await itemSearch.fill('diamond sword')
+  await settle(page)
+
+  await page.getByRole('button', { name: /diamond sword/i }).first().click()
   await settle(page)
 
   const artwork = page.getByAltText('Diamond Sword preview')
