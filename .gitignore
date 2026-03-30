@@ -19,6 +19,7 @@ data/
 *.sqlite
 test-results/
 playwright-report/
+.playwright/
 
 # OS
 .DS_Store

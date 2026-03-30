@@ -13,6 +13,7 @@
     "dokploy:deploy": "node scripts/dokploy-deploy.mjs",
     "catalog:art:audit": "npx -y tsx scripts/audit-catalog-art.ts",
     "catalog:art:entity-plan": "npx -y tsx scripts/audit-entity-art.ts",
+    "pw:bootstrap-libs": "bash scripts/bootstrap-playwright-libs.sh",
     "pw:install": "playwright install chromium",
     "pw:entity-audit": "playwright test tests/playwright/entity-art.spec.ts --project=desktop-chromium",
     "pw:screenshots": "playwright test tests/playwright/repo-screenshots.spec.ts --project=desktop-chromium",
@@ -20,6 +21,7 @@
     "pw:screenshots:highlights": "node scripts/capture-repo-highlights.mjs",
     "pw:screenshots:long-sections": "node scripts/capture-long-pages-sections.mjs",
     "pw:audit": "playwright test",
+    "pw:audit:local": "npm run build && (PORT=3054 HOSTNAME=127.0.0.1 node .next/standalone/server.js & SERVER_PID=$!; trap 'kill $SERVER_PID' EXIT; PLAYWRIGHT_LOCAL=true PLAYWRIGHT_DISABLE_WEBSERVER=true playwright test ${PLAYWRIGHT_ARGS:-})",
     "pw:audit:headed": "playwright test --headed"
   },
   "dependencies": {
