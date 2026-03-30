@@ -444,6 +444,7 @@ function PlayerPanel({
   })
   const [features, setFeatures]         = useState<FeatureFlags | null>(null)
   const [featuresLoaded, setFeaturesLoaded] = useState(false)
+  const canExperimentalItemArt = features?.enable_experimental_item_art ?? false
   const { toasts, addToast } = useToast()
   const [boosters, setBoosters] = useState<PlayerXpBooster[]>([])
   const [controlBusy, setControlBusy] = useState<string | null>(null)
@@ -1282,6 +1283,7 @@ function PlayerPanel({
                     <div className="mt-3 rounded-[20px] border border-white/10 bg-black/15 p-2">
                       <CatalogArtwork
                         kind="item"
+                        enabled={canExperimentalItemArt}
                         label={selectedSlot.label}
                         category={selectedInventoryItemMeta?.categoryLabel ?? 'Inventory'}
                         imageUrl={selectedInventoryItemMeta?.imageUrl}

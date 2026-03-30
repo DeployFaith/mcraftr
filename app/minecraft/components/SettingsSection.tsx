@@ -23,6 +23,7 @@ const FEATURE_CATEGORY_GROUP_STATE: Record<FeatureCategory, boolean> = {
   chat: true,
   terminal: true,
   admin: true,
+  experimental: true,
 }
 
 async function fileToAvatarDataUrl(file: File): Promise<string> {
@@ -242,6 +243,7 @@ export default function SettingsSection() {
     chat: false,
     terminal: false,
     admin: false,
+    experimental: false,
   })
   const [collapseAllActive, setCollapseAllActive] = useState(false)
 
@@ -254,6 +256,7 @@ export default function SettingsSection() {
       chat: [],
       terminal: [],
       admin: [],
+      experimental: [],
     }
     for (const def of FEATURE_DEFS) {
       grouped[def.category].push(def)
@@ -299,6 +302,7 @@ export default function SettingsSection() {
           chat: false,
           terminal: false,
           admin: false,
+          experimental: false,
         })
     setCollapseAllActive(!collapseAllActive)
   }
@@ -1169,13 +1173,13 @@ export default function SettingsSection() {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <button
-              onClick={() => setExpandedCategories({ tabs: true, actions: true, worlds: true, players: true, chat: true, terminal: true, admin: true })}
+              onClick={() => setExpandedCategories({ tabs: true, actions: true, worlds: true, players: true, chat: true, terminal: true, admin: true, experimental: true })}
               className="text-[11px] font-mono text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border)] rounded px-2 py-1"
             >
               Expand all
             </button>
             <button
-              onClick={() => setExpandedCategories({ tabs: false, actions: false, worlds: false, players: false, chat: false, terminal: false, admin: false })}
+              onClick={() => setExpandedCategories({ tabs: false, actions: false, worlds: false, players: false, chat: false, terminal: false, admin: false, experimental: false })}
               className="text-[11px] font-mono text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border)] rounded px-2 py-1"
             >
               Collapse all

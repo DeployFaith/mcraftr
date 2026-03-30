@@ -64,6 +64,8 @@ type Props = {
   mode: 'place-structure' | 'inspect-structure' | 'remove-structure' | 'spawn-entity'
   structure?: StructureCatalogEntry | null
   entity?: EntityCatalogEntry | null
+  enableStructureArt?: boolean
+  enableEntityArt?: boolean
   locationMode: LocationMode
   onLocationModeChange: (mode: LocationMode) => void
   worlds: string[]
@@ -170,6 +172,8 @@ export default function SpawnInspectModal({
   mode,
   structure,
   entity,
+  enableStructureArt = true,
+  enableEntityArt = true,
   locationMode,
   onLocationModeChange,
   worlds,
@@ -258,7 +262,8 @@ export default function SpawnInspectModal({
 
   const structureSupportsPreview = structure?.hasPreview !== false
   const resolvedStructure3DPreview = useMemo(() => getStructure3DPreview(structurePreview), [structurePreview])
-  const hasStructure3DPreview = Boolean(resolvedStructure3DPreview) && !structure3dFailed
+  const artEnabled = structure ? enableStructureArt : enableEntityArt
+  const hasStructure3DPreview = Boolean(resolvedStructure3DPreview) && !structure3dFailed && enableStructureArt
   const effectiveStructureRenderMode = hasStructure3DPreview && structureRenderMode === 'preview' ? '3d' : structureRenderMode
 
   if (!target) return null
@@ -299,11 +304,11 @@ export default function SpawnInspectModal({
         </div>
 
         <div className="min-h-0 overflow-y-auto touch-pan-y [-webkit-overflow-scrolling:touch]">
-          <div className={`grid gap-0 ${isCatalogArtworkEnabled(structure ? 'structure' : 'entity') ? 'md:grid-cols-[1.05fr_0.95fr]' : ''}`}>
-          <div className={`p-5 ${isCatalogArtworkEnabled(structure ? 'structure' : 'entity') ? 'border-b md:border-b-0 md:border-r' : ''}`} style={{ borderColor: 'var(--border)' }}>
+          <div className={`grid gap-0 ${isCatalogArtworkEnabled(structure ? 'structure' : 'entity') && artEnabled ? 'md:grid-cols-[1.05fr_0.95fr]' : ''}`}>
+          <div className={`p-5 ${isCatalogArtworkEnabled(structure ? 'structure' : 'entity') && artEnabled ? 'border-b md:border-b-0 md:border-r' : ''}`} style={{ borderColor: 'var(--border)' }}>
             {isCatalogArtworkEnabled(structure ? 'structure' : 'entity') && (
               <>
-                {structure && structureSupportsPreview && (
+                {structure && structureSupportsPreview && artEnabled && (
                   <div className="mb-3 flex flex-wrap gap-2">
                     {([
                       ['preview', hasStructure3DPreview ? '3D' : 'Preview'],
@@ -326,7 +331,7 @@ export default function SpawnInspectModal({
                     })}
                   </div>
                 )}
-                {structure && effectiveStructureRenderMode === '3d'
+                {structure && artEnabled && effectiveStructureRenderMode === '3d'
                   ? <Structure3DPreview
                       preview={structurePreview}
                       className="h-[260px] w-full rounded-[22px]"
@@ -346,6 +351,7 @@ export default function SpawnInspectModal({
                       structureArtView={structureRenderMode === 'materials' ? 'materials' : 'preview'}
                       hideStructureViewToggle={Boolean(structure)}
                       overlayNote={structure && !structureSupportsPreview ? 'Reference art only · sampled preview unavailable' : null}
+                      enabled={artEnabled}
                       className={structure
                         ? 'h-[260px] w-full rounded-[22px] border bg-[var(--bg2)] object-contain p-3'
                         : 'mx-auto h-[260px] w-full max-w-[22rem] rounded-[22px] border bg-[var(--bg2)] object-contain p-3'}

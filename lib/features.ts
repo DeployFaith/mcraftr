@@ -6,6 +6,7 @@ export const FEATURE_CATEGORIES = [
   { id: 'chat', label: 'Chat', desc: 'Control chat visibility and messaging' },
   { id: 'terminal', label: 'Terminal', desc: 'Control command explorer, docs, history, and favorites' },
   { id: 'admin', label: 'Admin', desc: 'Control admin tools and sections' },
+  { id: 'experimental', label: 'Experimental', desc: 'Opt into unfinished visual systems that may change or regress' },
 ] as const
 
 export type FeatureCategory = typeof FEATURE_CATEGORIES[number]['id']
@@ -69,12 +70,22 @@ export const FEATURE_DEFS = [
   { key: 'enable_admin_audit', label: 'Audit Log', desc: 'View admin action audit history', category: 'admin' },
   { key: 'enable_admin_user_management', label: 'User Management', desc: 'Create users and change roles', category: 'admin' },
   { key: 'enable_admin_feature_policies', label: 'Feature Policies', desc: 'Manage feature restrictions for users', category: 'admin' },
+
+  { key: 'enable_experimental_structure_art', label: 'Structure Art', desc: 'Enable experimental structure preview art and 3D structure artwork surfaces', category: 'experimental' },
+  { key: 'enable_experimental_entity_art', label: 'Entity Art', desc: 'Enable experimental entity artwork surfaces in catalogs and spawn flows', category: 'experimental' },
+  { key: 'enable_experimental_item_art', label: 'Item Art', desc: 'Enable experimental item artwork surfaces in inventories and catalogs', category: 'experimental' },
 ] as const
 
 export type FeatureKey = typeof FEATURE_DEFS[number]['key']
 
 export const FEATURE_KEYS: FeatureKey[] = FEATURE_DEFS.map(f => f.key)
 
+const EXPERIMENTAL_FEATURE_KEYS = new Set<FeatureKey>([
+  'enable_experimental_structure_art',
+  'enable_experimental_entity_art',
+  'enable_experimental_item_art',
+])
+
 export const DEFAULT_FEATURES: Record<FeatureKey, boolean> = Object.fromEntries(
-  FEATURE_KEYS.map(k => [k, true])
+  FEATURE_KEYS.map(k => [k, !EXPERIMENTAL_FEATURE_KEYS.has(k)])
 ) as Record<FeatureKey, boolean>

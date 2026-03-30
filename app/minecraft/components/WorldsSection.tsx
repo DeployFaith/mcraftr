@@ -622,6 +622,8 @@ export default function WorldsSection({
   const canSpawnTools = features?.enable_world_spawn_tools ?? true
   const canStructureCatalog = features?.enable_structure_catalog ?? true
   const canEntityCatalog = features?.enable_entity_catalog ?? true
+  const canExperimentalStructureArt = features?.enable_experimental_structure_art ?? false
+  const canExperimentalEntityArt = features?.enable_experimental_entity_art ?? false
   const canWorldControls = features?.enable_world ?? true
   const canWorldManagement = canWorldControls && (features?.enable_world_management ?? true)
   const canStructurePlace = canStructureCatalog && (features?.enable_structure_place ?? true)
@@ -1093,6 +1095,7 @@ export default function WorldsSection({
   }, [entityCategoryPageCount])
 
   useEffect(() => {
+    if (!canExperimentalStructureArt) return
     const candidates = visibleStructureEntries.filter(entry => entry.hasPreview !== false && entry.has3d && !(entry.id in structurePreviewById))
     if (candidates.length === 0) return
     const controller = new AbortController()
@@ -1116,7 +1119,7 @@ export default function WorldsSection({
     }
     void loadPreviews()
     return () => controller.abort()
-  }, [structurePreviewById, visibleStructureEntries])
+  }, [canExperimentalStructureArt, structurePreviewById, visibleStructureEntries])
 
   const postJson = useCallback(async (url: string, body: Record<string, unknown>) => {
     const res = await fetch(url, {
@@ -1759,7 +1762,7 @@ export default function WorldsSection({
     const palette = structureCardPalette(entry)
     const placementStatus = structurePlacementStatus(entry)
     const structurePreview = structurePreviewById[entry.id] ?? null
-    const hasCard3DPreview = Boolean(getStructure3DPreview(structurePreview))
+    const hasCard3DPreview = canExperimentalStructureArt && Boolean(getStructure3DPreview(structurePreview))
     const metaStats = [
       ['Category', entry.category],
       ['Format', entry.format ?? entry.placementKind ?? 'native'],
@@ -1797,6 +1800,7 @@ export default function WorldsSection({
               ? <Structure3DPreview preview={structurePreview} className={structureArtworkClass(entry)} />
               : <CatalogArtwork
                   kind="structure"
+                  enabled={canExperimentalStructureArt}
                   label={entry.label}
                   category={entry.category}
                   sourceKind={entry.sourceKind}
@@ -1894,7 +1898,7 @@ export default function WorldsSection({
 
         <div className="rounded-[24px] border p-2" style={{ borderColor: palette.frame, background: 'rgba(0,0,0,0.18)' }}>
           {isCatalogArtworkEnabled('entity') && (
-            <CatalogArtwork kind="entity" label={entry.label} category={entry.category} sourceKind={entry.sourceKind} imageUrl={entry.imageUrl} art={entry.art} className={entityArtworkClass(entry)} />
+            <CatalogArtwork kind="entity" enabled={canExperimentalEntityArt} label={entry.label} category={entry.category} sourceKind={entry.sourceKind} imageUrl={entry.imageUrl} art={entry.art} className={entityArtworkClass(entry)} />
           )}
           <div className={`${isCatalogArtworkEnabled('entity') ? 'mt-3 ' : ''}grid gap-2 sm:grid-cols-2 xl:grid-cols-4`}>
             {metaStats.map(([label, value]) => (
@@ -2912,7 +2916,7 @@ export default function WorldsSection({
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5 min-w-0">
                       {entry.imageUrl && isCatalogArtworkEnabled('entity') && (
-                        <CatalogArtwork kind="entity" label={displayLiveEntityLabel(entry)} category={entry.category} sourceKind="live" imageUrl={entry.imageUrl} art={null} className="h-8 w-8 shrink-0 rounded-xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-1 shadow-[0_8px_18px_rgba(0,0,0,0.14)]" />
+                        <CatalogArtwork kind="entity" enabled={canExperimentalEntityArt} label={displayLiveEntityLabel(entry)} category={entry.category} sourceKind="live" imageUrl={entry.imageUrl} art={null} className="h-8 w-8 shrink-0 rounded-xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-1 shadow-[0_8px_18px_rgba(0,0,0,0.14)]" />
                       )}
                       <div className="min-w-0">
                         <div className="truncate text-[13px] font-mono text-[var(--text)]">{displayLiveEntityLabel(entry)}</div>
@@ -2971,6 +2975,8 @@ export default function WorldsSection({
         <SpawnInspectModal
           mode="inspect-structure"
           structure={selectedStructure}
+          enableStructureArt={canExperimentalStructureArt}
+          enableEntityArt={canExperimentalEntityArt}
           locationMode={structureMode}
           onLocationModeChange={setStructureMode}
           worlds={worldNames}
@@ -3007,6 +3013,8 @@ export default function WorldsSection({
         <SpawnInspectModal
           mode="place-structure"
           structure={selectedStructure}
+          enableStructureArt={canExperimentalStructureArt}
+          enableEntityArt={canExperimentalEntityArt}
           locationMode={structureMode}
           onLocationModeChange={setStructureMode}
           worlds={worldNames}
@@ -3043,6 +3051,8 @@ export default function WorldsSection({
         <SpawnInspectModal
           mode="remove-structure"
           structure={selectedStructure}
+          enableStructureArt={canExperimentalStructureArt}
+          enableEntityArt={canExperimentalEntityArt}
           locationMode="coords"
           onLocationModeChange={() => {}}
           worlds={worldNames}
@@ -3071,6 +3081,8 @@ export default function WorldsSection({
         <SpawnInspectModal
           mode="spawn-entity"
           entity={selectedEntity}
+          enableStructureArt={canExperimentalStructureArt}
+          enableEntityArt={canExperimentalEntityArt}
           locationMode={entityMode}
           onLocationModeChange={setEntityMode}
           worlds={worldNames}

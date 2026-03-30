@@ -201,6 +201,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
   const hydratedCatalog = useMemo(() => hydrateCatalogWithArt(minecraftVersion, CATALOG), [minecraftVersion])
   const [itemArtById, setItemArtById] = useState<Record<string, { imageUrl: string | null; art: CatalogArtPayload | null }>>({})
   const [features, setFeatures] = useState<FeatureFlags | null>(null)
+  const canExperimentalItemArt = features?.enable_experimental_item_art ?? false
 
   useEffect(() => {
     setItemArtById({})
@@ -707,6 +708,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
   ])), [pageItems, catSelected])
 
   useEffect(() => {
+    if (!canExperimentalItemArt) return
     if (!minecraftVersion || visibleItemArtIds.length === 0) return
     const missingIds = visibleItemArtIds.filter(itemId => !(itemId in itemArtById))
     if (missingIds.length === 0) return
@@ -739,7 +741,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
 
     void loadItemArt()
     return () => controller.abort()
-  }, [minecraftVersion, visibleItemArtIds, itemArtById])
+  }, [canExperimentalItemArt, minecraftVersion, visibleItemArtIds, itemArtById])
 
   const catBatchEntries = useMemo(() => Object.entries(catBatchSelection)
     .map(([itemId, qty]) => {
@@ -1785,6 +1787,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                   <div className="rounded-[18px] border p-2" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
                     <CatalogArtwork
                       kind="item"
+                      enabled={canExperimentalItemArt}
                       label={item.label}
                       category={selectedCategoryLabel}
                       imageUrl={item.imageUrl}
@@ -1893,6 +1896,7 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                         <div className="rounded-[24px] border p-2" style={{ borderColor: itemCardPalette(catSelected, selectedCategoryLabel).frame, background: 'rgba(0,0,0,0.18)' }}>
                           <CatalogArtwork
                             kind="item"
+                            enabled={canExperimentalItemArt}
                             label={catSelected.label}
                             category={selectedCategoryLabel}
                             imageUrl={catSelected.imageUrl}

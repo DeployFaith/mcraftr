@@ -16,6 +16,7 @@ type Props = {
   onStructureArtViewChange?: (view: StructureArtView) => void
   hideStructureViewToggle?: boolean
   overlayNote?: string | null
+  enabled?: boolean
 }
 
 export const CATALOG_ARTWORK_ENABLED: Record<Props['kind'], boolean> = {
@@ -40,9 +41,12 @@ export default function CatalogArtwork({
   onStructureArtViewChange,
   hideStructureViewToggle = false,
   overlayNote = null,
+  enabled = true,
 }: Props) {
-  const placeholderMeta = [category, sourceKind].filter(Boolean).join(' · ') || `${kind} art unavailable`
-  return <ArtworkImage key={`${art?.url ?? imageUrl ?? 'missing'}:${label}`} src={art?.url ?? imageUrl ?? null} label={label} className={className} artClass={art?.class ?? kind} artStrategy={art?.strategy ?? 'missing-real-art'} placeholderMeta={placeholderMeta} kind={kind} structureArtView={structureArtView} onStructureArtViewChange={onStructureArtViewChange} hideStructureViewToggle={hideStructureViewToggle} overlayNote={overlayNote} />
+  const placeholderMeta = !enabled
+    ? `experimental ${kind} art disabled`
+    : ([category, sourceKind].filter(Boolean).join(' · ') || `${kind} art unavailable`)
+  return <ArtworkImage key={`${art?.url ?? imageUrl ?? 'missing'}:${label}:${enabled ? 'on' : 'off'}`} src={enabled ? (art?.url ?? imageUrl ?? null) : null} label={label} className={className} artClass={art?.class ?? kind} artStrategy={art?.strategy ?? 'missing-real-art'} placeholderMeta={placeholderMeta} kind={kind} structureArtView={structureArtView} onStructureArtViewChange={onStructureArtViewChange} hideStructureViewToggle={hideStructureViewToggle} overlayNote={overlayNote} />
 }
 
 function ArtworkImage({ src, label, className, artClass, artStrategy, placeholderMeta, kind, structureArtView: controlledStructureArtView, onStructureArtViewChange, hideStructureViewToggle, overlayNote }: { src: string | null; label: string; className: string; artClass: string; artStrategy: string; placeholderMeta: string; kind: Props['kind']; structureArtView?: StructureArtView; onStructureArtViewChange?: (view: StructureArtView) => void; hideStructureViewToggle: boolean; overlayNote?: string | null }) {
