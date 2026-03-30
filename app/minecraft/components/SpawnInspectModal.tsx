@@ -304,9 +304,9 @@ export default function SpawnInspectModal({
         </div>
 
         <div className="min-h-0 overflow-y-auto touch-pan-y [-webkit-overflow-scrolling:touch]">
-          <div className={`grid gap-0 ${isCatalogArtworkEnabled(structure ? 'structure' : 'entity') && artEnabled ? 'md:grid-cols-[1.05fr_0.95fr]' : ''}`}>
-          <div className={`p-5 ${isCatalogArtworkEnabled(structure ? 'structure' : 'entity') && artEnabled ? 'border-b md:border-b-0 md:border-r' : ''}`} style={{ borderColor: 'var(--border)' }}>
-            {isCatalogArtworkEnabled(structure ? 'structure' : 'entity') && (
+          <div className={`grid gap-0 ${artEnabled && isCatalogArtworkEnabled(structure ? 'structure' : 'entity') ? 'md:grid-cols-[1.05fr_0.95fr]' : ''}`}>
+          <div className={`p-5 ${artEnabled && isCatalogArtworkEnabled(structure ? 'structure' : 'entity') ? 'border-b md:border-b-0 md:border-r' : ''}`} style={{ borderColor: 'var(--border)' }}>
+            {isCatalogArtworkEnabled(structure ? 'structure' : 'entity') && artEnabled && (
               <>
                 {structure && structureSupportsPreview && artEnabled && (
                   <div className="mb-3 flex flex-wrap gap-2">

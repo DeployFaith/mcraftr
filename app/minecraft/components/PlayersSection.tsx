@@ -1280,36 +1280,39 @@ function PlayerPanel({
                       </span>
                     </div>
 
-                    <div className="mt-3 rounded-[20px] border border-white/10 bg-black/15 p-2">
-                      <CatalogArtwork
-                        kind="item"
-                        enabled={canExperimentalItemArt}
-                        label={selectedSlot.label}
-                        category={selectedInventoryItemMeta?.categoryLabel ?? 'Inventory'}
-                        imageUrl={selectedInventoryItemMeta?.imageUrl}
-                        art={selectedInventoryItemMeta?.art}
-                        className="h-40 w-full rounded-[16px] border border-white/10 object-contain"
-                      />
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        {[
-                          ['Id', selectedSlot.id],
-                          ['Slot', slotLabel(selectedSlot.slot)],
-                          ['Count', String(selectedSlot.count)],
-                          ['Per Stack', String(selectedInventoryItemMeta?.maxStack ?? 64)],
-                        ].map(([label, value]) => (
-                          <div key={label} className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
-                            <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">{label}</div>
-                            <div className="mt-1 break-all text-[12px] font-mono text-[var(--text)]">{value}</div>
-                          </div>
-                        ))}
+                    {canExperimentalItemArt && (
+                      <div className="mt-3 rounded-[20px] border border-white/10 bg-black/15 p-2">
+                        <CatalogArtwork
+                          kind="item"
+                          enabled={canExperimentalItemArt}
+                          label={selectedSlot.label}
+                          category={selectedInventoryItemMeta?.categoryLabel ?? 'Inventory'}
+                          imageUrl={selectedInventoryItemMeta?.imageUrl}
+                          art={selectedInventoryItemMeta?.art ?? null}
+                          className="h-52 w-full rounded-[16px] border border-white/10 object-contain"
+                        />
                       </div>
-                      {selectedSlot.enchants && (
-                        <div className="mt-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
-                          <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">Enchants</div>
-                          <div className="mt-1 text-[12px] font-mono text-[var(--accent)]">{selectedSlot.enchants}</div>
+                    )}
+
+                    <div className={`${canExperimentalItemArt ? 'mt-3 ' : 'mt-2 '}grid gap-2 sm:grid-cols-2`}>
+                      {[
+                        ['Id', selectedSlot.id],
+                        ['Slot', slotLabel(selectedSlot.slot)],
+                        ['Count', String(selectedSlot.count)],
+                        ['Per Stack', String(selectedInventoryItemMeta?.maxStack ?? 64)],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                          <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">{label}</div>
+                          <div className="mt-1 break-all text-[12px] font-mono text-[var(--text)]">{value}</div>
                         </div>
-                      )}
+                      ))}
                     </div>
+                    {selectedSlot.enchants && (
+                      <div className="mt-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                        <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">Enchants</div>
+                        <div className="mt-1 text-[12px] font-mono text-[var(--accent)]">{selectedSlot.enchants}</div>
+                      </div>
+                    )}
                   </div>
                 )}
 

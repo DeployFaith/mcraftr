@@ -1784,17 +1784,19 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                         borderColor: 'var(--border)',
                         background: 'color-mix(in srgb, var(--panel) 84%, transparent)',
                       }}>
-                  <div className="rounded-[18px] border p-2" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
-                    <CatalogArtwork
-                      kind="item"
-                      enabled={canExperimentalItemArt}
-                      label={item.label}
-                      category={selectedCategoryLabel}
-                      imageUrl={item.imageUrl}
-                      art={item.art}
-                      className="h-24 w-full rounded-[14px] object-contain"
-                    />
-                  </div>
+                  {canExperimentalItemArt && (
+                    <div className="rounded-[18px] border p-2" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
+                      <CatalogArtwork
+                        kind="item"
+                        enabled={canExperimentalItemArt}
+                        label={item.label}
+                        category={selectedCategoryLabel}
+                        imageUrl={item.imageUrl}
+                        art={item.art}
+                        className="h-24 w-full rounded-[14px] object-contain"
+                      />
+                    </div>
+                  )}
                   <div>
                     <div className="text-[12px] font-mono leading-tight line-clamp-2">{item.label}</div>
                     <div className="mt-1 text-[10px] font-mono tracking-[0.18em] opacity-70">{item.maxStack === 1 ? 'UNSTACKABLE' : `STACK ${item.maxStack}`}</div>
@@ -1894,16 +1896,18 @@ export default function ActionsSection({ players, selectedPlayer: selectedPlayer
                           </div>
                         </div>
                         <div className="rounded-[24px] border p-2" style={{ borderColor: itemCardPalette(catSelected, selectedCategoryLabel).frame, background: 'rgba(0,0,0,0.18)' }}>
-                          <CatalogArtwork
-                            kind="item"
-                            enabled={canExperimentalItemArt}
-                            label={catSelected.label}
-                            category={selectedCategoryLabel}
-                            imageUrl={catSelected.imageUrl}
-                            art={catSelected.art}
-                            className="h-52 w-full rounded-[18px] border border-white/10 object-contain"
-                          />
-                          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                          {canExperimentalItemArt && (
+                            <CatalogArtwork
+                              kind="item"
+                              enabled={canExperimentalItemArt}
+                              label={catSelected.label}
+                              category={selectedCategoryLabel}
+                              imageUrl={catSelected.imageUrl}
+                              art={catSelected.art}
+                              className="h-52 w-full rounded-[18px] border border-white/10 object-contain"
+                            />
+                          )}
+                          <div className={`${canExperimentalItemArt ? 'mt-3 ' : ''}grid gap-2 sm:grid-cols-2 xl:grid-cols-4`}>
                             {[
                               ['Id', `minecraft:${catSelected.id}`],
                               ['Category', selectedCategoryLabel],

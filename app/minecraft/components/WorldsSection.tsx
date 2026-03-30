@@ -1763,6 +1763,7 @@ export default function WorldsSection({
     const placementStatus = structurePlacementStatus(entry)
     const structurePreview = structurePreviewById[entry.id] ?? null
     const hasCard3DPreview = canExperimentalStructureArt && Boolean(getStructure3DPreview(structurePreview))
+    const showStructureArtwork = canExperimentalStructureArt && isCatalogArtworkEnabled('structure')
     const metaStats = [
       ['Category', entry.category],
       ['Format', entry.format ?? entry.placementKind ?? 'native'],
@@ -1795,7 +1796,7 @@ export default function WorldsSection({
         </div>
 
         <div className="rounded-[24px] border p-2" style={{ borderColor: palette.frame, background: 'rgba(0,0,0,0.18)' }}>
-          {isCatalogArtworkEnabled('structure') && (
+          {showStructureArtwork && (
             hasCard3DPreview
               ? <Structure3DPreview preview={structurePreview} className={structureArtworkClass(entry)} />
               : <CatalogArtwork
@@ -1811,7 +1812,7 @@ export default function WorldsSection({
                   overlayNote={entry.hasPreview === false ? 'Reference art only · sampled preview unavailable' : '3D unavailable · showing materials-first structure summary'}
                 />
           )}
-          <div className={`${isCatalogArtworkEnabled('structure') ? 'mt-3 ' : ''}grid gap-2 sm:grid-cols-2 xl:grid-cols-4`}>
+          <div className={`${showStructureArtwork ? 'mt-3 ' : ''}grid gap-2 sm:grid-cols-2 xl:grid-cols-4`}>
             {metaStats.map(([label, value]) => (
               <div key={label} className="rounded-2xl border px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
                 <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">{label}</div>
@@ -1869,6 +1870,7 @@ export default function WorldsSection({
 
   const renderEntityCatalogCard = (entry: EntityCatalogEntry) => {
     const palette = entityCardPalette(entry)
+    const showEntityArtwork = canExperimentalEntityArt && isCatalogArtworkEnabled('entity')
     const metaStats = [
       ['Category', entry.category],
       ['Source', entitySourceLabel(entry.sourceKind)],
@@ -1897,10 +1899,10 @@ export default function WorldsSection({
         </div>
 
         <div className="rounded-[24px] border p-2" style={{ borderColor: palette.frame, background: 'rgba(0,0,0,0.18)' }}>
-          {isCatalogArtworkEnabled('entity') && (
+          {showEntityArtwork && (
             <CatalogArtwork kind="entity" enabled={canExperimentalEntityArt} label={entry.label} category={entry.category} sourceKind={entry.sourceKind} imageUrl={entry.imageUrl} art={entry.art} className={entityArtworkClass(entry)} />
           )}
-          <div className={`${isCatalogArtworkEnabled('entity') ? 'mt-3 ' : ''}grid gap-2 sm:grid-cols-2 xl:grid-cols-4`}>
+          <div className={`${showEntityArtwork ? 'mt-3 ' : ''}grid gap-2 sm:grid-cols-2 xl:grid-cols-4`}>
             {metaStats.map(([label, value]) => (
               <div key={label} className="rounded-2xl border px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
                 <div className="text-[9px] font-mono tracking-[0.28em] text-[var(--text-dim)]">{label}</div>
