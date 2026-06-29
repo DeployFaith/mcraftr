@@ -4,6 +4,7 @@ import { requireServerCapability } from './server-capability'
 import { callSidecarForRequest } from './server-bridge'
 import { getIntegrationById, supportsMinecraftVersion, type IntegrationId } from './integrations'
 import { logAudit } from './audit'
+import { getAdminAccess } from './admin-access'
 
 export type IntegrationMutationAction = 'install' | 'remove' | 'repair'
 
@@ -23,6 +24,14 @@ type SidecarMutationResponse = {
 }
 
 export async function runIntegrationMutation(req: NextRequest, action: IntegrationMutationAction, integrationId: string) {
+  const access = await getAdminAccess(req)
+  if (!access) {
+    return { ok: false as const, response: Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 }) }
+  }
+  if (!access.isAdmin) {
+    return { ok: false as const, response: Response.json({ ok: false, error: 'Admin only' }, { status: 403 }) }
+  }
+
   const features = await getUserFeatureFlags(req)
   if (!checkFeatureAccess(features, 'enable_plugin_stack_status')) {
     return { ok: false as const, response: Response.json({ ok: false, error: 'Feature disabled by admin' }, { status: 403 }) }
