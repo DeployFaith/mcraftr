@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getUserFeatures, updateUserFeatures, getUserById, updateUserAvatar } from '@/lib/users'
+import { getUserFeatures, getUserById, updateUserAvatar } from '@/lib/users'
 import { getSessionUserId } from '@/lib/rcon'
 import { FEATURE_KEYS, type FeatureKey } from '@/lib/features'
 
@@ -33,11 +33,9 @@ export async function PUT(req: NextRequest) {
 
   const body = await req.json()
 
-  const updates: Partial<Record<FeatureKey, boolean>> = {}
-  for (const field of FEATURE_KEYS) {
-    if (body[field] !== undefined) {
-      updates[field] = !!body[field]
-    }
+  const attemptedFeatureUpdates = FEATURE_KEYS.filter((field: FeatureKey) => body[field] !== undefined)
+  if (attemptedFeatureUpdates.length > 0) {
+    return Response.json({ ok: false, error: 'Feature policies are admin-managed' }, { status: 403 })
   }
 
   let avatarUpdated = false
@@ -60,12 +58,9 @@ export async function PUT(req: NextRequest) {
     }
   }
 
-  if (Object.keys(updates).length === 0 && !avatarUpdated) {
+  if (!avatarUpdated) {
     return Response.json({ ok: false, error: 'No valid fields to update' }, { status: 400 })
   }
 
-  if (Object.keys(updates).length > 0) {
-    updateUserFeatures(userId, updates)
-  }
   return Response.json({ ok: true, features: getUserFeatures(userId), avatar: getUserById(userId)?.avatar ?? { type: 'none', value: null } })
 }
