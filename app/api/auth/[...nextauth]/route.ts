@@ -10,9 +10,11 @@ export const GET = handlers.GET
 export async function POST(req: NextRequest, ctx: { params: Promise<{ nextauth: string[] }> }) {
   const params = await ctx.params
   const action = params?.nextauth?.[0]
+  const provider = params?.nextauth?.[1]
 
-  // Rate-limit login attempts only (not signout, csrf, etc.)
-  if (action === 'signin') {
+  // Rate-limit credentials login attempts (signin page + credentials callback)
+  const isCredentialsLogin = action === 'signin' || (action === 'callback' && provider === 'credentials')
+  if (isCredentialsLogin) {
     const rl = await checkRateLimit(req, 'login')
     if (rl.limited) return rl.response
   }
